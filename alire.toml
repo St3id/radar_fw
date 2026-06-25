@@ -10,3 +10,6 @@ website = ""
 tags = ["embedded", "stm32", "radar", "spark", "real-time"]
 
 executables = ["radar_fw"]
+
+[[depends-on]]
+gnatprove = "^15.1.0"
