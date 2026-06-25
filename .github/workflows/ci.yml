@@ -25,7 +25,9 @@ jobs:
         run: alr build
 
       - name: Build tests
-        run: alr exec -- gprbuild -p -P radar_fw_tests.gpr
+        run: |
+          eval $(alr printenv)
+          gprbuild -p -P radar_fw_tests.gpr
 
       - name: Run tests
         run: ./bin/run_tests
