@@ -18,12 +18,22 @@ is
    --  Le balayage complet : une amplitude par case.
    type Sweep is array (Bin_Index) of Amplitude;
 
+   --  Seuil de detection : en dessous, l'echo est considere comme du bruit
+   --  et on estime qu'il n'y a pas de cible.
+   Detection_Threshold : constant Amplitude := 100;
+
    --  Case contenant l'amplitude la plus forte (le pic = la cible detectee).
    function Peak_Bin (S : Sweep) return Bin_Index
      with Post => (for all I in Bin_Index => S (I) <= S (Peak_Bin'Result));
 
+   --  Y a-t-il une cible ? (le pic depasse-t-il le seuil de detection ?)
+   function Has_Target (S : Sweep) return Boolean;
+
    --  Conversion du pic en distance physique.
+   --  Precondition : il doit y avoir une cible, sinon la distance n'a pas
+   --  de sens.
    function Peak_Distance (S : Sweep) return Millimeters
-     with Post => Peak_Distance'Result <= Max_Range_Mm;
+     with Pre  => Has_Target (S),
+          Post => Peak_Distance'Result <= Max_Range_Mm;
 
 end Radar_Sweep;
