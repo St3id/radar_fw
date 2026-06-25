@@ -25,6 +25,11 @@ jobs:
         run: alr build
 
       # 4. Compile et lance les tests AUnit.
+      # Recupere explicitement AUnit (dependance du projet de test).
+      - name: Get AUnit
+        run: alr with aunit
+
+      # Compile et lance les tests AUnit.
       - name: Tests
         run: |
           alr exec -- gprbuild -P radar_fw_tests.gpr
