@@ -26,8 +26,9 @@ jobs:
 
       # 4. Compile et lance les tests AUnit.
       # Recupere explicitement AUnit (dependance du projet de test).
-      - name: Get AUnit
-        run: alr with aunit
+      # Force Alire a telecharger les dependances deja declarees (dont AUnit).
+      - name: Get dependencies
+        run: alr build --stop-after=post-fetch
 
       # Compile et lance les tests AUnit.
       - name: Tests
