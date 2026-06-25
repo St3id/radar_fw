@@ -56,4 +56,10 @@ is
    function Detect_All (S : Sweep) return Detection
      with Post => Detect_All'Result.Count <= Max_Targets;
      
+   --  Comme Detect_All, mais regroupe les cases consecutives au-dessus du
+   --  seuil en UNE seule cible (le sommet du groupe). Plus realiste : un
+   --  objet etale sur plusieurs cases voisines = une cible, pas plusieurs.
+   function Detect_Clustered (S : Sweep) return Detection
+     with Post => Detect_Clustered'Result.Count <= Max_Targets;
+     
 end Radar_Sweep;

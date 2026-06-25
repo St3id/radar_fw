@@ -3,27 +3,20 @@ with Radar_Sweep;  use Radar_Sweep;
 
 procedure Radar_Fw is
 
-   --  On fabrique un balayage avec TROIS cibles a des positions connues.
-   S : Sweep := (others => 10);   --  bruit faible partout
+   --  Un seul objet, mais son echo s'etale sur 3 cases voisines (100,101,102).
+   S : Sweep := (others => 10);
 
    D : Detection;
 begin
-   --  Trois echos au-dessus du seuil (100).
-   S (40)  := 1_500;
-   S (128) := 2_800;
-   S (200) := 900;
+   S (100) := 1_200;
+   S (101) := 2_500;   --  sommet de l'echo
+   S (102) := 1_400;
 
-   D := Detect_All (S);
+   D := Detect_Clustered (S);
 
-   Put_Line ("Nombre de cibles detectees :" & D.Count'Image);
+   Put_Line ("Avec Detect_Clustered (regroupement) :");
+   Put_Line ("  Cibles detectees :" & D.Count'Image & "  (on en voudrait 1 !)");
    for I in 1 .. D.Count loop
-      declare
-         Pos  : constant Bin_Index := D.Targets (I);
-         Dist : constant Millimeters :=
-           Millimeters ((Integer (Pos) - 1) * (Max_Range_Mm / Sweep_Length));
-      begin
-         Put_Line ("  Cible" & I'Image & " : case" & Pos'Image
-                   & " a" & Dist'Image & " mm");
-      end;
+      Put_Line ("    case" & D.Targets (I)'Image);
    end loop;
 end Radar_Fw;
