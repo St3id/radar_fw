@@ -16,3 +16,7 @@ gnatprove = "^15.1.0"
 
 [[depends-on]]
 aunit = "^26.0.0"
+
+[[actions]]
+type = "test"
+command = ["gprbuild", "-p", "-P", "radar_fw_tests.gpr"]
