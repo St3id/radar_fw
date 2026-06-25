@@ -36,6 +36,29 @@ package body Radar_Sweep_Tests is
               "Le bruit seul ne devrait pas declencher de cible");
    end Test_No_Target;
 
+--  Test 3 : trois cibles posees doivent etre toutes les trois detectees.
+   procedure Test_Multi_Target (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      S : Sweep := (others => 10);
+   begin
+      S (40)  := 1_500;
+      S (128) := 2_800;
+      S (200) := 900;
+
+      declare
+         D : constant Detection := Detect_All (S);
+      begin
+         Assert (D.Count = 3,
+                 "On devrait detecter exactement 3 cibles");
+         Assert (D.Targets (1) = 40,
+                 "La 1re cible devrait etre en case 40");
+         Assert (D.Targets (2) = 128,
+                 "La 2e cible devrait etre en case 128");
+         Assert (D.Targets (3) = 200,
+                 "La 3e cible devrait etre en case 200");
+      end;
+   end Test_Multi_Target;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -44,6 +67,7 @@ package body Radar_Sweep_Tests is
    procedure Register_Tests (T : in out Test_Case) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine (T, Test_Multi_Target'Access, "Detection multi-cibles");
       Register_Routine (T, Test_Peak_Detection'Access, "Detection du pic");
       Register_Routine (T, Test_No_Target'Access, "Absence de cible");
    end Register_Tests;
