@@ -24,10 +24,14 @@ jobs:
       - name: Build
         run: alr build
 
-      - name: Build tests
+      - name: Diagnostic AUnit
         run: |
-          eval $(alr printenv)
-          gprbuild -p -P radar_fw_tests.gpr
+          echo "=== alr with (dependances) ==="
+          alr with
+          echo "=== recherche de aunit.gpr ==="
+          find ~ -name "aunit.gpr" 2>/dev/null || echo "aunit.gpr INTROUVABLE"
+          echo "=== GPR_PROJECT_PATH ==="
+          alr printenv | grep -i gpr || echo "pas de variable GPR"
 
       - name: Run tests
         run: ./bin/run_tests
