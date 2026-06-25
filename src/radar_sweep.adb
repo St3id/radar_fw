@@ -2,9 +2,9 @@ package body Radar_Sweep
   with SPARK_Mode => On
 is
 
-   ----------------
+   --------------
    -- Peak_Bin --
-   ----------------
+   --------------
 
    function Peak_Bin (S : Sweep) return Bin_Index is
       Best : Bin_Index := Bin_Index'First;
@@ -22,6 +22,16 @@ is
 
       return Best;
    end Peak_Bin;
+
+   ----------------
+   -- Has_Target --
+   ----------------
+
+   function Has_Target (S : Sweep) return Boolean is
+   begin
+      --  Une cible existe si le pic depasse le seuil de detection.
+      return S (Peak_Bin (S)) >= Detection_Threshold;
+   end Has_Target;
 
    -------------------
    -- Peak_Distance --

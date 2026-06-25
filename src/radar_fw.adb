@@ -3,30 +3,28 @@ with Radar_Sweep;  use Radar_Sweep;
 
 procedure Radar_Fw is
 
-   --  On fabrique un faux balayage : du bruit faible partout,
-   --  sauf un pic net dans une case choisie (la "cible").
-   Test_Sweep   : Sweep := (others => 10);   --  bruit de fond
-   Target_Bin   : constant Bin_Index := 64;  --  cible attendue ici
+   --  Petite routine d'affichage pour un balayage donne.
+   procedure Analyse (Label : String; S : Sweep) is
+   begin
+      Put_Line ("--- " & Label & " ---");
+      if Has_Target (S) then
+         Put_Line ("  Cible detectee.");
+         Put_Line ("  Case  : " & Peak_Bin (S)'Image);
+         Put_Line ("  Distance : " & Peak_Distance (S)'Image & " mm");
+      else
+         Put_Line ("  Aucune cible (bruit de fond seulement).");
+      end if;
+   end Analyse;
 
-   Found_Bin    : Bin_Index;
-   Found_Dist   : Millimeters;
+   --  Cas 1 : une vraie cible (pic net en case 64).
+   With_Target    : Sweep := (others => 10);
+
+   --  Cas 2 : que du bruit faible, sous le seuil de detection.
+   Noise_Only     : constant Sweep := (others => 10);
+
 begin
-   --  On place le pic.
-   Test_Sweep (Target_Bin) := 3_000;
+   With_Target (64) := 3_000;
 
-   --  On interroge notre paquet.
-   Found_Bin  := Peak_Bin (Test_Sweep);
-   Found_Dist := Peak_Distance (Test_Sweep);
-
-   --  On affiche les resultats.
-   Put_Line ("Case attendue : " & Target_Bin'Image);
-   Put_Line ("Case trouvee  : " & Found_Bin'Image);
-   Put_Line ("Distance      : " & Found_Dist'Image & " mm");
-
-   --  Verification automatique.
-   if Found_Bin = Target_Bin then
-      Put_Line ("==> OK : pic detecte au bon endroit.");
-   else
-      Put_Line ("==> ERREUR : mauvaise case.");
-   end if;
+   Analyse ("Cas 1 : avec cible", With_Target);
+   Analyse ("Cas 2 : bruit seul", Noise_Only);
 end Radar_Fw;
