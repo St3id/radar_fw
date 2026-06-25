@@ -1,4 +1,20 @@
+# Dossiers generes (build Alire/GNAT)
 /obj/
 /bin/
 /alire/
 /config/
+
+# Fichiers sensibles (secrets, cles, identifiants)
+.env
+.env.*
+*.pem
+*.key
+*.token
+id_rsa*
+*credentials*
+*.pfx
+*.p12
+
+# Fichiers de sortie generes (ne doivent pas etre versionnes)
+radar_log.csv
+radar_view.html
