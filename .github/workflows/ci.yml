@@ -17,24 +17,18 @@ jobs:
       - name: Install Alire
         uses: alire-project/setup-alire@v4
 
-      # Resout et telecharge TOUTES les dependances declarees (AUnit inclus).
-      - name: Resolve dependencies
-        run: alr update
-
+      # Compile le projet principal.
       - name: Build
         run: alr build
 
-      - name: Diagnostic AUnit
-        run: |
-          echo "=== alr with (dependances) ==="
-          alr with
-          echo "=== recherche de aunit.gpr ==="
-          find ~ -name "aunit.gpr" 2>/dev/null || echo "aunit.gpr INTROUVABLE"
-          echo "=== GPR_PROJECT_PATH ==="
-          alr printenv | grep -i gpr || echo "pas de variable GPR"
+      # Compile les tests VIA Alire (telecharge AUnit automatiquement).
+      - name: Build tests
+        run: alr action test
 
+      # Lance l'executable de tests produit.
       - name: Run tests
-        run: ./bin/run_tests
+        run: alr exec -- ./bin/run_tests
 
+      # Rejoue la preuve formelle SPARK.
       - name: SPARK proof
         run: alr gnatprove
