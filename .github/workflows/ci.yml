@@ -52,5 +52,9 @@ jobs:
       # Rejoue la preuve formelle SPARK sur le projet principal.
       # NB : en local "alr gnatprove" est un alias perso (= "alr exec -P1 --
       # gnatprove"). Cet alias n'existe pas en CI, on l'ecrit donc en clair.
+      #   --report=all          : affiche le detail des checks dans le log.
+      #   --checks-as-errors=on : fait ECHOUER la CI si un check n'est pas
+      #                           prouve (sans ca, gnatprove sort en code 0
+      #                           meme avec des checks non prouves).
       - name: SPARK proof
-        run: alr exec -- gnatprove -P radar_fw.gpr
+        run: alr exec -- gnatprove -P radar_fw.gpr --report=all --checks-as-errors=on
