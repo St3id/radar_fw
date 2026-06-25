@@ -13,3 +13,6 @@ executables = ["radar_fw"]
 
 [[depends-on]]
 gnatprove = "^15.1.0"
+
+[[depends-on]]
+aunit = "^26.0.0"
