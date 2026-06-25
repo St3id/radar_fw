@@ -1,18 +1,33 @@
-name = "radar_fw"
-description = "Firmware Ada/SPARK pour radar de scan 3D sur STM32"
-version = "0.1.0-dev"
+name: Build, Test & Prove
 
-authors = ["Boles Lucas"]
-maintainers = ["Boles Lucas <sissilucas7@gmail.com>"]
-maintainers-logins = ["St3id"]
-licenses = "MIT"
-website = ""
-tags = ["embedded", "stm32", "radar", "spark", "real-time"]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-executables = ["radar_fw"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-[[depends-on]]
-gnatprove = "^15.1.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-[[depends-on]]
-aunit = "^26.0.0"
+      - name: Install Alire
+        uses: alire-project/setup-alire@v4
+
+      # Compile le projet principal (resout gnatprove).
+      - name: Build
+        run: alr build
+
+      # Construit les tests via Alire en ciblant le projet de test :
+      # Alire materialise alors l'environnement complet, AUnit inclus.
+      - name: Build tests
+        run: alr exec -- gprbuild -p -P radar_fw_tests.gpr -largs -lstdc++
+
+      - name: Run tests
+        run: ./bin/run_tests
+
+      - name: SPARK proof
+        run: alr gnatprove
