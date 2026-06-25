@@ -35,5 +35,25 @@ is
    function Peak_Distance (S : Sweep) return Millimeters
      with Pre  => Has_Target (S),
           Post => Peak_Distance'Result <= Max_Range_Mm;
+--  ----- Detection de plusieurs cibles -----
 
+   --  Nombre maximum de cibles qu'on accepte de rapporter.
+   Max_Targets : constant := 16;
+
+   --  Combien de cibles au plus (0 a Max_Targets).
+   subtype Target_Count is Natural range 0 .. Max_Targets;
+
+   --  Une liste de positions de cibles (les cases ou un echo depasse le seuil).
+   type Target_Array is array (1 .. Max_Targets) of Bin_Index;
+
+   --  Resultat d'une detection multiple : les cibles trouvees + leur nombre.
+   type Detection is record
+      Targets : Target_Array;
+      Count   : Target_Count;
+   end record;
+
+   --  Cherche toutes les cases dont l'amplitude >= Detection_Threshold.
+   function Detect_All (S : Sweep) return Detection
+     with Post => Detect_All'Result.Count <= Max_Targets;
+     
 end Radar_Sweep;
