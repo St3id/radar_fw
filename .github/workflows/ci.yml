@@ -1,6 +1,5 @@
 name: Build, Test & Prove
 
-# Quand lancer ce pipeline : a chaque push et chaque pull request sur main.
 on:
   push:
     branches: [ main ]
@@ -12,30 +11,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Recupere ton code sur le serveur.
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Installe Alire (le gestionnaire de paquets Ada).
       - name: Install Alire
         uses: alire-project/setup-alire@v4
 
-      # 3. Compile le projet principal.
+      # Resout et telecharge TOUTES les dependances declarees (AUnit inclus).
+      - name: Resolve dependencies
+        run: alr update
+
       - name: Build
         run: alr build
 
-      # 4. Compile et lance les tests AUnit.
-      # Recupere explicitement AUnit (dependance du projet de test).
-      # Force Alire a telecharger les dependances deja declarees (dont AUnit).
-      - name: Get dependencies
-        run: alr build --stop-after=post-fetch
+      - name: Build tests
+        run: alr exec -- gprbuild -p -P radar_fw_tests.gpr
 
-      # Compile et lance les tests AUnit.
-      - name: Tests
-        run: |
-          alr exec -- gprbuild -P radar_fw_tests.gpr
-          alr exec -- ./bin/run_tests
+      - name: Run tests
+        run: ./bin/run_tests
 
-      # 5. Rejoue la preuve SPARK.
       - name: SPARK proof
         run: alr gnatprove
