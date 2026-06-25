@@ -1,3 +1,3 @@
 {
-    "ada.projectFile": "radar_fw_tests.gpr"
+    "ada.projectFile": "radar_fw_tests.gpr" // Sert à indiquer le fichier de projet Ada à utiliser pour l'analyse et la compilation du code.
   }
