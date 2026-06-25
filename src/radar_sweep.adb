@@ -48,4 +48,27 @@ is
       return Millimeters ((Integer (Peak) - 1) * Mm_Per_Bin);
    end Peak_Distance;
 
+----------------
+   -- Detect_All --
+   ----------------
+
+   function Detect_All (S : Sweep) return Detection is
+      Result : Detection := (Targets => (others => Bin_Index'First),
+                             Count   => 0);
+   begin
+      for I in Bin_Index loop
+         --  Si l'echo depasse le seuil ET qu'il reste de la place, on note.
+         if S (I) >= Detection_Threshold and then Result.Count < Max_Targets
+         then
+            Result.Count := Result.Count + 1;
+            Result.Targets (Result.Count) := I;
+         end if;
+
+         --  Invariant : le compte ne depasse jamais le maximum.
+         pragma Loop_Invariant (Result.Count <= Max_Targets);
+      end loop;
+
+      return Result;
+   end Detect_All;
+   
 end Radar_Sweep;
