@@ -1,0 +1,13 @@
+with "radar_fw.gpr";
+with "aunit.gpr";
+
+project Radar_Fw_Tests is
+
+   --  Ce projet ne possede QUE les tests ; les sources applicatives
+   --  viennent de radar_fw.gpr (importe ci-dessus).
+   for Source_Dirs use (Project'Project_Dir & "tests");
+   for Object_Dir use "obj/tests";
+   for Exec_Dir use "bin";
+   for Main use ("run_tests.adb");
+
+end Radar_Fw_Tests;

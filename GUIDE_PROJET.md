@@ -32,7 +32,7 @@ exactement ce que recherche le domaine.
 
 | Matériel                        | Statut    | Rôle                                          |
 |---------------------------------|-----------|-----------------------------------------------|
-| ESP32                           | possédé   | hors cible (Xtensa ; Ada possible mais peu balisé) |
+| ESP32                           | possédé   | hors cible (Xtensa ; Ada possible mais peubalisé) |  
 | PIC                             | possédé   | hors cible (pas de support Ada)               |
 | WeAct **STM32G474**             | à acheter | cerveau Ada (Cortex-M4 + FPU), ~10–15 €       |
 | ST-Link V2 (clone)              | à acheter | programmateur/débogueur, ~3–5 €               |
