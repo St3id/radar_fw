@@ -59,6 +59,30 @@ package body Radar_Sweep_Tests is
       end;
    end Test_Multi_Target;
 
+--  Test 4 : un echo etale sur 3 cases voisines = UNE cible (regroupement).
+   procedure Test_Clustering (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      S : Sweep := (others => 10);
+   begin
+      S (100) := 1_200;
+      S (101) := 2_500;   --  sommet
+      S (102) := 1_400;
+
+      declare
+         Raw       : constant Detection := Detect_All (S);
+         Clustered : constant Detection := Detect_Clustered (S);
+      begin
+         --  Sans regroupement : 3 cases comptees.
+         Assert (Raw.Count = 3,
+                 "Detect_All devrait compter 3 cases brutes");
+         --  Avec regroupement : une seule cible, au sommet.
+         Assert (Clustered.Count = 1,
+                 "Detect_Clustered devrait compter 1 cible");
+         Assert (Clustered.Targets (1) = 101,
+                 "La cible regroupee devrait etre au sommet (case 101)");
+      end;
+   end Test_Clustering;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -67,6 +91,7 @@ package body Radar_Sweep_Tests is
    procedure Register_Tests (T : in out Test_Case) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine (T, Test_Clustering'Access, "Regroupement de detections");
       Register_Routine (T, Test_Multi_Target'Access, "Detection multi-cibles");
       Register_Routine (T, Test_Peak_Detection'Access, "Detection du pic");
       Register_Routine (T, Test_No_Target'Access, "Absence de cible");
