@@ -1,30 +1,46 @@
-with Ada.Text_IO;  use Ada.Text_IO;
-with Radar_Sweep;  use Radar_Sweep;
+with Ada.Text_IO;            use Ada.Text_IO;
+with Ada.Calendar;          use Ada.Calendar;
+with Radar_Sweep;           use Radar_Sweep;
+with Radar_Sim;             use Radar_Sim;
+with Radar_Display;         use Radar_Display;
 
 procedure Radar_Fw is
 
-   --  Petite routine d'affichage pour un balayage donne.
-   procedure Analyse (Label : String; S : Sweep) is
+   Frames : constant := 12;   --  nombre d'images
+
+   --  Petite pause entre deux images (effet "temps reel").
+   procedure Wait (Seconds : Duration) is
+      Start : constant Time := Clock;
    begin
-      Put_Line ("--- " & Label & " ---");
-      if Has_Target (S) then
-         Put_Line ("  Cible detectee.");
-         Put_Line ("  Case  : " & Peak_Bin (S)'Image);
-         Put_Line ("  Distance : " & Peak_Distance (S)'Image & " mm");
-      else
-         Put_Line ("  Aucune cible (bruit de fond seulement).");
-      end if;
-   end Analyse;
+      loop
+         exit when Clock - Start >= Seconds;
+      end loop;
+   end Wait;
 
-   --  Cas 1 : une vraie cible (pic net en case 64).
-   With_Target    : Sweep := (others => 10);
-
-   --  Cas 2 : que du bruit faible, sous le seuil de detection.
-   Noise_Only     : constant Sweep := (others => 10);
-
+   S : Sweep;
 begin
-   With_Target (64) := 3_000;
+   for F in 1 .. Frames loop
 
-   Analyse ("Cas 1 : avec cible", With_Target);
-   Analyse ("Cas 2 : bruit seul", Noise_Only);
+      --  Une cible FIXE (case 180) et une cible MOBILE qui se rapproche :
+      --  elle part de la case 240 et avance de ~18 cases par image.
+      declare
+         Moving_Pos : constant Bin_Index :=
+           Bin_Index (Integer'Max (10, 240 - (F - 1) * 18));
+
+         Scene : constant Target_List :=
+           (1 => (Position => 180,        Strength => 2_200),   --  fixe
+            2 => (Position => Moving_Pos, Strength => 3_500));   --  mobile
+      begin
+         --  Noise_Level eleve => bruit de fond bien visible a l'ecran.
+         S := Generate (Scene, Noise_Level => 1_200);
+
+         Put_Line ("===== Image" & F'Image & " /" & Frames'Image
+                   & "  (cible mobile en case" & Moving_Pos'Image & ") =====");
+         Show (S);
+      end;
+
+      Wait (0.5);
+   end loop;
+
+   Put_Line ("Fin de la simulation.");
 end Radar_Fw;
