@@ -14,21 +14,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # On epingle Alire 2.1.0 : c'est la MEME version qu'en local.
+      # Chaque version d'alr est liee a une branche d'index communautaire.
+      #   - 2.0.2 (defaut de l'action) -> index "stable-1.3.0" : PAS d'AUnit 26,
+      #     ni gnatprove 15.1, ni gnat 15.2  ==> le solveur abandonne AUnit et la
+      #     compilation des tests echoue ("aunit.gpr not found").
+      #   - 2.1.0 -> index "stable-1.4.0" : contient AUnit 26.0.0, gnatprove 15.1.0
+      #     et gnat 15.2.x. La toolchain CI devient coherente avec le poste local.
       - name: Install Alire
         uses: alire-project/setup-alire@v4
+        with:
+          version: "2.1.0"
+          toolchain: "gnat_native gprbuild"
 
-      # Compile le projet principal.
-      - name: Build
+      # Diagnostic : doit afficher gnat 15.2.x / gprbuild 25.x, et un
+      # GPR_PROJECT_PATH contenant un dossier .../aunit_26.../lib/gnat.
+      - name: Show Alire environment
+        run: |
+          alr version
+          alr toolchain
+          alr printenv | grep -i GPR_PROJECT_PATH || true
+
+      # Compile le projet principal et resout/telecharge toutes les dependances.
+      - name: Build main project
         run: alr build
 
-      # Compile les tests VIA Alire (telecharge AUnit automatiquement).
+      # Compile les tests. "alr exec" injecte GPR_PROJECT_PATH (AUnit inclus),
+      # donc "aunit.gpr" est trouve. C'est exactement la commande qui marche
+      # en local.
       - name: Build tests
-        run: alr action test
+        run: alr exec -- gprbuild -p -P radar_fw_tests.gpr
 
-      # Lance l'executable de tests produit.
+      # Lance l'executable de tests AUnit produit dans bin/.
       - name: Run tests
         run: alr exec -- ./bin/run_tests
 
-      # Rejoue la preuve formelle SPARK.
+      # Rejoue la preuve formelle SPARK sur le projet principal.
+      # NB : en local "alr gnatprove" est un alias perso (= "alr exec -P1 --
+      # gnatprove"). Cet alias n'existe pas en CI, on l'ecrit donc en clair.
       - name: SPARK proof
-        run: alr gnatprove
+        run: alr exec -- gnatprove -P radar_fw.gpr
