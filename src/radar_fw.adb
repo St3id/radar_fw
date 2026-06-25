@@ -3,28 +3,27 @@ with Radar_Sweep;  use Radar_Sweep;
 
 procedure Radar_Fw is
 
-   --  Petite routine d'affichage pour un balayage donne.
-   procedure Analyse (Label : String; S : Sweep) is
-   begin
-      Put_Line ("--- " & Label & " ---");
-      if Has_Target (S) then
-         Put_Line ("  Cible detectee.");
-         Put_Line ("  Case  : " & Peak_Bin (S)'Image);
-         Put_Line ("  Distance : " & Peak_Distance (S)'Image & " mm");
-      else
-         Put_Line ("  Aucune cible (bruit de fond seulement).");
-      end if;
-   end Analyse;
+   --  On fabrique un balayage avec TROIS cibles a des positions connues.
+   S : Sweep := (others => 10);   --  bruit faible partout
 
-   --  Cas 1 : une vraie cible (pic net en case 64).
-   With_Target    : Sweep := (others => 10);
-
-   --  Cas 2 : que du bruit faible, sous le seuil de detection.
-   Noise_Only     : constant Sweep := (others => 10);
-
+   D : Detection;
 begin
-   With_Target (64) := 3_000;
+   --  Trois echos au-dessus du seuil (100).
+   S (40)  := 1_500;
+   S (128) := 2_800;
+   S (200) := 900;
 
-   Analyse ("Cas 1 : avec cible", With_Target);
-   Analyse ("Cas 2 : bruit seul", Noise_Only);
+   D := Detect_All (S);
+
+   Put_Line ("Nombre de cibles detectees :" & D.Count'Image);
+   for I in 1 .. D.Count loop
+      declare
+         Pos  : constant Bin_Index := D.Targets (I);
+         Dist : constant Millimeters :=
+           Millimeters ((Integer (Pos) - 1) * (Max_Range_Mm / Sweep_Length));
+      begin
+         Put_Line ("  Cible" & I'Image & " : case" & Pos'Image
+                   & " a" & Dist'Image & " mm");
+      end;
+   end loop;
 end Radar_Fw;
