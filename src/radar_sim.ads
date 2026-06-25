@@ -16,7 +16,7 @@ package Radar_Sim is
    --  si on veut des cibles bien nettes).
    function Generate
      (Targets     : Target_List;
-      Noise_Level : Amplitude := 20)
+      Noise_Level : Amplitude := 30)
       return Sweep;
 
 end Radar_Sim;
