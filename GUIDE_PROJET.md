@@ -119,6 +119,18 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
 8. **(PC)** DSP + reconstruction 3D (Python / Open3D), affichage progressif.
    *→ Première version : visualiseur **Three.js** autonome (`radar_3d.html`)
    généré directement par le programme Ada.*
+9. **(vision long terme)** Deux modes d'exploitation à terme, partageant la
+   même source de données :
+   - **Mode surveillance (temps réel)** : détection et suivi des objets
+     MOBILES en continu, avec affichage live (cibles, vecteurs vitesse,
+     traînées, ID).
+   - **Mode cartographie (analyse de pièce)** : scan méticuleux de
+     l'environnement STATIQUE sur une durée donnée, accumulation dense de
+     points, puis rendu 3D détaillé et figé, explorable a posteriori (version
+     haute qualité du `Scan_Room` actuel).
+
+   Les deux modes diffèrent par le traitement des balayages (suivi temps réel
+   vs accumulation), pas par la source de données.
 
 ---
 
