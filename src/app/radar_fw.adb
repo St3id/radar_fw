@@ -2,10 +2,12 @@ with Ada.Text_IO;        use Ada.Text_IO;
 with Radar_Source;       use Radar_Source;
 with Radar_Sim_Source;   use Radar_Sim_Source;
 with Radar_Detect;       use Radar_Detect;
+with Radar_Track;        use Radar_Track;
 
 procedure Radar_Fw is
 
-   Src : Simulated_Source := Make (Sweeps => 4);
+   Src : Simulated_Source := Make (Sweeps => 5);
+   Trk : Tracker;
 
    procedure Process (Radar : in out Source'Class) is
       M       : Measurement;
@@ -14,24 +16,31 @@ procedure Radar_Fw is
       Turn    : Natural := 1;
       Last_Az : Float := 0.0;
 
-      --  Affiche le contenu d'une frame (les objets vus ce tour).
-   procedure Show_Frame is
-            C : constant Frame := Cluster (F);
-         begin
-            Put_Line ("=== Tour" & Turn'Image & " :" & C.Count'Image
-                     & " cible(s) (regroupe de" & F.Count'Image & ") ===");
-            for I in 1 .. C.Count loop
+      --  Fin d'un tour : on regroupe, on met a jour le tracking, on affiche.
+      procedure End_Of_Turn is
+         C : constant Frame := Cluster (F);
+      begin
+         Update (Trk, C);
+
+         Put_Line ("===== Tour" & Turn'Image & " =====");
+         for I in Trk.Tracks'Range loop
+            if Trk.Tracks (I).Active then
                declare
-                  D : constant Detection_3D := C.Items (I);
-            begin
-               Put_Line ("   X=" & Integer'Image (Integer (D.Pos.X))
-                         & " Y=" & Integer'Image (Integer (D.Pos.Y))
-                         & " Z=" & Integer'Image (Integer (D.Pos.Z))
-                         & "  (dist" & Integer'Image (Integer (D.Distance))
-                         & " mm)");
-            end;
+                  Tk : constant Track := Trk.Tracks (I);
+               begin
+                  Put_Line ("  Cible #" & Tk.Id'Image
+                            & " | pos (" & Integer'Image (Integer (Tk.Pos.X))
+                            & "," & Integer'Image (Integer (Tk.Pos.Y))
+                            & "," & Integer'Image (Integer (Tk.Pos.Z))
+                            & " ) | vitesse ("
+                            & Integer'Image (Integer (Tk.Velocity.X))
+                            & "," & Integer'Image (Integer (Tk.Velocity.Y))
+                            & "," & Integer'Image (Integer (Tk.Velocity.Z))
+                            & " )");
+               end;
+            end if;
          end loop;
-      end Show_Frame;
+      end End_Of_Turn;
 
    begin
       Reset (F);
@@ -39,9 +48,8 @@ procedure Radar_Fw is
          Radar.Next (M, OK);
          exit when not OK;
 
-         --  Retour de l'azimut a ~0 = nouveau tour : on cloture la frame.
          if M.Azimuth < Last_Az - 1.0 then
-            Show_Frame;
+            End_Of_Turn;
             Turn := Turn + 1;
             Reset (F);
          end if;
@@ -50,8 +58,7 @@ procedure Radar_Fw is
          Add (F, M);
       end loop;
 
-      --  Cloturer le dernier tour.
-      Show_Frame;
+      End_Of_Turn;  --  dernier tour
    end Process;
 
 begin
