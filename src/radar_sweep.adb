@@ -70,7 +70,7 @@ is
 
       return Result;
    end Detect_All;
-   
+
 ----------------------
    -- Detect_Clustered --
    ----------------------
@@ -96,7 +96,7 @@ is
                Best_Amp := S (I);
             end if;
          else
-            --  Case sous le seuil : si on sortait d'un groupe, on l'enregistre.
+            --  Sous le seuil : si on sortait d'un groupe, on l'enregistre.
             if In_Group and then Result.Count < Max_Targets then
                Result.Count := Result.Count + 1;
                Result.Targets (Result.Count) := Best_Pos;
