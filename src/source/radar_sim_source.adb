@@ -1,9 +1,27 @@
+with Radar_Geometry;  use Radar_Geometry;
+
 package body Radar_Sim_Source is
 
-   --  Position (azimut) de notre objet simule, en degres.
-   Object_Azimuth : constant Float := 90.0;
-   --  Case (distance) ou se trouve l'objet dans le balayage.
-   Object_Bin     : constant Bin_Index := 100;
+   --  Tolerance angulaire : un objet est "vu" si le radar pointe a moins
+   --  de cette valeur (en degres) de sa direction.
+   Beam_Width : constant Float := 3.0;
+
+   --  Convertit une distance physique (mm) en numero de case du balayage.
+   function Distance_To_Bin (Dist : Float) return Bin_Index is
+      Mm_Per_Bin : constant Float :=
+        Float (Max_Range_Mm) / Float (Sweep_Length);
+      Raw : Integer;
+   begin
+      Raw := Integer (Dist / Mm_Per_Bin) + 1;
+      --  On borne dans l'intervalle valide des cases.
+      if Raw < Integer (Bin_Index'First) then
+         return Bin_Index'First;
+      elsif Raw > Integer (Bin_Index'Last) then
+         return Bin_Index'Last;
+      else
+         return Bin_Index (Raw);
+      end if;
+   end Distance_To_Bin;
 
    ----------
    -- Make --
@@ -11,7 +29,7 @@ package body Radar_Sim_Source is
 
    function Make return Simulated_Source is
    begin
-      return (Step => 0);
+      return (Step => 0, Scene => Initial_World);
    end Make;
 
    ----------
@@ -26,7 +44,6 @@ package body Radar_Sim_Source is
    is
    begin
       if Self.Step >= Total_Steps then
-         --  Balayage termine : plus rien a fournir.
          Available := False;
          Result    := (Azimuth => 0.0, Elevation => 0.0,
                        Data => (others => 0));
@@ -34,17 +51,28 @@ package body Radar_Sim_Source is
       end if;
 
       declare
-         --  Direction visee pour ce pas : un tour complet sur 360 degres.
+         --  Direction visee pour ce pas.
          Az : constant Float :=
            Float (Self.Step) * 360.0 / Float (Total_Steps);
 
-         --  On part d'un balayage vide (bruit de fond leger).
+         --  Balayage vide (bruit de fond leger).
          S : Sweep := (others => 5);
       begin
-         --  Si le radar pointe (a peu pres) vers l'objet, on place un echo.
-         if abs (Az - Object_Azimuth) < 3.0 then
-            S (Object_Bin) := 3_000;
-         end if;
+         --  Pour chaque objet reel, on regarde s'il tombe dans le faisceau.
+         for I in 1 .. Self.Scene.Count loop
+            declare
+               O : constant Object := Self.Scene.Objects (I);
+               P : constant Point_3D := (O.X, O.Y, O.Z);
+               R : constant Polar := To_Polar (P);
+            begin
+               --  L'objet est-il (a peu pres) dans la direction visee ?
+               if abs (R.Azimuth - Az) < Beam_Width then
+                  --  Oui : on place un echo a la case correspondant
+                  --  a sa distance.
+                  S (Distance_To_Bin (R.Distance)) := 3_000;
+               end if;
+            end;
+         end loop;
 
          Result    := (Azimuth => Az, Elevation => 0.0, Data => S);
          Available := True;
