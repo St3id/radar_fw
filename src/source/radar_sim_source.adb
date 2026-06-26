@@ -2,7 +2,12 @@ with Radar_Geometry;  use Radar_Geometry;
 
 package body Radar_Sim_Source is
 
-   Beam_Width : constant Float := 3.0;
+   Beam_Width : constant Float := 3.0;   --  tolerance azimut (degres)
+   El_Width   : constant Float := 5.0;   --  tolerance elevation (degres)
+
+   --  Plage d'elevation balayee : de -30 a +30 degres.
+   El_Min : constant Float := -30.0;
+   El_Max : constant Float := 30.0;
 
    function Distance_To_Bin (Dist : Float) return Bin_Index is
       Mm_Per_Bin : constant Float :=
@@ -19,13 +24,10 @@ package body Radar_Sim_Source is
       end if;
    end Distance_To_Bin;
 
-   ----------
-   -- Make --
-   ----------
-
    function Make (Sweeps : Positive) return Simulated_Source is
    begin
-      return (Step         => 0,
+      return (Az_Step      => 0,
+              El_Step      => 0,
               Current_Turn => 0,
               Max_Turns    => Sweeps,
               Scene        => Initial_World);
@@ -42,7 +44,6 @@ package body Radar_Sim_Source is
       Available : out Boolean)
    is
    begin
-      --  Plus de tours a faire : termine.
       if Self.Current_Turn >= Self.Max_Turns then
          Available := False;
          Result    := (Azimuth => 0.0, Elevation => 0.0,
@@ -51,8 +52,12 @@ package body Radar_Sim_Source is
       end if;
 
       declare
+         --  Direction visee : azimut ET elevation.
          Az : constant Float :=
-           Float (Self.Step) * 360.0 / Float (Total_Steps);
+           Float (Self.Az_Step) * 360.0 / Float (Azimuth_Steps);
+         El : constant Float :=
+           El_Min + Float (Self.El_Step)
+                    * (El_Max - El_Min) / Float (Elevation_Steps - 1);
          S : Sweep := (others => 5);
       begin
          for I in 1 .. Self.Scene.Count loop
@@ -61,30 +66,33 @@ package body Radar_Sim_Source is
                P : constant Point_3D := (O.X, O.Y, O.Z);
                R : constant Polar := To_Polar (P);
             begin
-               if abs (R.Azimuth - Az) < Beam_Width then
+               --  L'objet doit etre dans le faisceau EN AZIMUT ET EN ELEVATION.
+               if abs (R.Azimuth - Az) < Beam_Width
+                 and then abs (R.Elevation - El) < El_Width
+               then
                   S (Distance_To_Bin (R.Distance)) := 3_000;
                end if;
             end;
          end loop;
 
-         Result    := (Azimuth => Az, Elevation => 0.0, Data => S);
+         Result    := (Azimuth => Az, Elevation => El, Data => S);
          Available := True;
       end;
 
-      --  On avance dans le tour.
-      Self.Step := Self.Step + 1;
+      --  Avancer dans la grille : d'abord l'elevation, puis l'azimut.
+      Self.El_Step := Self.El_Step + 1;
+      if Self.El_Step >= Elevation_Steps then
+         Self.El_Step := 0;
+         Self.Az_Step := Self.Az_Step + 1;
 
-      --  Fin du tour : on passe au suivant et on FAIT AVANCER LE MONDE.
-      if Self.Step >= Total_Steps then
-         Self.Step         := 0;
-         Self.Current_Turn := Self.Current_Turn + 1;
-         Step (Self.Scene);   --  les objets se deplacent d'un pas de temps
+         --  Fin du tour complet (tous azimuts x toutes elevations).
+         if Self.Az_Step >= Azimuth_Steps then
+            Self.Az_Step      := 0;
+            Self.Current_Turn := Self.Current_Turn + 1;
+            Step (Self.Scene);
+         end if;
       end if;
    end Next;
-
-   --------------
-   -- Has_More --
-   --------------
 
    overriding
    function Has_More (Self : Simulated_Source) return Boolean is
