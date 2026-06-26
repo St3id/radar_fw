@@ -1,7 +1,10 @@
 with "config/radar_fw_config.gpr";
 project Radar_Fw is
 
-   for Source_Dirs use ("src/", "config/");
+   --  "src/**" = le dossier src/ ET tous ses sous-dossiers (recursif).
+   --  Les sources sont rangees par domaine (processing, geometry, tasking,
+   --  app) ; le nom d'un paquet Ada ne depend pas de son dossier.
+   for Source_Dirs use ("src/**", "config/");
    for Object_Dir use "obj/" & Radar_Fw_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
