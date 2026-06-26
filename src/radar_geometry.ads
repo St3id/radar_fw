@@ -10,7 +10,7 @@ package Radar_Geometry is
    --  Angles de visee, en degres.
    --  Azimut   : rotation horizontale (0 = devant, +90 = a gauche...).
    --  Elevation: inclinaison verticale (0 = horizontal, +90 = vers le haut).
-   subtype Degrees is Float range -180.0 .. 180.0;
+   subtype Degrees is Float range -360.0 .. 360.0;
 
    --  Convertit une mesure radar (distance + direction) en point 3D.
    function To_Point
