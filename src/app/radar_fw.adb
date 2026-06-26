@@ -15,13 +15,14 @@ procedure Radar_Fw is
       Last_Az : Float := 0.0;
 
       --  Affiche le contenu d'une frame (les objets vus ce tour).
-      procedure Show_Frame is
-      begin
-         Put_Line ("=== Tour" & Turn'Image & " :" & F.Count'Image
-                   & " objet(s) detecte(s) ===");
-         for I in 1 .. F.Count loop
-            declare
-               D : constant Detection_3D := F.Items (I);
+   procedure Show_Frame is
+            C : constant Frame := Cluster (F);
+         begin
+            Put_Line ("=== Tour" & Turn'Image & " :" & C.Count'Image
+                     & " cible(s) (regroupe de" & F.Count'Image & ") ===");
+            for I in 1 .. C.Count loop
+               declare
+                  D : constant Detection_3D := C.Items (I);
             begin
                Put_Line ("   X=" & Integer'Image (Integer (D.Pos.X))
                          & " Y=" & Integer'Image (Integer (D.Pos.Y))
