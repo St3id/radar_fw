@@ -1,6 +1,11 @@
-with Ada.Text_IO;     use Ada.Text_IO;
-with Radar_Geometry;  use Radar_Geometry;
-with Radar_Cloud;     use Radar_Cloud;
+with Ada.Text_IO;  use Ada.Text_IO;
+with Radar_Cloud;  use Radar_Cloud;
+
+--  Ce fichier GENERE du HTML : certaines lignes (balises et script Three.js)
+--  depassent volontairement la limite de 79 colonnes. On releve donc la
+--  limite de longueur de ligne pour CE seul fichier, sans toucher aux autres
+--  regles de style ni aux autres fichiers.
+pragma Style_Checks ("M200");
 
 procedure Radar_Fw is
 
