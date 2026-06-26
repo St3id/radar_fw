@@ -5,14 +5,13 @@ with Radar_World;   use Radar_World;
 package Radar_Sim_Source is
 
    --  Source SIMULEE : implemente le contrat Radar_Source.Source.
-   --  Elle balaie l'espace direction par direction et fabrique les echos
-   --  a partir des objets reels du monde simule (la verite terrain).
+   --  Elle effectue plusieurs TOURS ; entre chaque tour, le monde avance
+   --  d'un pas de temps (les objets se deplacent).
    type Simulated_Source is new Source with private;
 
-   --  Cree une source simulee prete a balayer.
-   function Make return Simulated_Source;
+   --  Cree une source simulee qui effectuera Sweeps tours complets.
+   function Make (Sweeps : Positive) return Simulated_Source;
 
-   --  Implementations OBLIGATOIRES du contrat :
    overriding
    procedure Next
      (Self      : in out Simulated_Source;
@@ -24,12 +23,14 @@ package Radar_Sim_Source is
 
 private
 
-   --  Nombre de directions a balayer (azimut) pour un tour complet.
+   --  Nombre de directions par tour (azimut).
    Total_Steps : constant := 120;
 
    type Simulated_Source is new Source with record
-      Step  : Natural := 0;        --  ou en est-on dans le balayage
-      Scene : World;               --  le monde reel (verite terrain)
+      Step         : Natural := 0;   --  direction courante dans le tour
+      Current_Turn : Natural := 0;   --  numero du tour en cours
+      Max_Turns    : Positive := 1;  --  nombre total de tours a faire
+      Scene        : World;          --  le monde reel (verite terrain)
    end record;
 
 end Radar_Sim_Source;
