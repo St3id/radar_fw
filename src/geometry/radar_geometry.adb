@@ -26,4 +26,29 @@ package body Radar_Geometry is
               Z => Distance_Mm * Sin (El_Rad));
    end To_Point;
 
+   --------------
+   -- To_Polar --
+   --------------
+
+   function To_Polar (P : Point_3D) return Polar is
+      --  Distance totale (norme du vecteur).
+      Dist : constant Float := Sqrt (P.X * P.X + P.Y * P.Y + P.Z * P.Z);
+
+      Az : Float := 0.0;
+      El : Float := 0.0;
+   begin
+      --  Azimut : angle horizontal dans le plan X-Y.
+      --  Arctan(Y, X) gere tous les quadrants et le cas X=0.
+      if P.X /= 0.0 or else P.Y /= 0.0 then
+         Az := Arctan (P.Y, P.X) * 180.0 / Pi;
+      end if;
+
+      --  Elevation : angle vertical (hauteur Z par rapport a la distance).
+      if Dist > 0.0 then
+         El := Arcsin (P.Z / Dist) * 180.0 / Pi;
+      end if;
+
+      return (Distance => Dist, Azimuth => Az, Elevation => El);
+   end To_Polar;
+
 end Radar_Geometry;

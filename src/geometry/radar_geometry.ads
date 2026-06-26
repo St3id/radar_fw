@@ -19,4 +19,15 @@ package Radar_Geometry is
       Elevation   : Degrees)
       return Point_3D;
 
+   --  Resultat de la conversion inverse : ou se trouve un point, vu du radar.
+   type Polar is record
+      Distance  : Float;    --  distance radar -> point, en mm
+      Azimuth   : Float;    --  direction horizontale, en degres
+      Elevation : Float;    --  direction verticale, en degres
+   end record;
+
+   --  Conversion INVERSE de To_Point : d'un point (X,Y,Z) vers
+   --  sa direction et sa distance vues depuis le radar (a l'origine).
+   function To_Polar (P : Point_3D) return Polar;
+   
 end Radar_Geometry;
