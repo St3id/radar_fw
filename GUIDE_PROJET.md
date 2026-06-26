@@ -80,20 +80,29 @@ angulaire grossière), pas une maquette CAO.
 
 - [x] Environnement Ada complet (Alire + VS Code + toolchains native et ARM)
 - [x] Paquet `Radar_Sweep` : types bornés (`Millimeters`, `Bin_Index`,
-      `Amplitude`, `Sweep`), `Peak_Bin` (détection du pic) et `Peak_Distance`
-      (conversion en distance), avec contrats `Post` et `Loop_Invariant`
-- [x] Banc de test dans `radar_fw.adb` (pic simulé en case 64 → détecté, ~4914 mm)
-- [x] **Preuve SPARK complète : 8 checks, 0 non prouvé** (prouveur CVC5)
+      `Amplitude`, `Sweep`), seuil de détection, `Peak_Bin` (pic) et
+      `Peak_Distance` (distance), détection multi-cibles (`Detect_All`) et
+      regroupement des échos voisins (`Detect_Clustered`), avec contrats
+      `Post` et `Loop_Invariant`
+- [x] **Preuve SPARK : 23 checks, 0 non prouvé** (prouveur CVC5)
+- [x] Tests **AUnit** : 4 tests verts (absence de cible, pic, multi-cibles,
+      regroupement) — remplacent l'ancien banc de test du `main`
+- [x] Architecture **Ravenscar** : tâches `Producer` / `Consumer`
+      (`Radar_Tasks`) + objet protégé `Mailbox` (`Radar_Buffer`)
+- [x] Reconstruction 3D : géométrie (`Radar_Geometry`), scan de pièce simulé
+      (`Radar_Cloud`) et visualiseur **Three.js** généré (`radar_3d.html`)
+- [x] **CI GitHub Actions** : build + tests AUnit + preuve SPARK, bloquante
 - [x] Git + GitHub (`github.com/St3id/radar_fw`) + README
 
 ### À venir — feuille de route
 
 Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matériel**.
 
-1. **(sans HW)** Enrichir le traitement : cas « aucune cible » (seuil de
-   détection), détection multi-cibles — et **prouver** ces versions en SPARK.
-2. **(sans HW)** Cadre de tests **AUnit** (remplace le `if` du main ;
-   renforce l'argument traçabilité exigences → tests).
+1. **(sans HW)** ✅ **Fait.** Enrichir le traitement : cas « aucune cible »
+   (seuil de détection), détection multi-cibles — et **prouver** ces versions
+   en SPARK.
+2. **(sans HW)** ✅ **Fait.** Cadre de tests **AUnit** (remplace le `if` du
+   main ; renforce l'argument traçabilité exigences → tests).
 3. **(sans HW)** Documenter la traçabilité (exigences ↔ code ↔ tests).
 4. **(carte requise)** Phase 0 « blinky » sur STM32G474 :
    cross-compiler (`gnat_arm_elf` + runtime **AdaCore** `embedded_stm32g4xx` /
@@ -102,8 +111,14 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
 5. **(carte requise)** Driver **A121 en SPI**, écrit en Ada.
 6. **(carte requise)** Architecture **Ravenscar** : tâches + objet protégé
    (tampon partagé), idéalement prouvé SPARK.
+   *→ Version simulée déjà réalisée (`Radar_Tasks` + `Radar_Buffer`) ; reste à
+   valider sur carte réelle.*
 7. **(carte requise)** Scan motorisé + assemblage du nuage de points.
+   *→ Nuage de points simulé déjà réalisé (`Radar_Cloud`) ; reste le balayage
+   motorisé réel.*
 8. **(PC)** DSP + reconstruction 3D (Python / Open3D), affichage progressif.
+   *→ Première version : visualiseur **Three.js** autonome (`radar_3d.html`)
+   généré directement par le programme Ada.*
 
 ---
 
