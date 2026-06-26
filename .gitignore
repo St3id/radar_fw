@@ -18,3 +18,5 @@ id_rsa*
 # Fichiers de sortie generes (ne doivent pas etre versionnes)
 radar_log.csv
 radar_view.html
+radar_3d.html
+#  NB : la copie publiee du visualiseur vit dans docs/index.html (versionnee).
