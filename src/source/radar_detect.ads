@@ -29,4 +29,13 @@ package Radar_Detect is
    --  Remet la frame a zero (debut d'un nouveau tour).
    procedure Reset (F : in out Frame);
 
+   --  Rayon de regroupement : deux detections a moins de cette distance
+   --  (en mm) sont considerees comme le meme objet reel.
+   Cluster_Radius : constant Float := 300.0;
+
+   --  Regroupe les detections proches d'une frame en cibles uniques.
+   --  Renvoie une nouvelle frame ou chaque objet reel n'apparait qu'une fois
+   --  (a la position moyenne de ses detections).
+   function Cluster (F : Frame) return Frame;
+
 end Radar_Detect;
