@@ -41,6 +41,12 @@ package body Radar_Geometry is
       --  Arctan(Y, X) gere tous les quadrants et le cas X=0.
       if P.X /= 0.0 or else P.Y /= 0.0 then
          Az := Arctan (P.Y, P.X) * 180.0 / Pi;
+         --  Ramener l'angle dans [0, 360[ : un azimut negatif (ex. -143)
+         --  designe la meme direction que +217. Le radar balaie 0..360,
+         --  donc on normalise pour que la correspondance fonctionne.
+         if Az < 0.0 then
+            Az := Az + 360.0;
+         end if;
       end if;
 
       --  Elevation : angle vertical (hauteur Z par rapport a la distance).

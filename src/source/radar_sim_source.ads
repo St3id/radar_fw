@@ -4,12 +4,10 @@ with Radar_World;   use Radar_World;
 
 package Radar_Sim_Source is
 
-   --  Source SIMULEE : implemente le contrat Radar_Source.Source.
-   --  Elle effectue plusieurs TOURS ; entre chaque tour, le monde avance
-   --  d'un pas de temps (les objets se deplacent).
+   --  Source SIMULEE : balaie une grille azimut x elevation (scan 3D),
+   --  sur plusieurs tours ; entre chaque tour, le monde avance d'un pas.
    type Simulated_Source is new Source with private;
 
-   --  Cree une source simulee qui effectuera Sweeps tours complets.
    function Make (Sweeps : Positive) return Simulated_Source;
 
    overriding
@@ -23,14 +21,16 @@ package Radar_Sim_Source is
 
 private
 
-   --  Nombre de directions par tour (azimut).
-   Total_Steps : constant := 120;
+   --  Grille de balayage : directions horizontales et verticales.
+   Azimuth_Steps   : constant := 120;   --  azimut : tour complet
+   Elevation_Steps : constant := 7;     --  elevation : de -30 a +30 deg
 
    type Simulated_Source is new Source with record
-      Step         : Natural := 0;   --  direction courante dans le tour
-      Current_Turn : Natural := 0;   --  numero du tour en cours
-      Max_Turns    : Positive := 1;  --  nombre total de tours a faire
-      Scene        : World;          --  le monde reel (verite terrain)
+      Az_Step      : Natural := 0;   --  position azimut dans le tour
+      El_Step      : Natural := 0;   --  position elevation dans le tour
+      Current_Turn : Natural := 0;
+      Max_Turns    : Positive := 1;
+      Scene        : World;
    end record;
 
 end Radar_Sim_Source;
