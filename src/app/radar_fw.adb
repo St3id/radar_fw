@@ -1,27 +1,35 @@
-with Ada.Text_IO;     use Ada.Text_IO;
-with Radar_Geometry;  use Radar_Geometry;
+with Ada.Text_IO;        use Ada.Text_IO;
+with Radar_Sweep;        use Radar_Sweep;
+with Radar_Source;       use Radar_Source;
+with Radar_Sim_Source;   use Radar_Sim_Source;
 
 procedure Radar_Fw is
 
-   procedure Test (Label : String; P : Point_3D) is
-      R : constant Polar := To_Polar (P);
+   Src : Simulated_Source := Make;
+
+   --  Traite un balayage complet via le CONTRAT (sans savoir que c'est simule).
+   procedure Process (Radar : in out Source'Class) is
+      M  : Measurement;
+      OK : Boolean;
+      Found : Natural := 0;
    begin
-      Put_Line (Label
-                & " -> distance=" & Integer'Image (Integer (R.Distance))
-                & "  azimut=" & Integer'Image (Integer (R.Azimuth))
-                & "  elevation=" & Integer'Image (Integer (R.Elevation)));
-   end Test;
+      while Radar.Has_More loop
+         Radar.Next (M, OK);
+         exit when not OK;
+
+         --  On applique la detection prouvee sur chaque direction.
+         if Has_Target (M.Data) then
+            Found := Found + 1;
+            Put_Line ("Detection a l'azimut"
+                      & Integer'Image (Integer (M.Azimuth))
+                      & " deg : case" & Peak_Bin (M.Data)'Image
+                      & " (" & Peak_Distance (M.Data)'Image & " mm)");
+         end if;
+      end loop;
+
+      Put_Line ("--- Tour termine :" & Found'Image & " direction(s) avec cible ---");
+   end Process;
 
 begin
-   --  Point droit devant (sur l'axe X) : azimut 0, elevation 0.
-   Test ("Droit devant (1000,0,0)   ", (1000.0, 0.0, 0.0));
-
-   --  Point a gauche (sur l'axe Y) : azimut 90.
-   Test ("A gauche     (0,1000,0)   ", (0.0, 1000.0, 0.0));
-
-   --  Point droit en haut (sur l'axe Z) : elevation 90.
-   Test ("En haut      (0,0,1000)   ", (0.0, 0.0, 1000.0));
-
-   --  Point en diagonale a 45 : azimut 45, distance ~1414.
-   Test ("Diagonale    (1000,1000,0)", (1000.0, 1000.0, 0.0));
+   Process (Src);
 end Radar_Fw;
