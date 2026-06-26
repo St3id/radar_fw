@@ -19,4 +19,5 @@ id_rsa*
 radar_log.csv
 radar_view.html
 radar_3d.html
+radar_tracking_3d.html
 #  NB : la copie publiee du visualiseur vit dans docs/index.html (versionnee).
