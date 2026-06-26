@@ -1,40 +1,31 @@
-with Ada.Text_IO;        use Ada.Text_IO;
-with Radar_Sweep;        use Radar_Sweep;
-with Radar_Source;       use Radar_Source;
-with Radar_Sim_Source;   use Radar_Sim_Source;
+with Ada.Text_IO;    use Ada.Text_IO;
+with Radar_World;    use Radar_World;
 
 procedure Radar_Fw is
 
-   --  On cree une source SIMULEE...
-   Src : Simulated_Source := Make;
+   W : World := Initial_World;
 
-   --  ... mais le traitement ci-dessous parle au CONTRAT (Source'Class),
-   --  sans savoir si c'est de la simu ou un vrai capteur.
-   procedure Process (Radar : in out Source'Class) is
-      M  : Measurement;
-      OK : Boolean;
-      Detections : Natural := 0;
+   --  Affiche l'etat du monde a un instant donne.
+   procedure Show (Step_No : Natural) is
    begin
-      --  Tant que la source a des mesures, on les traite.
-      while Radar.Has_More loop
-         Radar.Next (M, OK);
-         exit when not OK;
-
-         --  On applique la detection (ton pipeline prouve) sur la mesure.
-         if Has_Target (M.Data) then
-            Detections := Detections + 1;
-            Put_Line ("Detection a l'azimut"
-                      & Integer'Image (Integer (M.Azimuth))
-                      & " deg : cible case"
-                      & Peak_Bin (M.Data)'Image
-                      & " a" & Peak_Distance (M.Data)'Image & " mm");
-         end if;
+      Put_Line ("=== Pas" & Step_No'Image & " ===");
+      for I in 1 .. W.Count loop
+         declare
+            O : constant Object := W.Objects (I);
+         begin
+            Put_Line ("  Objet" & O.Id'Image
+                      & " : X=" & Integer'Image (Integer (O.X))
+                      & " Y=" & Integer'Image (Integer (O.Y))
+                      & " Z=" & Integer'Image (Integer (O.Z)));
+         end;
       end loop;
-
-      Put_Line ("--- Balayage termine :" & Detections'Image
-                & " direction(s) avec cible ---");
-   end Process;
+   end Show;
 
 begin
-   Process (Src);
+   --  On affiche l'etat initial, puis on avance de 5 pas.
+   Show (0);
+   for N in 1 .. 5 loop
+      Step (W);
+      Show (N);
+   end loop;
 end Radar_Fw;
