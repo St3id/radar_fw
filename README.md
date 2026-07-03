@@ -10,94 +10,136 @@ conception en Ada, concurrence déterministe (profil Ravenscar) et
 
 ## Objectif
 
-Acquérir un balayage radar, en extraire les cibles (distance, angle), et
-reconstruire une représentation 3D de la scène. Le radar est ici un support
-technique pour démontrer une chaîne embarquée rigoureuse, applicable au
-domaine défense / aéronautique.
+Acquérir un balayage radar, en extraire les cibles (distance, angle), les
+suivre dans le temps et reconstruire une représentation 3D de la scène. Le
+radar est ici un support technique pour démontrer une chaîne embarquée
+rigoureuse, applicable au domaine défense / aéronautique.
 
 ## État d'avancement
 
-- [x] Traitement d'un balayage : seuil de détection, détection du pic et
-      conversion en distance
-- [x] Détection multi-cibles (`Detect_All`) et regroupement des échos voisins
-      en une seule cible (`Detect_Clustered`)
-- [x] Types bornés et contrats (conception « correct par construction »)
-- [x] Vérification formelle SPARK : **23 checks prouvés, 0 non prouvé**
-- [x] Tests unitaires **AUnit** : 4 tests verts
-- [x] Architecture concurrente **Ravenscar** : tâches `Producer` / `Consumer`
-      et objet protégé `Mailbox`
-- [x] Intégration continue **GitHub Actions** : build + tests + preuve SPARK,
-      bloquante en cas d'échec
-- [x] Reconstruction 3D : géométrie, scan de pièce simulé et visualiseur
-      **Three.js** (`radar_3d.html`)
-- [ ] Driver capteur en Ada sur STM32 (matériel requis)
+- [x] Traitement d'un balayage : seuil de détection, pic, conversion en
+      distance, multi-cibles (`Detect_All`) et regroupement des échos
+      voisins (`Detect_Clustered`)
+- [x] Vérification formelle SPARK : **35 checks prouvés, 0 non prouvé**,
+      avec des **contrats fonctionnels** (aucune fausse alarme : toute
+      cible rapportée dépasse réellement le seuil) et la terminaison
+      prouvée automatiquement (`Always_Terminates`)
+- [x] Pipeline 3D complet sur source simulée : interface abstraite
+      (`Radar_Source`), monde simulé mobile, détections 3D, regroupement
+      spatial (`Cluster`), **pistage** avec ID stables et vitesses
+      (`Radar_Track`), visualiseur Three.js généré (`radar_tracking_3d.html`)
+- [x] Concurrence **Ravenscar réelle** : exécutable `radar_demo` sous
+      `pragma Profile (Ravenscar)` imposé à la compilation, tâche cyclique →
+      objet protégé (entry à barrière) → tâche sporadique, objet protégé
+      `Mailbox` **prouvé SPARK**
+- [x] **Cross-compilation embarquée sans la carte** : le cœur prouvé
+      (`src/processing`) compile pour Cortex-M4F (runtime `light`), vérifié
+      en CI (`radar_core.gpr`)
+- [x] Tests unitaires **AUnit** : 10 tests verts (traitement du balayage +
+      géométrie, regroupement 3D, pistage)
+- [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
+      build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
+      cross-compilation ARM
+- [ ] Driver capteur A121 en Ada sur STM32 (matériel requis)
 - [ ] Balayage motorisé réel (matériel requis)
 
 ## Chaîne de traitement
 
-Le paquet `Radar_Sweep` transforme un balayage brut en cibles :
+Le paquet `Radar_Sweep` (SPARK, prouvé) transforme un balayage brut en
+cibles : seuil de détection, pic (`Peak_Bin`), conversion case → distance
+(`Bin_Distance`), détection multi-cibles et regroupement d'échos voisins.
 
-- **Seuil de détection** : un écho sous le seuil est considéré comme du bruit
-  (cas « aucune cible »).
-- **Détection du pic** : la case d'amplitude maximale.
-- **`Detect_All`** : toutes les cases dont l'écho dépasse le seuil.
-- **`Detect_Clustered`** : regroupe les cases voisines au-dessus du seuil en
-  une seule cible (un objet étalé sur plusieurs cases = une cible, pas
-  plusieurs).
+Au-dessus, le pipeline de perception 3D (branche `tracking-3d`) :
+
+1. `Radar_Source` : interface abstraite — la source simulée
+   (`Radar_Sim_Source`) et, plus tard, le vrai capteur sont
+   interchangeables ;
+2. `Radar_Detect` : chaque mesure passe par `Detect_Clustered` (la
+   fonction **prouvée**) — deux objets alignés sur un même rayon donnent
+   bien deux détections ;
+3. `Cluster` : fusion spatiale des détections d'un même tour ;
+4. `Radar_Track` : association par proximité, ID stables, vecteurs
+   vitesse (corrigés du nombre de tours écoulés en cas d'occultation).
+
+`alr run` rejoue 60 tours de scan d'un monde simulé mobile et génère
+`radar_tracking_3d.html`, un visualiseur Three.js autonome (la version
+publiée sur [GitHub Pages](https://St3id.github.io/radar_fw/) provient du
+mode cartographie statique de la branche `main`).
 
 ## Architecture concurrente (Ravenscar)
 
-Deux tâches déclarées au niveau bibliothèque communiquent par un objet
-protégé, comme l'impose le profil Ravenscar (concurrence déterministe, sans
-interblocage) :
+L'exécutable `radar_demo` (projet `radar_demo.gpr`) fait tourner le motif
+Ravenscar canonique — et le profil est **imposé à la compilation** par
+`ravenscar.adc` (`pragma Profile (Ravenscar)` + élaboration séquentielle),
+pas seulement annoncé :
 
-- `Producer` dépose un balayage dans l'objet protégé `Mailbox` ;
-- `Consumer` le récupère et le traite ;
-- `Mailbox` garantit l'exclusion mutuelle entre les deux tâches.
+- `Producer` (tâche **cyclique**) : cadencée par `delay until`, dépose un
+  balayage toutes les 250 ms dans l'objet protégé ;
+- `Mailbox` (objet protégé, **prouvé SPARK**) : `entry Get` à barrière
+  simple — le consommateur est suspendu par le noyau tant qu'il n'y a
+  rien à lire, zéro polling ;
+- `Consumer` (tâche **sporadique**) : réveillée par la barrière, traite le
+  balayage avec les fonctions prouvées de `Radar_Sweep` ;
+- fin de démo signalée par un **objet de suspension**
+  (`Ada.Synchronous_Task_Control`), l'autre primitive de synchronisation
+  autorisée par Ravenscar.
 
-## Reconstruction 3D
+```sh
+alr exec -- gprbuild -p -P radar_demo.gpr
+alr exec -- ./bin/radar_demo
+```
 
-Le paquet `Radar_Cloud` simule un scan complet d'une pièce (azimut × élévation)
-et produit un nuage de points 3D, à partir de la géométrie de `Radar_Geometry`
-(conversion distance + angles → point cartésien). Le programme principal génère
-`radar_3d.html`, un visualiseur **autonome** : Three.js est chargé depuis un
-CDN, le fichier s'ouvre directement dans un navigateur (rotation à la souris,
-zoom à la molette), sans serveur.
+## Cible embarquée (sans la carte)
+
+`radar_core.gpr` compile le cœur algorithmique pour **arm-eabi /
+Cortex-M4F** avec le runtime réduit `light` — le processeur du STM32G474
+visé. La CI rejoue cette compilation à chaque commit : tout ajout au cœur
+qui dépendrait du PC (`Text_IO`, `Calendar`, exceptions propagées…) casse
+le build immédiatement.
 
 ## Vérification formelle
 
-Le code en `SPARK_Mode` (principalement le paquet `Radar_Sweep`) est prouvé
-avec SPARK (prouveur CVC5) : **23 checks, 0 non prouvé**.
+Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
+**35 checks, 0 non prouvé** :
 
 - absence d'erreur d'exécution (débordements, indices hors bornes) ;
-- contrats fonctionnels (par ex. la détection de pic renvoie bien le maximum) ;
-- terminaison des sous-programmes.
+- contrats fonctionnels : `Peak_Bin` renvoie bien le maximum,
+  `Peak_Distance` vaut exactement `Bin_Distance (Peak_Bin (S))`, et
+  `Detect_All` / `Detect_Clustered` ne rapportent **aucune fausse
+  alarme** (toute cible retournée dépasse le seuil) ;
+- terminaison des sous-programmes (aspect implicite `Always_Terminates`) ;
+- l'objet protégé `Mailbox` est prouvé dans le contexte Ravenscar
+  (projet `radar_demo.gpr`).
 
-Reproduire la preuve :
+Reproduire les deux preuves :
 
-    alr gnatprove
+    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on
+    alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
 
 ## Tests
 
-Tests unitaires AUnit (4 tests : absence de cible, détection du pic,
-multi-cibles, regroupement) :
+10 tests AUnit en deux suites : traitement du balayage (pic, seuil,
+multi-cibles, regroupement) et pipeline 3D (aller-retour géométrique,
+normalisation d'azimut, zénith, regroupement 3D, vitesse de piste après
+occultation, deux échos sur un même rayon) :
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr
-    ./bin/run_tests
+    alr exec -- ./bin/run_tests
 
 ## Compilation et exécution
 
     alr build
     alr run
 
-`alr run` génère `radar_3d.html` ; ouvrez-le dans un navigateur.
+`alr run` génère `radar_tracking_3d.html` ; ouvrez-le dans un navigateur.
 
 ## Intégration continue
 
-Le workflow GitHub Actions (`.github/workflows/ci.yml`) se déclenche à chaque
-push et pull request : compilation, tests AUnit et preuve SPARK. La preuve est
-**bloquante** (`--checks-as-errors=on`) : un seul check non prouvé fait échouer
-la CI.
+Le workflow GitHub Actions (`.github/workflows/ci.yml`) se déclenche à
+chaque push sur **toutes les branches** : compilation, tests AUnit,
+exécution du démonstrateur Ravenscar, preuves SPARK des deux projets
+(**bloquantes** : `--checks-as-errors=on`) et cross-compilation du cœur
+pour la cible ARM.
 
 ## Outils
 

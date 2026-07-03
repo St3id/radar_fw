@@ -32,7 +32,7 @@ exactement ce que recherche le domaine.
 
 | Matériel                        | Statut    | Rôle                                          |
 |---------------------------------|-----------|-----------------------------------------------|
-| ESP32                           | possédé   | hors cible (Xtensa ; Ada possible mais peubalisé) |  
+| ESP32                           | possédé   | hors cible (Xtensa ; Ada peu balisé)          |
 | PIC                             | possédé   | hors cible (pas de support Ada)               |
 | WeAct **STM32G474**             | à acheter | cerveau Ada (Cortex-M4 + FPU), ~10–15 €       |
 | ST-Link V2 (clone)              | à acheter | programmateur/débogueur, ~3–5 €               |
@@ -48,7 +48,7 @@ Ravenscar. Budget matériel total visé : **100–300 €**.
 
 ## 3. Architecture cible
 
-```
+```text
 [Capteur A121] --SPI--> [STM32G474 — Ada bare-metal, profil Ravenscar]
 [Moteur+encodeur] <----> |  tâche acquisition  |
                          |  tâche moteur/scan  |  --> objet protégé (tampon, prouvé SPARK)
@@ -80,18 +80,34 @@ angulaire grossière), pas une maquette CAO.
 
 - [x] Environnement Ada complet (Alire + VS Code + toolchains native et ARM)
 - [x] Paquet `Radar_Sweep` : types bornés (`Millimeters`, `Bin_Index`,
-      `Amplitude`, `Sweep`), seuil de détection, `Peak_Bin` (pic) et
-      `Peak_Distance` (distance), détection multi-cibles (`Detect_All`) et
-      regroupement des échos voisins (`Detect_Clustered`), avec contrats
-      `Post` et `Loop_Invariant`
-- [x] **Preuve SPARK : 23 checks, 0 non prouvé** (prouveur CVC5)
-- [x] Tests **AUnit** : 4 tests verts (absence de cible, pic, multi-cibles,
-      regroupement) — remplacent l'ancien banc de test du `main`
-- [x] Architecture **Ravenscar** : tâches `Producer` / `Consumer`
-      (`Radar_Tasks`) + objet protégé `Mailbox` (`Radar_Buffer`)
-- [x] Reconstruction 3D : géométrie (`Radar_Geometry`), scan de pièce simulé
-      (`Radar_Cloud`) et visualiseur **Three.js** généré (`radar_3d.html`)
-- [x] **CI GitHub Actions** : build + tests AUnit + preuve SPARK, bloquante
+      `Amplitude`, `Sweep`), seuil de détection, `Peak_Bin` (pic),
+      `Bin_Distance` / `Peak_Distance` (distance), détection multi-cibles
+      (`Detect_All`) et regroupement des échos voisins (`Detect_Clustered`),
+      avec contrats `Post` et `Loop_Invariant`
+- [x] **Preuve SPARK : 35 checks, 0 non prouvé** (prouveur CVC5), dont des
+      **contrats fonctionnels non triviaux** (aucune fausse alarme : toute
+      cible rapportée dépasse le seuil ; `Peak_Distance` = distance exacte
+      de la case du pic) et la terminaison (`Always_Terminates` implicite)
+- [x] Pipeline 3D perçu (branche `tracking-3d`) : interface abstraite
+      `Radar_Source`, monde simulé mobile (`Radar_World`), détections 3D
+      (`Radar_Detect`, branchées sur `Detect_Clustered` — la fonction
+      prouvée), regroupement spatial (`Cluster`), pistage
+      (`Radar_Track` : ID stables, vitesses corrigées de l'occultation),
+      visualiseur `radar_tracking_3d.html`
+- [x] Tests **AUnit** : 10 tests verts en deux suites (traitement du
+      balayage + géométrie / regroupement / pistage)
+- [x] Architecture **Ravenscar RÉELLE** : exécutable `radar_demo`
+      (`radar_demo.gpr`) sous `pragma Profile (Ravenscar)` imposé par
+      `ravenscar.adc` + élaboration séquentielle ; tâche cyclique
+      `Producer` → objet protégé `Mailbox` (**entry à barrière**, prouvé
+      SPARK) → tâche sporadique `Consumer` ; fin signalée par un objet de
+      suspension (`Ada.Synchronous_Task_Control`)
+- [x] **Cross-compilation embarquée sans la carte** : `radar_core.gpr`
+      compile le cœur prouvé (`src/processing`) pour Cortex-M4F
+      (runtime `light`), vérifié en CI
+- [x] **CI GitHub Actions** sur **toutes les branches** : build + tests +
+      démo Ravenscar exécutée + 2 preuves SPARK bloquantes + cross-compile
+      ARM
 - [x] Git + GitHub (`github.com/St3id/radar_fw`) + README
 
 ### À venir — feuille de route
@@ -104,15 +120,22 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
 2. **(sans HW)** ✅ **Fait.** Cadre de tests **AUnit** (remplace le `if` du
    main ; renforce l'argument traçabilité exigences → tests).
 3. **(sans HW)** Documenter la traçabilité (exigences ↔ code ↔ tests).
+3bis. **(sans HW)** Étendre SPARK à la couche 3D (`Radar_Geometry`,
+   `Radar_Detect`, `Radar_Track`) — aujourd'hui en Float non SPARK ;
+   envisager des millimètres entiers bornés / virgule fixe (plus
+   « défense », preuve plus simple).
 4. **(carte requise)** Phase 0 « blinky » sur STM32G474 :
    cross-compiler (`gnat_arm_elf` + runtime **AdaCore** `embedded_stm32g4xx` /
    `light-tasking-stm32g4xx`), puis flasher via OpenOCD/ST-Link.
    *Éviter les crates `a0b` (voir § Notes).*
+   *→ La cross-compilation du cœur est DÉJÀ en CI (`radar_core.gpr`,
+   runtime générique `light-cortex-m4f`) ; reste le runtime G474 + flash.*
 5. **(carte requise)** Driver **A121 en SPI**, écrit en Ada.
 6. **(carte requise)** Architecture **Ravenscar** : tâches + objet protégé
    (tampon partagé), idéalement prouvé SPARK.
-   *→ Version simulée déjà réalisée (`Radar_Tasks` + `Radar_Buffer`) ; reste à
-   valider sur carte réelle.*
+   *→ FAIT côté simulation : `radar_demo` s'exécute sous profil Ravenscar
+   imposé, `Mailbox` (entry à barrière) prouvée SPARK. Reste à valider
+   sur carte réelle (runtime `light-tasking`).*
 7. **(carte requise)** Scan motorisé + assemblage du nuage de points.
    *→ Nuage de points simulé déjà réalisé (`Radar_Cloud`) ; reste le balayage
    motorisé réel.*
@@ -141,7 +164,12 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
 - **Types bornés + contrats partout** : pas d'entier nu pour une grandeur
   physique ; préconditions/postconditions sur les interfaces.
 - **`SPARK_Mode => On`** sur tous les paquets de calcul ; le `main` de test peut
-  rester en `SPARK_Mode => Off`.
+  rester en `SPARK_Mode => Off`. *État réel : `Radar_Sweep` et `Radar_Buffer`
+  sont en SPARK ; la couche 3D (Float) ne l'est pas encore — c'est le
+  chantier 3bis de la feuille de route.*
+- **Contrats non triviaux** : une postcondition déjà garantie par un
+  sous-type (ex. `Count <= Max`) ne prouve rien ; viser des propriétés
+  fonctionnelles (ex. « toute cible rapportée dépasse le seuil »).
 - **Reprouver après chaque ajout** de logique (`alr gnatprove`, viser 0 unproved).
 - **README** tenu à jour (la liste d'avancement reflète l'état réel).
 - Commentaires : tolérés sans accents par sécurité ; passage en anglais prévu
@@ -169,10 +197,14 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
 > Projet `radar_fw` : démonstrateur d'embarqué haute-intégrité en **Ada/SPARK**,
 > visant la défense/aéro. Le radar est un prétexte ; la vitrine, c'est la
 > rigueur (Ravenscar, contrats, preuve SPARK). Cible matérielle : **STM32G474**.
-> État actuel : environnement OK ; paquet `Radar_Sweep` (détection de pic +
-> distance) écrit, testé et **prouvé en SPARK (0 unproved)** ; versionné sur
-> GitHub. Voir `GUIDE_PROJET.md` (ce fichier) et `GUIDE_INSTALLATION_ADA.md`.
-> Prochaine étape sans matériel : enrichir le traitement (seuil « aucune cible »,
-> multi-cibles) et le prouver en SPARK, puis AUnit.
+> État actuel : `Radar_Sweep` **prouvé SPARK (35 checks, contrats
+> fonctionnels)** ; pipeline 3D perçu (source abstraite → détections →
+> clustering → **tracking**) sur monde simulé ; **Ravenscar réel**
+> (`radar_demo` : profil imposé par `ravenscar.adc`, entry à barrière,
+> `Mailbox` prouvée) ; 10 tests AUnit ; CI sur toutes les branches avec
+> 2 preuves bloquantes et **cross-compilation ARM du cœur**
+> (`radar_core.gpr`). Voir `GUIDE_PROJET.md` (ce fichier).
+> Prochaines étapes sans matériel : traçabilité exigences ↔ code ↔ tests,
+> étendre SPARK à la couche 3D, bruit réaliste dans le simulateur.
 > Important : c'est un projet d'apprentissage — **expliquer avant de modifier**,
 > et procéder par petites étapes.
