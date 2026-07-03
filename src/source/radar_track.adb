@@ -48,12 +48,20 @@ package body Radar_Track is
                   declare
                      Old_Pos : constant Point_3D := T.Tracks (I).Pos;
                      New_Pos : constant Point_3D := F.Items (Best_J).Pos;
+
+                     --  Nombre de tours ecoules depuis la derniere
+                     --  association : 1 + les tours rates. Si la piste a
+                     --  rate des tours, le deplacement observe s'est etale
+                     --  sur tous ces tours ; sans cette division, la
+                     --  vitesse serait surestimee d'un facteur Missing+1.
+                     Turns : constant Float :=
+                       Float (T.Tracks (I).Missing + 1);
                   begin
-                     --  Vitesse = deplacement depuis le tour precedent.
+                     --  Vitesse = deplacement PAR TOUR.
                      T.Tracks (I).Velocity :=
-                       (X => New_Pos.X - Old_Pos.X,
-                        Y => New_Pos.Y - Old_Pos.Y,
-                        Z => New_Pos.Z - Old_Pos.Z);
+                       (X => (New_Pos.X - Old_Pos.X) / Turns,
+                        Y => (New_Pos.Y - Old_Pos.Y) / Turns,
+                        Z => (New_Pos.Z - Old_Pos.Z) / Turns);
                      T.Tracks (I).Pos     := New_Pos;
                      T.Tracks (I).Missing := 0;
                      Matched (Best_J)     := True;

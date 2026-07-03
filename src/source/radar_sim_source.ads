@@ -1,5 +1,4 @@
 with Radar_Source;  use Radar_Source;
-with Radar_Sweep;   use Radar_Sweep;
 with Radar_World;   use Radar_World;
 
 package Radar_Sim_Source is

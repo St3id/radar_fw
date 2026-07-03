@@ -29,5 +29,5 @@ package Radar_Geometry is
    --  Conversion INVERSE de To_Point : d'un point (X,Y,Z) vers
    --  sa direction et sa distance vues depuis le radar (a l'origine).
    function To_Polar (P : Point_3D) return Polar;
-   
+
 end Radar_Geometry;
