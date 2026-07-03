@@ -30,6 +30,9 @@ exactement ce que recherche le domaine.
 
 ## 2. Matériel
 
+> Détail des capteurs, liste d'achats par phase et marche à suivre
+> matérielle : voir **`GUIDE_MATERIEL.md`**.
+
 | Matériel                        | Statut    | Rôle                                          |
 |---------------------------------|-----------|-----------------------------------------------|
 | ESP32                           | possédé   | hors cible (Xtensa ; Ada peu balisé)          |
