@@ -31,7 +31,15 @@ package Radar_Detect is
 
    --  Rayon de regroupement : deux detections a moins de cette distance
    --  (en mm) sont considerees comme le meme objet reel.
-   Cluster_Radius : constant Float := 300.0;
+   --
+   --  600 mm et pas moins, parce qu'une cible ETENDUE (reflecteurs a
+   --  +/-150 mm) vue par une grille d'elevation a pas de 10 degres peut
+   --  voir ses echos "claquer" sur deux lignes d'elevation voisines :
+   --  a 3 m, cela ecarte deux detections du meme objet d'environ
+   --  3000 x sin(10 deg) = 520 mm. Revers assume : deux objets reels a
+   --  moins de 600 mm fusionnent - c'est la limite de resolution reelle
+   --  du capteur simule.
+   Cluster_Radius : constant Float := 600.0;
 
    --  Regroupe les detections proches d'une frame en cibles uniques.
    --  Renvoie une nouvelle frame ou chaque objet reel n'apparait qu'une fois

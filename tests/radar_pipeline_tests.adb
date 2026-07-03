@@ -67,8 +67,9 @@ package body Radar_Pipeline_Tests is
               "L'elevation au zenith devrait etre 90 deg");
    end Test_Zenith;
 
-   --  Test 4 : regroupement. Deux detections a 100 mm l'une de l'autre
-   --  fusionnent (position moyenne) ; une troisieme a 2 m reste seule.
+   --  Test 4 : regroupement. Deux echos d'une MEME cible etendue
+   --  (500 mm d'ecart : reflecteurs + quantification en elevation)
+   --  fusionnent ; un objet a 2 m reste une cible distincte.
    procedure Test_Cluster
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -78,7 +79,7 @@ package body Radar_Pipeline_Tests is
       Reset (F);
       F.Count := 3;
       F.Items (1) := (Pos => (0.0, 0.0, 0.0),    Distance => 0.0);
-      F.Items (2) := (Pos => (100.0, 0.0, 0.0),  Distance => 100.0);
+      F.Items (2) := (Pos => (500.0, 0.0, 0.0),  Distance => 500.0);
       F.Items (3) := (Pos => (2000.0, 0.0, 0.0), Distance => 2000.0);
 
       declare
@@ -86,7 +87,7 @@ package body Radar_Pipeline_Tests is
       begin
          Assert (C.Count = 2,
                  "3 detections dont 2 proches devraient donner 2 cibles");
-         Assert (abs (C.Items (1).Pos.X - 50.0) < 0.001,
+         Assert (abs (C.Items (1).Pos.X - 250.0) < 0.001,
                  "La cible fusionnee devrait etre a la position moyenne");
          Assert (abs (C.Items (2).Pos.X - 2000.0) < 0.001,
                  "La detection isolee devrait rester en place");
