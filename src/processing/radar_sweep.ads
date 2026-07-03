@@ -81,4 +81,37 @@ is
        (for all K in 1 .. Detect_Clustered'Result.Count =>
           S (Detect_Clustered'Result.Targets (K)) >= Detection_Threshold);
 
+   --  ----- Seuil adaptatif CFAR (ANALYSE_REALISME.md, point 2) -----
+   --  Un seuil fixe ne survit pas au monde reel : trop bas, il noie le
+   --  pistage de fausses alarmes ; trop haut, il rate les cibles
+   --  faibles. CA-CFAR (Cell-Averaging Constant False Alarm Rate) : le
+   --  seuil de CHAQUE case = bruit moyen de ses voisines x un facteur.
+
+   CFAR_Window : constant := 8;  --  cases moyennees de chaque cote
+   CFAR_Guard  : constant := 2;  --  cases ignorees autour de la testee
+   CFAR_Factor : constant := 4;  --  seuil = 4 x bruit local (~12 dB)
+
+   --  Plancher absolu : en zone parfaitement silencieuse, le seuil ne
+   --  descend pas en dessous (sinon le moindre souffle detecterait).
+   CFAR_Floor : constant Natural := 60;
+
+   --  Bruit local autour d'une case : moyenne des cases voisines dans
+   --  la fenetre, hors cases de garde, bornes du balayage respectees.
+   function Noise_Estimate (S : Sweep; B : Bin_Index) return Amplitude;
+
+   --  Seuil CFAR d'une case donnee.
+   function CFAR_Threshold (S : Sweep; B : Bin_Index) return Natural is
+     (Natural'Max (CFAR_Floor,
+                   CFAR_Factor * Natural (Noise_Estimate (S, B))));
+
+   --  Detection a seuil ADAPTATIF + regroupement des cases voisines.
+   --  C'est elle que le pipeline utilise. Contrat prouve : toute cible
+   --  rapportee depasse le seuil CFAR de SA case (pas de fausse alarme
+   --  par rapport au bruit local).
+   function Detect_Adaptive (S : Sweep) return Detection
+     with Post =>
+       (for all K in 1 .. Detect_Adaptive'Result.Count =>
+          Natural (S (Detect_Adaptive'Result.Targets (K)))
+            >= CFAR_Threshold (S, Detect_Adaptive'Result.Targets (K)));
+
 end Radar_Sweep;
