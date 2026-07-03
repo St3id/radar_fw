@@ -1,0 +1,37 @@
+--  Coeur de traitement compile pour la CIBLE EMBARQUEE, sans la carte.
+--
+--  Ce projet ne produit pas d'executable : il verifie en continu (CI)
+--  que le coeur algorithmique (src/processing, prouve SPARK) compile
+--  pour un Cortex-M4F avec le runtime reduit "light" - celui du
+--  STM32G474 vise. C'est le garde-fou "embedded-ready" du depot : tout
+--  ajout au coeur qui dependrait du PC (Text_IO, Calendar, exceptions
+--  propagees, allocation...) casse cette compilation immediatement.
+--
+--  NB : light-cortex-m4f est le runtime generique M4F livre avec
+--  gnat_arm_elf ; le passage au runtime specifique STM32G474
+--  (embedded_stm32g4xx) se fera avec la carte.
+project Radar_Core is
+
+   for Target use "arm-eabi";
+   for Runtime ("Ada") use "light-cortex-m4f";
+
+   for Source_Dirs use ("src/processing");
+   for Object_Dir use "obj/arm-core";
+   for Create_Missing_Dirs use "True";
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-Os",       --  optimiser la taille (norme en embarque)
+         "-g",
+         "-gnatwa",
+         --  Le runtime light interdit la propagation d'exceptions ;
+         --  GNAT signalerait chaque check susceptible d'appeler le
+         --  Last_Chance_Handler. Or la preuve SPARK demontre justement
+         --  que ces checks ne peuvent pas echouer : on coupe ce bruit.
+         "-gnatw.X",
+         "-gnatVa",
+         --  Memes controles de style que le projet principal.
+         "-gnaty3aAbBcefhiIklmnOprStux");
+   end Compiler;
+
+end Radar_Core;
