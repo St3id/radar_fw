@@ -35,11 +35,18 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] **Cross-compilation embarquée sans la carte** : le cœur prouvé
       (`src/processing`) compile pour Cortex-M4F (runtime `light`), vérifié
       en CI (`radar_core.gpr`)
-- [x] **Deux modes d'exploitation** partageant la même source et la même
-      chaîne prouvée : `radar_fw track` (surveillance temps réel) et
-      `radar_fw map` (cartographie 3D d'une pièce statique)
-- [x] Tests unitaires **AUnit** : 11 tests verts (traitement du balayage +
-      géométrie, regroupement 3D, pistage, murs de la pièce)
+- [x] **Trois modes d'exploitation** partageant la même source et la même
+      chaîne prouvée : `radar_fw track` (rejeu du pistage), `radar_fw map`
+      (cartographie 3D navigable d'une pièce) et `radar_fw live`
+      (surveillance **temps réel** dans le navigateur)
+- [x] **MTI par carte de clutter** (`Radar_Clutter`, embarquable et
+      cross-compilé ARM en CI) : le décor statique appris au premier tour
+      est soustrait, seuls les objets **mobiles** deviennent des pistes —
+      avec ou sans pièce autour
+- [x] **Serveur HTTP écrit en Ada** (`GNAT.Sockets`, mono-thread à
+      selector) : la page 3D live interroge `/state.json` en continu
+- [x] Tests unitaires **AUnit** : 12 tests verts (traitement du balayage +
+      géométrie, regroupement 3D, pistage, murs, clutter)
 - [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
       build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
       cross-compilation ARM
@@ -64,23 +71,31 @@ Au-dessus, le pipeline de perception 3D (branche `tracking-3d`) :
 4. `Radar_Track` : association par proximité, ID stables, vecteurs
    vitesse (corrigés du nombre de tours écoulés en cas d'occultation).
 
-## Deux modes d'exploitation
+## Trois modes d'exploitation
 
-Les deux modes partagent la même source de données (`Radar_Source`) et la
+Les modes partagent la même source de données (`Radar_Source`) et la
 même chaîne de détection prouvée ; seul le **traitement des balayages**
 change (c'est le point 9 de la feuille de route) :
 
-    alr run                          # mode surveillance (defaut)
-    alr exec -- ./bin/radar_fw map   # mode cartographie
+    alr run                          # rejeu du pistage (defaut)
+    alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
+    alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
 
-- **`track` — surveillance temps réel** : 60 tours d'un monde d'objets
-  mobiles, pistage, vitesses → `radar_tracking_3d.html`, un rejeu animé
-  (lissage et vitesse réglables) ;
+- **`track` — rejeu du pistage** : 60 tours d'un monde d'objets mobiles,
+  pistage, vitesses → `radar_tracking_3d.html`, un rejeu animé (lissage
+  et vitesse réglables) ;
 - **`map` — cartographie statique** : un tour méticuleux (180 × 24
-  directions) d'une pièce sans objets mobiles, accumulation d'un nuage
-  dense (~4 300 points) → `radar_3d.html`, un nuage figé explorable —
-  c'est cette sortie qui alimente la page
-  [GitHub Pages](https://St3id.github.io/radar_fw/).
+  directions) d'une pièce sans objets mobiles → `radar_3d.html`, un nuage
+  dense (~4 300 points) **navigable** : déplacement ZQSD/WASD, clic sur un
+  point pour ses détails (position, distance, angles) — c'est cette sortie
+  qui alimente la page [GitHub Pages](https://St3id.github.io/radar_fw/) ;
+- **`live` — surveillance temps réel** : un serveur HTTP **écrit en Ada**
+  fait tourner la simulation en continu (murs + objets mobiles qui
+  rebondissent). Le tour 1 calibre la **carte de clutter** ; ensuite le
+  décor est soustrait et seuls les mobiles sont pistés. La page 3D
+  (overlay : cibles numérotées, distance, vitesse en m/s, traînées) se
+  met à jour seule. Le jour du matériel, seule la source change (UART au
+  lieu du simulateur).
 
 ## Architecture concurrente (Ravenscar)
 
@@ -132,10 +147,11 @@ Reproduire les deux preuves :
 
 ## Tests
 
-11 tests AUnit en deux suites : traitement du balayage (pic, seuil,
+12 tests AUnit en deux suites : traitement du balayage (pic, seuil,
 multi-cibles, regroupement) et pipeline 3D (aller-retour géométrique,
 normalisation d'azimut, zénith, regroupement 3D, vitesse de piste après
-occultation, deux échos sur un même rayon, distance aux murs) :
+occultation, deux échos sur un même rayon, distance aux murs, carte de
+clutter) :
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr
     alr exec -- ./bin/run_tests
@@ -145,8 +161,10 @@ occultation, deux échos sur un même rayon, distance aux murs) :
     alr build
     alr run                          # tracking -> radar_tracking_3d.html
     alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
+    alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
 
-Ouvrez le fichier HTML généré dans un navigateur.
+Pour `track` et `map`, ouvrez le fichier HTML généré dans un navigateur ;
+pour `live`, ouvrez l'URL pendant que le programme tourne.
 
 ## Intégration continue
 
