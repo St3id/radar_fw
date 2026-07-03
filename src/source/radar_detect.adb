@@ -18,11 +18,10 @@ package body Radar_Detect is
    ---------
 
    procedure Add (F : in out Frame; M : Measurement) is
-      --  Toutes les cibles du balayage, via la fonction PROUVEE en SPARK
-      --  (contrat : aucune fausse alarme). Avant, on ne gardait que le
-      --  pic : deux objets alignes sur le meme rayon ne donnaient qu'une
-      --  detection, le second etait invisible.
-      D : constant Detection := Detect_Clustered (M.Data);
+      --  Toutes les cibles du balayage, via la detection CFAR prouvee
+      --  en SPARK (seuil adaptatif au bruit local : contrat "aucune
+      --  fausse alarme par rapport au bruit ambiant").
+      D : constant Detection := Detect_Adaptive (M.Data);
    begin
       for K in 1 .. D.Count loop
          exit when F.Count = Max_Detections;

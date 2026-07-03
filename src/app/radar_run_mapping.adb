@@ -35,7 +35,7 @@ begin
       exit when not OK;
 
       declare
-         D : constant Detection := Detect_Clustered (M.Data);
+         D : constant Detection := Detect_Adaptive (M.Data);
       begin
          for K in 1 .. D.Count loop
             Append (Cloud,

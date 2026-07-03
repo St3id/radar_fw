@@ -148,10 +148,11 @@ procedure Radar_Run_Tracking is
       begin
          Update (Trk, C);
 
-         --  On serialise UNIQUEMENT les pistes percues (Id, pos, vitesse).
+         --  On serialise UNIQUEMENT les pistes CONFIRMEES (M-sur-N) :
+         --  les tentatives et les fantomes n'apparaissent jamais.
          Put (Out_F, "[");
          for I in Trk.Tracks'Range loop
-            if Trk.Tracks (I).Active then
+            if Trk.Tracks (I).Active and then Trk.Tracks (I).Confirmed then
                declare
                   Tk : constant Track := Trk.Tracks (I);
                begin
