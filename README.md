@@ -20,7 +20,7 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] Traitement d'un balayage : seuil de détection, pic, conversion en
       distance, multi-cibles (`Detect_All`) et regroupement des échos
       voisins (`Detect_Clustered`)
-- [x] Vérification formelle SPARK : **83 checks prouvés, 0 non prouvé**,
+- [x] Vérification formelle SPARK : **85 checks prouvés, 0 non prouvé**,
       avec des **contrats fonctionnels** — dont le **CFAR** (seuil
       adaptatif au bruit local : « aucune cible rapportée sous son seuil
       local », prouvé) — et la terminaison (`Always_Terminates`)
@@ -49,13 +49,14 @@ rigoureuse, applicable au domaine défense / aéronautique.
       données imparfaites (voir `ANALYSE_REALISME.md`)
 - [x] **Pistage robuste** : prédiction + coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (les tentatives et les fantômes ne sont
-      jamais affichés), clutter **adaptatif** (apprentissage de fond,
-      oubli lent)
+      jamais affichés), **association globale** (pas de vol de détection),
+      **fusion anti-fragmentation**, clutter **adaptatif** (apprentissage
+      de fond, oubli lent), **distance aveugle** prouvée (625 mm)
 - [x] **Serveur HTTP écrit en Ada** (`GNAT.Sockets`, mono-thread à
       selector) : la page 3D live interroge `/state.json` en continu
-- [x] Tests unitaires **AUnit** : 14 tests verts (balayage, CFAR,
-      géométrie, regroupement 3D, cycle de vie du pistage, murs, clutter
-      adaptatif)
+- [x] Tests unitaires **AUnit** : 16 tests verts (balayage, CFAR,
+      géométrie, regroupement 3D, cycle de vie du pistage, association
+      globale, fusion, murs, clutter adaptatif)
 - [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
       build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
       cross-compilation ARM
@@ -138,7 +139,7 @@ le build immédiatement.
 ## Vérification formelle
 
 Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
-**83 checks, 0 non prouvé** :
+**85 checks, 0 non prouvé** :
 
 - absence d'erreur d'exécution (débordements, indices hors bornes) ;
 - contrats fonctionnels : `Peak_Bin` renvoie bien le maximum,
