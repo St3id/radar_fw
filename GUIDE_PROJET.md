@@ -155,6 +155,12 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
    Les deux modes diffèrent par le traitement des balayages (suivi temps réel
    vs accumulation), pas par la source de données.
 
+   *→ Première version FAITE : `radar_fw track` (surveillance, défaut) et
+   `radar_fw map` (cartographie : murs dans `Radar_World`, source
+   `Make_Room_Scan`, nuage accumulé via `Detect_Clustered`, sortie
+   `radar_3d.html`). Reste : bruit réaliste, accumulation multi-passes,
+   densité configurable.*
+
 ---
 
 ## 5. Conventions du projet

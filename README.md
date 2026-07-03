@@ -35,8 +35,11 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] **Cross-compilation embarquée sans la carte** : le cœur prouvé
       (`src/processing`) compile pour Cortex-M4F (runtime `light`), vérifié
       en CI (`radar_core.gpr`)
-- [x] Tests unitaires **AUnit** : 10 tests verts (traitement du balayage +
-      géométrie, regroupement 3D, pistage)
+- [x] **Deux modes d'exploitation** partageant la même source et la même
+      chaîne prouvée : `radar_fw track` (surveillance temps réel) et
+      `radar_fw map` (cartographie 3D d'une pièce statique)
+- [x] Tests unitaires **AUnit** : 11 tests verts (traitement du balayage +
+      géométrie, regroupement 3D, pistage, murs de la pièce)
 - [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
       build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
       cross-compilation ARM
@@ -61,10 +64,23 @@ Au-dessus, le pipeline de perception 3D (branche `tracking-3d`) :
 4. `Radar_Track` : association par proximité, ID stables, vecteurs
    vitesse (corrigés du nombre de tours écoulés en cas d'occultation).
 
-`alr run` rejoue 60 tours de scan d'un monde simulé mobile et génère
-`radar_tracking_3d.html`, un visualiseur Three.js autonome (la version
-publiée sur [GitHub Pages](https://St3id.github.io/radar_fw/) provient du
-mode cartographie statique de la branche `main`).
+## Deux modes d'exploitation
+
+Les deux modes partagent la même source de données (`Radar_Source`) et la
+même chaîne de détection prouvée ; seul le **traitement des balayages**
+change (c'est le point 9 de la feuille de route) :
+
+    alr run                          # mode surveillance (defaut)
+    alr exec -- ./bin/radar_fw map   # mode cartographie
+
+- **`track` — surveillance temps réel** : 60 tours d'un monde d'objets
+  mobiles, pistage, vitesses → `radar_tracking_3d.html`, un rejeu animé
+  (lissage et vitesse réglables) ;
+- **`map` — cartographie statique** : un tour méticuleux (180 × 24
+  directions) d'une pièce sans objets mobiles, accumulation d'un nuage
+  dense (~4 300 points) → `radar_3d.html`, un nuage figé explorable —
+  c'est cette sortie qui alimente la page
+  [GitHub Pages](https://St3id.github.io/radar_fw/).
 
 ## Architecture concurrente (Ravenscar)
 
@@ -84,10 +100,8 @@ pas seulement annoncé :
   (`Ada.Synchronous_Task_Control`), l'autre primitive de synchronisation
   autorisée par Ravenscar.
 
-```sh
-alr exec -- gprbuild -p -P radar_demo.gpr
-alr exec -- ./bin/radar_demo
-```
+    alr exec -- gprbuild -p -P radar_demo.gpr
+    alr exec -- ./bin/radar_demo
 
 ## Cible embarquée (sans la carte)
 
@@ -118,10 +132,10 @@ Reproduire les deux preuves :
 
 ## Tests
 
-10 tests AUnit en deux suites : traitement du balayage (pic, seuil,
+11 tests AUnit en deux suites : traitement du balayage (pic, seuil,
 multi-cibles, regroupement) et pipeline 3D (aller-retour géométrique,
 normalisation d'azimut, zénith, regroupement 3D, vitesse de piste après
-occultation, deux échos sur un même rayon) :
+occultation, deux échos sur un même rayon, distance aux murs) :
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr
     alr exec -- ./bin/run_tests
@@ -129,9 +143,10 @@ occultation, deux échos sur un même rayon) :
 ## Compilation et exécution
 
     alr build
-    alr run
+    alr run                          # tracking -> radar_tracking_3d.html
+    alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
 
-`alr run` génère `radar_tracking_3d.html` ; ouvrez-le dans un navigateur.
+Ouvrez le fichier HTML généré dans un navigateur.
 
 ## Intégration continue
 
