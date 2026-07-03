@@ -200,8 +200,11 @@ is
    begin
       --  Meme regroupement que Detect_Clustered, mais chaque case est
       --  comparee a SON seuil CFAR au lieu d'un seuil global fixe.
+      --  Les cases de la distance aveugle ne sont jamais des cibles.
       for I in Bin_Index loop
-         if Natural (S (I)) >= CFAR_Threshold (S, I) then
+         if I > Blind_Bins
+           and then Natural (S (I)) >= CFAR_Threshold (S, I)
+         then
             if not In_Group then
                In_Group := True;
                Best_Pos := I;
@@ -221,11 +224,13 @@ is
          pragma Loop_Invariant (Result.Count <= Max_Targets);
          pragma Loop_Invariant
            (if In_Group
-            then Natural (S (Best_Pos)) >= CFAR_Threshold (S, Best_Pos));
+            then Natural (S (Best_Pos)) >= CFAR_Threshold (S, Best_Pos)
+                 and then Best_Pos > Blind_Bins);
          pragma Loop_Invariant
            (for all K in 1 .. Result.Count =>
               Natural (S (Result.Targets (K)))
-                >= CFAR_Threshold (S, Result.Targets (K)));
+                >= CFAR_Threshold (S, Result.Targets (K))
+              and then Result.Targets (K) > Blind_Bins);
       end loop;
 
       if In_Group and then Result.Count < Max_Targets then
