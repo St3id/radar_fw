@@ -1,5 +1,4 @@
 with Ada.Real_Time;          use Ada.Real_Time;
-with Ada.Streams;            use Ada.Streams;
 with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
 with Ada.Text_IO;            use Ada.Text_IO;
 with GNAT.Sockets;           use GNAT.Sockets;
@@ -8,6 +7,7 @@ with Radar_Clutter;          use Radar_Clutter;
 with Radar_Detect;           use Radar_Detect;
 with Radar_Geometry;         use Radar_Geometry;
 with Radar_Html;             use Radar_Html;
+with Radar_Http;             use Radar_Http;
 with Radar_Sim_Source;       use Radar_Sim_Source;
 with Radar_Source;           use Radar_Source;
 with Radar_Sweep;            use Radar_Sweep;
@@ -68,10 +68,7 @@ procedure Radar_Run_Live is
    Cloud_Json : Unbounded_String :=
      To_Unbounded_String ("{""points"":[]}");
 
-   Server : Socket_Type;
-   Sel    : Selector_Type;
-
-   CRLF : constant String := ASCII.CR & ASCII.LF;
+   Srv : Radar_Http.Server;
 
    --  ================= LA PAGE (visualiseur live) =================
 
@@ -298,143 +295,28 @@ procedure Radar_Run_Live is
       State_Json := Build_State;
    end Process_Turn;
 
-   --  ================= LE SERVEUR HTTP =================
+   --  ================= LES ROUTES HTTP =================
 
-   procedure Send_Str (Sock : Socket_Type; S : String) is
-      Data  : Stream_Element_Array (1 .. Stream_Element_Offset (S'Length));
-      First : Stream_Element_Offset := Data'First;
-      Last  : Stream_Element_Offset;
+   procedure Route (Path : String; Sock : Socket_Type) is
    begin
-      for I in S'Range loop
-         Data (Stream_Element_Offset (I - S'First + 1)) :=
-           Stream_Element (Character'Pos (S (I)));
-      end loop;
-      --  Send_Socket peut envoyer partiellement : on boucle.
-      while First <= Data'Last loop
-         Send_Socket (Sock, Data (First .. Data'Last), Last);
-         exit when Last >= Data'Last;
-         First := Last + 1;
-      end loop;
-   end Send_Str;
-
-   procedure Send_Response
-     (Sock   : Socket_Type;
-      Ctype  : String;
-      Content : Unbounded_String;
-      Code   : String := "200 OK")
-   is
-      B : constant String := To_String (Content);
-   begin
-      Send_Str (Sock,
-        "HTTP/1.1 " & Code & CRLF
-        & "Content-Type: " & Ctype & "; charset=utf-8" & CRLF
-        & "Content-Length:" & Natural'Image (B'Length) & CRLF
-        & "Cache-Control: no-store" & CRLF
-        & "Connection: close" & CRLF & CRLF);
-      Send_Str (Sock, B);
-   end Send_Response;
-
-   procedure Handle (Sock : Socket_Type) is
-      Buf  : Stream_Element_Array (1 .. 2048);
-      Last : Stream_Element_Offset;
-      Req  : String (1 .. 2048) := (others => ' ');
-   begin
-      Receive_Socket (Sock, Buf, Last);
-      for I in Buf'First .. Last loop
-         Req (Natural (I)) := Character'Val (Buf (I));
-      end loop;
-
-      --  Ligne de requete : "GET /chemin HTTP/1.1". On extrait /chemin.
-      declare
-         Sp1  : Natural := 0;
-         Sp2  : Natural := 0;
-      begin
-         for I in Req'Range loop
-            if Req (I) = ' ' then
-               if Sp1 = 0 then
-                  Sp1 := I;
-               else
-                  Sp2 := I;
-                  exit;
-               end if;
-            end if;
-         end loop;
-
-         if Sp1 = 0 or else Sp2 = 0 then
-            Send_Response (Sock, "text/plain",
-                           To_Unbounded_String ("bad request"),
-                           "400 Bad Request");
-         else
-            declare
-               Path : constant String := Req (Sp1 + 1 .. Sp2 - 1);
-            begin
-               if Path = "/" then
-                  Send_Response (Sock, "text/html", Page);
-               elsif Path = "/state.json" then
-                  Send_Response (Sock, "application/json", State_Json);
-               elsif Path = "/cloud.json" then
-                  Send_Response (Sock, "application/json", Cloud_Json);
-               else
-                  Send_Response (Sock, "text/plain",
-                                 To_Unbounded_String ("not found"),
-                                 "404 Not Found");
-               end if;
-            end;
-         end if;
-      end;
-
-      Close_Socket (Sock);
-   exception
-      when Socket_Error =>
-         --  Client parti en cours de route : on ferme et on continue.
-         begin
-            Close_Socket (Sock);
-         exception
-            when Socket_Error => null;
-         end;
-   end Handle;
-
-   --  Sert les requetes jusqu'a l'echeance du prochain tour : attente
-   --  passive sur le socket d'ecoute, avec timeout (selector).
-   procedure Serve_Until (Deadline : Time) is
-      R_Set  : Socket_Set_Type;
-      W_Set  : Socket_Set_Type;
-      Status : Selector_Status;
-   begin
-      loop
-         declare
-            Remaining : constant Duration := To_Duration (Deadline - Clock);
-         begin
-            exit when Remaining <= 0.0;
-            Empty (R_Set);
-            Set (R_Set, Server);
-            Empty (W_Set);
-            Check_Selector (Sel, R_Set, W_Set, Status, Remaining);
-            exit when Status /= Completed;
-
-            declare
-               Sock : Socket_Type;
-               Addr : Sock_Addr_Type;
-            begin
-               Accept_Socket (Server, Sock, Addr);
-               Handle (Sock);
-            end;
-         end;
-      end loop;
-   end Serve_Until;
+      if Path = "/" then
+         Send_Response (Sock, "text/html", Page);
+      elsif Path = "/state.json" then
+         Send_Response (Sock, "application/json", State_Json);
+      elsif Path = "/cloud.json" then
+         Send_Response (Sock, "application/json", Cloud_Json);
+      else
+         Send_Response (Sock, "text/plain",
+                        To_Unbounded_String ("not found"),
+                        "404 Not Found");
+      end if;
+   end Route;
 
    Next_Turn : Time;
 
 begin
    Clear (Clut);
-
-   Create_Socket (Server);
-   Set_Socket_Option (Server, Socket_Level, (Reuse_Address, True));
-   Bind_Socket (Server, (Family => Family_Inet,
-                         Addr   => Inet_Addr ("127.0.0.1"),
-                         Port   => Port));
-   Listen_Socket (Server);
-   Create_Selector (Sel);
+   Start (Srv, Port);
 
    Put_Line ("Mode LIVE : ouvre http://localhost:" & Img (Port)
              & "  (Ctrl+C pour arreter)");
@@ -444,6 +326,6 @@ begin
    loop
       Process_Turn;
       Next_Turn := Next_Turn + Milliseconds (Turn_Ms);
-      Serve_Until (Next_Turn);
+      Serve_Until (Srv, Next_Turn, Route'Access);
    end loop;
 end Radar_Run_Live;
