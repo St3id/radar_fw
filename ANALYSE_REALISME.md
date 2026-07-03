@@ -99,17 +99,29 @@ Le simulateur modélise un faisceau crayon de 3° balayé mécaniquement.
    ~520 mm d'écart possible entre échos du même objet à 3 m) — revers
    assumé : deux objets réels à moins de 600 mm fusionnent, c'est la
    résolution réelle du capteur simulé.
-2. **Bruit de fond + CFAR** : récupérer le générateur de bruit de la
-   branche `experiment-simulateur` ; remplacer le seuil fixe par un
-   CA-CFAR (fenêtre glissante, entier, prouvable SPARK).
-3. **Cycle de vie de piste M-sur-N** : piste « tentative » invisible
-   jusqu'à M détections sur N tours ; piste en « coasting » affichée
-   autrement (l'overlay du mode live est prêt pour ça).
-4. **Filtre alpha-beta** sur position/vitesse (le Kalman viendra après,
-   avec l'horodatage en secondes).
-5. **Fantômes multitrajet** : ~5 % d'écho miroir derrière le mur le plus
-   proche, pour éprouver M-sur-N et le clutter.
-6. **Clutter adaptatif** : oubli lent au lieu du one-shot du tour 1.
+2. **Bruit de fond + CFAR** — ✅ **FAIT** : bruit aléatoire dans chaque
+   case ; seuil CA-CFAR (fenêtre 8, garde 2, facteur 4) **prouvé SPARK**
+   (`Detect_Adaptive` : « aucune cible sous son seuil local », 83 checks
+   au total) ; c'est lui que tout le pipeline utilise.
+3. **Cycle de vie M-sur-N** — ✅ **FAIT** : piste tentative invisible
+   avant 3 détections, tentative jamais revue morte en 2 tours ;
+   l'affichage (live et rejeu) ne montre que les pistes confirmées, le
+   coasting est marqué (gris + `*`).
+4. **Filtre alpha-beta** — ✅ **FAIT** : prédiction + coasting (une piste
+   non revue roule sur son erre) et correction alpha (0,5) / beta (0,3) ;
+   la vitesse filtrée converge (testé : 100 mm/tour ± 20 en 10 tours).
+5. **Fantômes multitrajet** — ✅ **FAIT** : 5 % de probabilité d'écho
+   miroir derrière le mur ; c'est M-sur-N qui les étouffe (testé).
+6. **Clutter adaptatif** — ✅ **FAIT** : compteurs de confiance 2 bits,
+   confirmation à 2 observations, apprentissage de fond (1 tour sur 4)
+   et oubli lent (`Age` tous les 8 tours) : le décor qui apparaît est
+   appris, celui qui disparaît est oublié, un mobile qui passe
+   n'empoisonne pas la carte — et un mobile qui se gare y fond
+   (réalisme assumé).
+   *Limite connue observée : la fragmentation d'une cible étendue peut
+   confirmer une piste « ombre » (3 pistes pour 2 objets par moments) —
+   parade au chantier suivant : association globale + fusion de pistes
+   (voir `ARCHITECTURE_SYSTEME.md` §5).*
 7. **Émulateur LD2450** : une source de niveau détection (x, y, vitesse,
    10 Hz, 3 cibles max, jitter réaliste, dropouts, fantômes) — le
    pipeline PC sera prêt **avant** l'arrivée du module, qui remplacera
