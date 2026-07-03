@@ -91,10 +91,14 @@ Le simulateur modélise un faisceau crayon de 3° balayé mécaniquement.
 
 ## 4. Plan de mise à niveau du réalisme (tout en simulation, par priorité)
 
-1. **Cibles étendues + Swerling** : chaque objet du monde simulé devient
-   3–5 réflecteurs (± 150 mm autour du centre) avec amplitude aléatoire
-   par tour et 10–20 % de trous de détection. C'est le forcing function
-   des points 2 à 4.
+1. **Cibles étendues + Swerling** — ✅ **FAIT** : chaque objet est simulé
+   par 4 réflecteurs (± 150 mm), amplitude retirée au sort à chaque tour
+   (graine fixe : reproductible), 15 % d'extinction par réflecteur et
+   10 % d'évanouissement profond par objet. `Cluster_Radius` est passé à
+   600 mm en conséquence (cible étendue + quantification d'élévation :
+   ~520 mm d'écart possible entre échos du même objet à 3 m) — revers
+   assumé : deux objets réels à moins de 600 mm fusionnent, c'est la
+   résolution réelle du capteur simulé.
 2. **Bruit de fond + CFAR** : récupérer le générateur de bruit de la
    branche `experiment-simulateur` ; remplacer le seuil fixe par un
    CA-CFAR (fenêtre glissante, entier, prouvable SPARK).

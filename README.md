@@ -43,6 +43,10 @@ rigoureuse, applicable au domaine défense / aéronautique.
       cross-compilé ARM en CI) : le décor statique appris au premier tour
       est soustrait, seuls les objets **mobiles** deviennent des pistes —
       avec ou sans pièce autour
+- [x] **Cibles réalistes** : chaque objet simulé est une cible **étendue**
+      (4 réflecteurs) à l'écho **fluctuant** (type Swerling) avec de vrais
+      trous de détection — le pistage est éprouvé contre des données
+      imparfaites (voir `ANALYSE_REALISME.md`)
 - [x] **Serveur HTTP écrit en Ada** (`GNAT.Sockets`, mono-thread à
       selector) : la page 3D live interroge `/state.json` en continu
 - [x] Tests unitaires **AUnit** : 12 tests verts (traitement du balayage +
