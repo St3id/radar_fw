@@ -42,7 +42,9 @@ package body Radar_Sim_Source is
       end if;
    end Distance_To_Bin;
 
-   function Make (Sweeps : Positive) return Simulated_Source is
+   function Make
+     (Sweeps   : Positive;
+      See_Room : Boolean := False) return Simulated_Source is
    begin
       return (Az_Step      => 0,
               El_Step      => 0,
@@ -50,9 +52,18 @@ package body Radar_Sim_Source is
               Max_Turns    => Sweeps,
               Az_Steps     => Default_Azimuth_Steps,
               El_Steps     => Default_Elevation_Steps,
-              See_Room     => False,
+              See_Room     => See_Room,
               Scene        => Initial_World);
    end Make;
+
+   --------------
+   -- Per_Turn --
+   --------------
+
+   function Per_Turn (Self : Simulated_Source) return Positive is
+   begin
+      return Self.Az_Steps * Self.El_Steps;
+   end Per_Turn;
 
    --------------------
    -- Make_Room_Scan --
