@@ -1,4 +1,5 @@
 with Radar_Source;  use Radar_Source;
+with Radar_Sweep;
 with Radar_World;   use Radar_World;
 
 package Radar_Sim_Source is
@@ -47,6 +48,18 @@ private
    Default_Azimuth_Steps   : constant := 120;  --  azimut : tour complet
    Default_Elevation_Steps : constant := 7;    --  de -30 a +30 deg
 
+   --  ----- Realisme des cibles (voir ANALYSE_REALISME.md, point 1) ----
+   --  Une cible reelle n'est pas un point : c'est un ensemble de
+   --  reflecteurs (torse, membres...) dont l'echo FLUCTUE d'un tour a
+   --  l'autre selon l'orientation (modeles de Swerling), avec de vrais
+   --  trous de detection. Chaque objet est donc simule par
+   --  Scatter_Count reflecteurs dont l'amplitude est retiree au sort a
+   --  chaque tour (0 = eteint ce tour-ci).
+   Scatter_Count : constant := 4;
+
+   type Scatter_Amps is
+     array (1 .. Max_Objects, 1 .. Scatter_Count) of Radar_Sweep.Amplitude;
+
    type Simulated_Source is new Source with record
       Az_Step      : Natural := 0;   --  position azimut dans le tour
       El_Step      : Natural := 0;   --  position elevation dans le tour
@@ -59,6 +72,10 @@ private
 
       --  La source percoit-elle les murs de la piece ? (cartographie)
       See_Room     : Boolean := False;
+
+      --  Amplitudes des reflecteurs pour le tour en cours (retirees au
+      --  sort a chaque nouveau tour ; 0 = reflecteur eteint ce tour).
+      Echoes       : Scatter_Amps := (others => (others => 0));
 
       Scene        : World;
    end record;
