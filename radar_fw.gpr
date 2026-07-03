@@ -1,10 +1,12 @@
 with "config/radar_fw_config.gpr";
 project Radar_Fw is
 
-   --  "src/**" = le dossier src/ ET tous ses sous-dossiers (recursif).
-   --  Les sources sont rangees par domaine (processing, geometry, tasking,
-   --  app) ; le nom d'un paquet Ada ne depend pas de son dossier.
-   for Source_Dirs use ("src/**", "config/");
+   --  Dossiers listes EXPLICITEMENT (par domaine) : ce projet est
+   --  l'application PC (simulation + generation du visualiseur HTML).
+   --  La partie temps reel (src/tasking, src/demo) appartient a
+   --  radar_demo.gpr, qui lui impose le profil Ravenscar.
+   for Source_Dirs use
+     ("src/app", "src/geometry", "src/processing", "src/source", "config/");
    for Object_Dir use "obj/" & Radar_Fw_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";

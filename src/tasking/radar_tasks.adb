@@ -8,7 +8,9 @@ package body Radar_Tasks is
    Period     : constant Time_Span := Milliseconds (250);
    Max_Cycles : constant := 8;
 
-   --  ===== Tache PRODUCTEUR =====
+   --  ===== Tache PRODUCTEUR (cyclique) =====
+   --  Cadence stricte par "delay until" (jamais de delay relatif en
+   --  Ravenscar) : produit un balayage simule toutes les 250 ms.
    task body Producer is
       Next  : Time := Clock;
       Frame : Natural := 0;
@@ -31,9 +33,11 @@ package body Radar_Tasks is
       end loop;
    end Producer;
 
-   --  ===== Tache CONSOMMATEUR =====
+   --  ===== Tache CONSOMMATEUR (sporadique) =====
+   --  Pas d'horloge propre : elle BLOQUE sur l'entry Get et n'est
+   --  reveillee que lorsqu'une donnee arrive (barriere de l'objet
+   --  protege). Zero polling, zero attente active.
    task body Consumer is
-      Next  : Time := Clock + Milliseconds (125);
       Cycle : Natural := 0;
    begin
       loop
@@ -41,23 +45,22 @@ package body Radar_Tasks is
          Cycle := Cycle + 1;
 
          declare
-            S  : Sweep;
-            OK : Boolean;
+            S : Sweep;
          begin
-            Mailbox.Get (S, OK);
-            if OK and then Has_Target (S) then
+            Mailbox.Get (S);
+            if Has_Target (S) then
                Put_Line ("[Consumer] cycle" & Cycle'Image
                          & " : cible en case" & Peak_Bin (S)'Image
                          & " a" & Peak_Distance (S)'Image & " mm");
             else
                Put_Line ("[Consumer] cycle" & Cycle'Image
-                         & " : (pas de donnee)");
+                         & " : bruit seul, pas de cible");
             end if;
          end;
-
-         Next := Next + Period;
-         delay until Next;
       end loop;
+
+      --  Fin de la demo : on reveille le programme principal.
+      Ada.Synchronous_Task_Control.Set_True (Demo_Done);
    end Consumer;
 
 end Radar_Tasks;
