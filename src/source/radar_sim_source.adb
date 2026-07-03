@@ -48,8 +48,29 @@ package body Radar_Sim_Source is
               El_Step      => 0,
               Current_Turn => 0,
               Max_Turns    => Sweeps,
+              Az_Steps     => Default_Azimuth_Steps,
+              El_Steps     => Default_Elevation_Steps,
+              See_Room     => False,
               Scene        => Initial_World);
    end Make;
+
+   --------------------
+   -- Make_Room_Scan --
+   --------------------
+
+   function Make_Room_Scan
+     (Az_Steps : Grid_Steps := 180;
+      El_Steps : Grid_Steps := 24) return Simulated_Source is
+   begin
+      return (Az_Step      => 0,
+              El_Step      => 0,
+              Current_Turn => 0,
+              Max_Turns    => 1,              --  un seul tour, meticuleux
+              Az_Steps     => Az_Steps,
+              El_Steps     => El_Steps,
+              See_Room     => True,           --  percoit les murs
+              Scene        => Empty_World);   --  pas d'objet mobile
+   end Make_Room_Scan;
 
    ----------
    -- Next --
@@ -72,12 +93,18 @@ package body Radar_Sim_Source is
       declare
          --  Direction visee : azimut ET elevation.
          Az : constant Float :=
-           Float (Self.Az_Step) * 360.0 / Float (Azimuth_Steps);
+           Float (Self.Az_Step) * 360.0 / Float (Self.Az_Steps);
          El : constant Float :=
            El_Min + Float (Self.El_Step)
-                    * (El_Max - El_Min) / Float (Elevation_Steps - 1);
+                    * (El_Max - El_Min) / Float (Self.El_Steps - 1);
          S : Sweep := (others => 5);
       begin
+         --  Les murs de la piece (mode cartographie) : un echo a la
+         --  distance du premier mur touche dans cette direction.
+         if Self.See_Room then
+            S (Distance_To_Bin (Wall_Distance (Az, El))) := 2_500;
+         end if;
+
          for I in 1 .. Self.Scene.Count loop
             declare
                O : constant Object := Self.Scene.Objects (I);
@@ -101,12 +128,12 @@ package body Radar_Sim_Source is
 
       --  Avancer dans la grille : d'abord l'elevation, puis l'azimut.
       Self.El_Step := Self.El_Step + 1;
-      if Self.El_Step >= Elevation_Steps then
+      if Self.El_Step >= Self.El_Steps then
          Self.El_Step := 0;
          Self.Az_Step := Self.Az_Step + 1;
 
          --  Fin du tour complet (tous azimuts x toutes elevations).
-         if Self.Az_Step >= Azimuth_Steps then
+         if Self.Az_Step >= Self.Az_Steps then
             Self.Az_Step      := 0;
             Self.Current_Turn := Self.Current_Turn + 1;
             Step (Self.Scene);

@@ -1,3 +1,6 @@
+with Ada.Numerics;                      use Ada.Numerics;
+with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
+
 package body Radar_World is
 
    -------------------
@@ -21,6 +24,44 @@ package body Radar_World is
       W.Count := 2;
       return W;
    end Initial_World;
+
+   -----------------
+   -- Empty_World --
+   -----------------
+
+   function Empty_World return World is
+   begin
+      return (Objects => (others => (Id => 1, others => 0.0)),
+              Count   => 0);
+   end Empty_World;
+
+   -------------------
+   -- Wall_Distance --
+   -------------------
+
+   function Wall_Distance (Azimuth_Deg, Elevation_Deg : Float) return Float is
+      Az_Rad : constant Float := Azimuth_Deg   * Pi / 180.0;
+      El_Rad : constant Float := Elevation_Deg * Pi / 180.0;
+
+      Cos_A : constant Float := Cos (Az_Rad);
+      Sin_A : constant Float := Sin (Az_Rad);
+
+      Dist_X : Float := Float'Last;
+      Dist_Y : Float := Float'Last;
+   begin
+      --  Distance (vue de dessus) pour toucher un mur vertical
+      --  (gauche/droite), puis un mur horizontal (avant/arriere).
+      if abs Cos_A > 0.0001 then
+         Dist_X := Room_Half_X / abs Cos_A;
+      end if;
+      if abs Sin_A > 0.0001 then
+         Dist_Y := Room_Half_Y / abs Sin_A;
+      end if;
+
+      --  On touche le mur le plus proche ; viser haut ou bas allonge le
+      --  trajet (elevation supposee < 90 degres : cos > 0).
+      return Float'Min (Dist_X, Dist_Y) / Cos (El_Rad);
+   end Wall_Distance;
 
    ----------
    -- Step --

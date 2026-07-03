@@ -28,7 +28,24 @@ package Radar_World is
    --  Cree une scene de depart avec quelques objets mobiles.
    function Initial_World return World;
 
+   --  Un monde SANS objet mobile : sert au mode cartographie, ou l'on
+   --  scanne l'environnement statique (les murs) sans etre pollue par
+   --  des objets en mouvement.
+   function Empty_World return World;
+
    --  Fait avancer tous les objets d'un pas de temps (position += vitesse).
    procedure Step (W : in out World);
+
+   --  ----- La piece statique (mode cartographie) -----
+
+   --  Dimensions de la piece rectangulaire, centree sur le radar (mm).
+   Room_Half_X : constant Float := 2000.0;   --  murs a +/- 2000 en X
+   Room_Half_Y : constant Float := 1500.0;   --  murs a +/- 1500 en Y
+
+   --  Distance du radar au premier mur touche dans une direction donnee
+   --  (angles en degres). Modele volontairement simple : murs verticaux
+   --  "infinis" (pas de sol ni de plafond) ; viser haut ou bas allonge
+   --  le trajet d'un facteur 1/cos(elevation).
+   function Wall_Distance (Azimuth_Deg, Elevation_Deg : Float) return Float;
 
 end Radar_World;
