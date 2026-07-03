@@ -38,14 +38,11 @@ is
    -------------------
 
    function Peak_Distance (S : Sweep) return Millimeters is
-      Peak : constant Bin_Index := Peak_Bin (S);
-
-      --  Chaque case couvre une tranche de distance constante.
-      --  20 000 mm repartis sur 256 cases.
-      Mm_Per_Bin : constant := Max_Range_Mm / Sweep_Length;
    begin
       --  Case 1 -> distance la plus proche, case 256 -> la plus lointaine.
-      return Millimeters ((Integer (Peak) - 1) * Mm_Per_Bin);
+      --  Le calcul lui-meme vit dans Bin_Distance (partage avec les
+      --  clients qui convertissent d'autres cases que le pic).
+      return Bin_Distance (Peak_Bin (S));
    end Peak_Distance;
 
 ----------------
@@ -64,8 +61,13 @@ is
             Result.Targets (Result.Count) := I;
          end if;
 
-         --  Invariant : le compte ne depasse jamais le maximum.
+         --  Invariants : le compte reste borne, et tout ce qui a ete
+         --  enregistre jusqu'ici depasse reellement le seuil (c'est ce
+         --  second invariant qui porte la postcondition fonctionnelle).
          pragma Loop_Invariant (Result.Count <= Max_Targets);
+         pragma Loop_Invariant
+           (for all K in 1 .. Result.Count =>
+              S (Result.Targets (K)) >= Detection_Threshold);
       end loop;
 
       return Result;
@@ -105,6 +107,13 @@ is
          end if;
 
          pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Si on est dans un groupe, son sommet depasse le seuil : c'est
+         --  ce qui garantit qu'on n'enregistrera jamais une fausse alarme.
+         pragma Loop_Invariant
+           (if In_Group then S (Best_Pos) >= Detection_Threshold);
+         pragma Loop_Invariant
+           (for all K in 1 .. Result.Count =>
+              S (Result.Targets (K)) >= Detection_Threshold);
       end loop;
 
       --  Cas particulier : un groupe qui va jusqu'a la toute derniere case.

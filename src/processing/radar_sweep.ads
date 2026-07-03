@@ -29,12 +29,22 @@ is
    --  Y a-t-il une cible ? (le pic depasse-t-il le seuil de detection ?)
    function Has_Target (S : Sweep) return Boolean;
 
+   --  Distance physique du debut de la tranche couverte par une case.
+   --  On multiplie AVANT de diviser : 20_000/256 = 78,125 mm par case,
+   --  tronquer d'abord (78) fausserait la distance de 110 mm en bout de
+   --  portee. Ecrite en "expression function" : sa definition sert de
+   --  contrat, le prouveur et les clients la voient.
+   function Bin_Distance (B : Bin_Index) return Millimeters is
+     (Millimeters ((Integer (B) - 1) * Max_Range_Mm / Sweep_Length));
+
    --  Conversion du pic en distance physique.
    --  Precondition : il doit y avoir une cible, sinon la distance n'a pas
-   --  de sens.
+   --  de sens. Postcondition FONCTIONNELLE : le resultat est exactement
+   --  la distance de la case du pic (pas juste "dans les bornes", ce que
+   --  le type garantit deja tout seul).
    function Peak_Distance (S : Sweep) return Millimeters
      with Pre  => Has_Target (S),
-          Post => Peak_Distance'Result <= Max_Range_Mm;
+          Post => Peak_Distance'Result = Bin_Distance (Peak_Bin (S));
 --  ----- Detection de plusieurs cibles -----
 
    --  Nombre maximum de cibles qu'on accepte de rapporter.
@@ -53,13 +63,22 @@ is
    end record;
 
    --  Cherche toutes les cases dont l'amplitude >= Detection_Threshold.
+   --  Contrat fonctionnel prouve : PAS DE FAUSSE ALARME - toute cible
+   --  rapportee depasse reellement le seuil. (L'ancien contrat
+   --  "Count <= Max_Targets" etait deja garanti par le sous-type
+   --  Target_Count : il ne prouvait rien.)
    function Detect_All (S : Sweep) return Detection
-     with Post => Detect_All'Result.Count <= Max_Targets;
+     with Post =>
+       (for all K in 1 .. Detect_All'Result.Count =>
+          S (Detect_All'Result.Targets (K)) >= Detection_Threshold);
 
    --  Comme Detect_All, mais regroupe les cases consecutives au-dessus du
    --  seuil en UNE seule cible (le sommet du groupe). Plus realiste : un
    --  objet etale sur plusieurs cases voisines = une cible, pas plusieurs.
+   --  Meme contrat fonctionnel : pas de fausse alarme.
    function Detect_Clustered (S : Sweep) return Detection
-     with Post => Detect_Clustered'Result.Count <= Max_Targets;
+     with Post =>
+       (for all K in 1 .. Detect_Clustered'Result.Count =>
+          S (Detect_Clustered'Result.Targets (K)) >= Detection_Threshold);
 
 end Radar_Sweep;
