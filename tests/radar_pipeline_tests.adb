@@ -4,6 +4,8 @@ with Radar_Detect;      use Radar_Detect;
 with Radar_Track;       use Radar_Track;
 with Radar_Source;      use Radar_Source;
 with Radar_World;       use Radar_World;
+with Radar_Sweep;       use Radar_Sweep;
+with Radar_Clutter;     use Radar_Clutter;
 
 package body Radar_Pipeline_Tests is
 
@@ -174,6 +176,38 @@ package body Radar_Pipeline_Tests is
               "A 60 deg d'elevation le trajet devrait doubler");
    end Test_Wall_Distance;
 
+   --  Test 8 : carte de clutter (MTI). Un echo appris comme decor est
+   --  supprime (meme a une case pres : marge de garde) ; un echo a une
+   --  autre distance ou dans une autre direction passe.
+   procedure Test_Clutter_Filter
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      C : Clutter_Map;
+
+      --  Une detection d'une seule cible, a la case demandee.
+      function One (B : Bin_Index) return Detection is
+      begin
+         return (Targets => (1 => B, others => Bin_Index'First),
+                 Count   => 1);
+      end One;
+
+   begin
+      Clear (C);
+
+      --  Apprentissage : un mur en case 100, direction az=9, el=0.
+      Learn (C, 9.0, 0.0, One (100));
+
+      Assert (Filter (C, 9.0, 0.0, One (100)).Count = 0,
+              "L'echo du mur appris devrait etre supprime");
+      Assert (Filter (C, 9.0, 0.0, One (101)).Count = 0,
+              "Un echo dans la marge de garde devrait etre supprime");
+      Assert (Filter (C, 9.0, 0.0, One (150)).Count = 1,
+              "Un echo a une autre distance devrait passer (mobile)");
+      Assert (Filter (C, 90.0, 0.0, One (100)).Count = 1,
+              "La meme case dans une AUTRE direction devrait passer");
+   end Test_Clutter_Filter;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -199,6 +233,9 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Wall_Distance'Access,
          "Distance aux murs de la piece");
+      Register_Routine
+        (T, Test_Clutter_Filter'Access,
+         "Carte de clutter (MTI)");
    end Register_Tests;
 
 end Radar_Pipeline_Tests;
