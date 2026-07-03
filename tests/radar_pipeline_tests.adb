@@ -3,6 +3,7 @@ with Radar_Geometry;    use Radar_Geometry;
 with Radar_Detect;      use Radar_Detect;
 with Radar_Track;       use Radar_Track;
 with Radar_Source;      use Radar_Source;
+with Radar_World;       use Radar_World;
 
 package body Radar_Pipeline_Tests is
 
@@ -156,6 +157,23 @@ package body Radar_Pipeline_Tests is
               "Les detections devraient etre ordonnees par case");
    end Test_Two_Echoes_Same_Ray;
 
+   --  Test 7 : distance aux murs de la piece (mode cartographie).
+   --  Piece 4000 x 3000 mm centree sur le radar : mur de face a 2000,
+   --  mur lateral a 1500 ; viser a 60 degres d'elevation double le
+   --  trajet (1 / cos 60 = 2).
+   procedure Test_Wall_Distance
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert (abs (Wall_Distance (0.0, 0.0) - 2000.0) < 0.01,
+              "Le mur de face devrait etre a 2000 mm");
+      Assert (abs (Wall_Distance (90.0, 0.0) - 1500.0) < 0.01,
+              "Le mur lateral devrait etre a 1500 mm");
+      Assert (abs (Wall_Distance (0.0, 60.0) - 4000.0) < 0.1,
+              "A 60 deg d'elevation le trajet devrait doubler");
+   end Test_Wall_Distance;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -178,6 +196,9 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Two_Echoes_Same_Ray'Access,
          "Deux echos sur un meme rayon");
+      Register_Routine
+        (T, Test_Wall_Distance'Access,
+         "Distance aux murs de la piece");
    end Register_Tests;
 
 end Radar_Pipeline_Tests;
