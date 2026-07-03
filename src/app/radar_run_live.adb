@@ -42,6 +42,21 @@ procedure Radar_Run_Live is
    Port    : constant := 8080;
    Turn_Ms : constant := 800;
 
+   --  Tours de calibration : le decor est appris a chaque tour jusqu'a
+   --  atteindre le niveau de confirmation de la carte de clutter ; le
+   --  pistage ne demarre qu'apres.
+   Calibration_Turns : constant := 2;
+
+   --  Apprentissage de fond (1 tour sur N) : le decor qui apparait
+   --  (meuble deplace...) finit par etre appris, mais un mobile qui ne
+   --  fait que passer n'est vu qu'une fois par case : il ne devient
+   --  pas du decor.
+   Learn_Period : constant := 4;
+
+   --  Oubli lent (1 vieillissement tous les N tours) : le decor qui
+   --  disparait finit par etre oublie.
+   Age_Period : constant := 8;
+
    Src  : Simulated_Source := Make (Sweeps => Positive'Last, See_Room => True);
    Trk  : Tracker;
    Clut : Clutter_Map;
@@ -76,7 +91,7 @@ procedure Radar_Run_Live is
       L (".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
       L ("<div id='info'><b>radar_fw - surveillance live</b>");
       L ("<div id='status'>connexion...</div><div id='tgts'></div>");
-      L ("<div class='hint'>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Points verts : decor appris (tour 1) &middot; spheres : cibles mobiles</div></div>");
+      L ("<div class='hint'>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Points verts : decor appris &middot; spheres : cibles CONFIRMEES<br>Gris + * : piste non revue ce tour (position extrapolee)</div></div>");
       L ("<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'></script>");
       L ("<script>");
       L ("const scene=new THREE.Scene();");
@@ -109,19 +124,20 @@ procedure Radar_Run_Live is
       L (" clearDyn();let list='';");
       L (" for(const tk of s.tracks){");
       L ("  const p=v3(tk);");
-      L ("  const b=new THREE.Mesh(new THREE.SphereGeometry(70,16,16),new THREE.MeshBasicMaterial({color:0x34e29b}));");
+      L ("  const col=tk.coast?0x777777:0x34e29b;");
+      L ("  const b=new THREE.Mesh(new THREE.SphereGeometry(70,16,16),new THREE.MeshBasicMaterial({color:col}));");
       L ("  b.position.copy(p);dyn.add(b);");
       L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),sp=vel.length();");
       L ("  if(sp>1){const len=Math.min(2500,sp*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
       L ("  const d=Math.round(Math.sqrt(tk.x*tk.x+tk.y*tk.y+tk.z*tk.z));");
       L ("  const ms=(sp*1000/TURN_MS/1000).toFixed(2);");
-      L ("  const lab=makeLabel('#'+tk.id+'  '+d+'mm  '+ms+'m/s');");
+      L ("  const lab=makeLabel('#'+tk.id+'  '+d+'mm  '+ms+'m/s'+(tk.coast?' *':''));");
       L ("  lab.position.copy(p).add(new THREE.Vector3(0,220,0));dyn.add(lab);");
       L ("  const tp=(trails[tk.id]||[]).map(v3);tp.push(p);");
       L ("  if(tp.length>1)dyn.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tp),new THREE.LineBasicMaterial({color:0x1f7a5a})));");
       L ("  list+='#'+tk.id+' &mdash; '+d+' mm &mdash; '+ms+' m/s<br>';");
       L (" }");
-      L (" status.innerHTML=(s.turn===0)?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s)';");
+      L (" status.innerHTML=(s.turn<2)?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
       L (" tgts.innerHTML=list;}");
       L ("async function tick(){");
       L (" try{const s=await(await fetch('/state.json')).json();TURN_MS=s.turn_ms;");
@@ -168,8 +184,11 @@ procedure Radar_Run_Live is
    begin
       Append (R, "{""turn"":" & Img (Turn) & ",""turn_ms"":"
                  & Img (Turn_Ms) & ",""tracks"":[");
+      --  Seules les pistes CONFIRMEES (M-sur-N) sont publiees : les
+      --  tentatives et les fantomes de multitrajet restent invisibles.
+      --  "coast" = 1 : piste non revue ce tour, position extrapolee.
       for I in Trk.Tracks'Range loop
-         if Trk.Tracks (I).Active then
+         if Trk.Tracks (I).Active and then Trk.Tracks (I).Confirmed then
             if not First then
                Append (R, ",");
             end if;
@@ -181,6 +200,8 @@ procedure Radar_Run_Live is
                        & ",""vx"":" & F_Img (Trk.Tracks (I).Velocity.X)
                        & ",""vy"":" & F_Img (Trk.Tracks (I).Velocity.Y)
                        & ",""vz"":" & F_Img (Trk.Tracks (I).Velocity.Z)
+                       & ",""coast"":"
+                       & (if Trk.Tracks (I).Missing > 0 then "1" else "0")
                        & "}");
          end if;
       end loop;
@@ -206,11 +227,18 @@ procedure Radar_Run_Live is
          exit when not OK;
 
          declare
-            D : constant Detection := Detect_Clustered (M.Data);
+            D : constant Detection := Detect_Adaptive (M.Data);
          begin
-            if Turn = 0 then
-               --  Calibration : tout est memorise comme decor statique.
+            --  Apprentissage du decor : chaque tour pendant la
+            --  calibration, puis a faible cadence en tache de fond.
+            if Turn < Calibration_Turns
+              or else Turn mod Learn_Period = 0
+            then
                Learn (Clut, M.Azimuth, M.Elevation, D);
+            end if;
+
+            --  Nuage decoratif (affichage) : collecte au premier tour.
+            if Turn = 0 then
                for K in 1 .. D.Count loop
                   declare
                      P : constant Point_3D :=
@@ -225,9 +253,12 @@ procedure Radar_Run_Live is
                                      & "," & F_Img (P.Z) & "]");
                   end;
                end loop;
-            else
-               --  Surveillance : le clutter est soustrait, seuls les
-               --  echos NOUVEAUX (= mobiles) alimentent le pistage.
+            end if;
+
+            --  Surveillance (apres calibration) : le clutter est
+            --  soustrait, seuls les echos NOUVEAUX (= mobiles)
+            --  alimentent le pistage.
+            if Turn >= Calibration_Turns then
                declare
                   DF : constant Detection :=
                     Filter (Clut, M.Azimuth, M.Elevation, D);
@@ -252,8 +283,15 @@ procedure Radar_Run_Live is
       if Turn = 0 then
          Append (Points, "]}");
          Cloud_Json := Points;
-      else
+      end if;
+
+      if Turn >= Calibration_Turns then
          Update (Trk, Cluster (F));
+      end if;
+
+      --  Oubli lent du decor disparu.
+      if Turn > 0 and then Turn mod Age_Period = 0 then
+         Age (Clut);
       end if;
 
       Turn       := Turn + 1;
