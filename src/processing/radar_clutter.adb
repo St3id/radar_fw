@@ -42,7 +42,7 @@ package body Radar_Clutter is
 
    procedure Clear (C : out Clutter_Map) is
    begin
-      C.Cells := (others => (others => (others => False)));
+      C.Cells := (others => (others => (others => 0)));
    end Clear;
 
    -----------
@@ -58,9 +58,34 @@ package body Radar_Clutter is
    begin
       To_Cell (Az_Deg, El_Deg, Az_Idx, El_Idx);
       for K in 1 .. D.Count loop
-         C.Cells (Az_Idx, El_Idx) (D.Targets (K)) := True;
+         declare
+            Cnt : Confidence renames
+              C.Cells (Az_Idx, El_Idx) (D.Targets (K));
+         begin
+            --  Saturation : pas de retour a zero par debordement.
+            if Cnt < Confidence'Last then
+               Cnt := Cnt + 1;
+            end if;
+         end;
       end loop;
    end Learn;
+
+   ---------
+   -- Age --
+   ---------
+
+   procedure Age (C : in out Clutter_Map) is
+   begin
+      for Az in 0 .. Az_Cells - 1 loop
+         for El in 0 .. El_Cells - 1 loop
+            for B in Bin_Index loop
+               if C.Cells (Az, El) (B) > 0 then
+                  C.Cells (Az, El) (B) := C.Cells (Az, El) (B) - 1;
+               end if;
+            end loop;
+         end loop;
+      end loop;
+   end Age;
 
    ------------
    -- Filter --
@@ -86,9 +111,9 @@ package body Radar_Clutter is
             Hi         : constant Bin_Index :=
               Bin_Index'Min (Bin_Index'Last, B + Guard_Bins);
          begin
-            --  Clutter si une case memorisee existe dans la marge.
+            --  Clutter si une case CONFIRMEE existe dans la marge.
             for G in Lo .. Hi loop
-               if C.Cells (Az_Idx, El_Idx) (G) then
+               if C.Cells (Az_Idx, El_Idx) (G) >= Confirm_Level then
                   Is_Clutter := True;
                   exit;
                end if;
