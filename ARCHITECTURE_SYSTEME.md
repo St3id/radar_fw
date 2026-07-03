@@ -101,11 +101,16 @@ peux donc être ailleurs dans la maison pendant que le radar scanne.
 
 ## 5. Défauts d'implémentation identifiés (revue honnête)
 
-1. **Fragmentation de pistes** : une cible étendue scindée par la
-   quantification d'élévation peut confirmer une piste « ombre » (vu en
-   test live : 3 pistes confirmées pour 2 objets). Parade connue :
-   association GLOBALE (algorithme hongrois/GNN) + fusion de pistes
-   proches. C'est le prochain chantier tracker.
+1. **Fragmentation de pistes** — ✅ **résolu** en deux temps :
+   association GLOBALE (paire piste/détection la plus proche au monde,
+   plus de « vol » de détection) + FUSION des pistes à moins de 400 mm.
+   La traque du fantôme restant a révélé un phénomène radar authentique:
+   les fausses alarmes CFAR des premières cases de distance se
+   concentrent géométriquement près de l'origine (tous les azimuts y
+   convergent) et fabriquaient une piste fantôme persistante au pied du
+   radar — parade réelle appliquée : **distance aveugle** de 625 mm
+   (`Blind_Bins`), sous contrat prouvé, comme sur un vrai module dont
+   la fuite TX→RX sature les premières cases.
 2. **Couplage implicite** : la grille de `Radar_Clutter` (120 × 7) doit
    correspondre à celle de la source — convention non vérifiée par le
    compilateur. À terme : passer la grille en paramètre (générique ou
