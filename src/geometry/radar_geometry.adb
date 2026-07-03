@@ -51,7 +51,19 @@ package body Radar_Geometry is
 
       --  Elevation : angle vertical (hauteur Z par rapport a la distance).
       if Dist > 0.0 then
-         El := Arcsin (P.Z / Dist) * 180.0 / Pi;
+         declare
+            --  Mathematiquement |Z| <= Dist, mais en flottant le quotient
+            --  peut depasser 1.0 d'un epsilon (quand X et Y sont quasi
+            --  nuls) et Arcsin leverait alors Argument_Error. On borne.
+            Ratio : Float := P.Z / Dist;
+         begin
+            if Ratio > 1.0 then
+               Ratio := 1.0;
+            elsif Ratio < -1.0 then
+               Ratio := -1.0;
+            end if;
+            El := Arcsin (Ratio) * 180.0 / Pi;
+         end;
       end if;
 
       return (Distance => Dist, Azimuth => Az, Elevation => El);

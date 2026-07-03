@@ -1,4 +1,5 @@
 with Radar_Geometry;  use Radar_Geometry;
+with Radar_Sweep;     use Radar_Sweep;
 
 package body Radar_Sim_Source is
 
@@ -9,12 +10,29 @@ package body Radar_Sim_Source is
    El_Min : constant Float := -30.0;
    El_Max : constant Float := 30.0;
 
+   --  Ecart angulaire minimal entre deux angles en degres, en tenant
+   --  compte du passage 0/360 : l'ecart entre 359 et 1 vaut 2, pas 358.
+   function Angle_Diff (A, B : Float) return Float is
+      D : constant Float := abs (A - B);
+   begin
+      if D > 180.0 then
+         return 360.0 - D;
+      else
+         return D;
+      end if;
+   end Angle_Diff;
+
    function Distance_To_Bin (Dist : Float) return Bin_Index is
       Mm_Per_Bin : constant Float :=
         Float (Max_Range_Mm) / Float (Sweep_Length);
       Raw : Integer;
    begin
-      Raw := Integer (Dist / Mm_Per_Bin) + 1;
+      --  Float'Floor et pas une conversion directe : en Ada, Integer (X)
+      --  ARRONDIT au plus proche, alors que la conversion inverse
+      --  (Bin_Distance) tronque. Les deux sens doivent partager la meme
+      --  convention (debut de tranche), sinon l'aller-retour
+      --  distance -> case -> distance derive d'une demi-case.
+      Raw := Integer (Float'Floor (Dist / Mm_Per_Bin)) + 1;
       if Raw < Integer (Bin_Index'First) then
          return Bin_Index'First;
       elsif Raw > Integer (Bin_Index'Last) then
@@ -66,8 +84,10 @@ package body Radar_Sim_Source is
                P : constant Point_3D := (O.X, O.Y, O.Z);
                R : constant Polar := To_Polar (P);
             begin
-               --  L'objet doit etre dans le faisceau EN AZIMUT ET EN ELEVATION.
-               if abs (R.Azimuth - Az) < Beam_Width
+               --  L'objet doit etre dans le faisceau EN AZIMUT ET EN
+               --  ELEVATION. L'azimut se compare modulo 360 (Angle_Diff) :
+               --  un objet a 359 degres est bien dans le faisceau vise a 0.
+               if Angle_Diff (R.Azimuth, Az) < Beam_Width
                  and then abs (R.Elevation - El) < El_Width
                then
                   S (Distance_To_Bin (R.Distance)) := 3_000;
