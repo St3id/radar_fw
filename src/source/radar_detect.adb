@@ -1,5 +1,6 @@
 with Radar_Sweep;  use Radar_Sweep;
-with Ada.Numerics.Elementary_Functions;   use  Ada.Numerics.Elementary_Functions;
+with Ada.Numerics.Elementary_Functions;
+use  Ada.Numerics.Elementary_Functions;
 
 package body Radar_Detect is
 
@@ -17,22 +18,29 @@ package body Radar_Detect is
    ---------
 
    procedure Add (F : in out Frame; M : Measurement) is
+      --  Toutes les cibles du balayage, via la fonction PROUVEE en SPARK
+      --  (contrat : aucune fausse alarme). Avant, on ne gardait que le
+      --  pic : deux objets alignes sur le meme rayon ne donnaient qu'une
+      --  detection, le second etait invisible.
+      D : constant Detection := Detect_Clustered (M.Data);
    begin
-      --  On n'ajoute que s'il y a une cible et qu'il reste de la place.
-      if Has_Target (M.Data) and then F.Count < Max_Detections then
+      for K in 1 .. D.Count loop
+         exit when F.Count = Max_Detections;
+
          declare
-            --  Distance physique du pic detecte.
-            Dist : constant Float := Float (Peak_Distance (M.Data));
+            --  Distance physique de la case detectee (Bin_Distance est
+            --  la conversion prouvee, partagee avec Peak_Distance).
+            Dist : constant Float := Float (Bin_Distance (D.Targets (K)));
 
             --  Position 3D : on combine la direction visee (azimut,
-            --  elevation de la mesure) avec la distance du pic.
+            --  elevation de la mesure) avec la distance de l'echo.
             P : constant Point_3D :=
               To_Point (Dist, M.Azimuth, M.Elevation);
          begin
             F.Count := F.Count + 1;
             F.Items (F.Count) := (Pos => P, Distance => Dist);
          end;
-      end if;
+      end loop;
    end Add;
 
    -------------
