@@ -18,7 +18,7 @@ arrive donc antennes comprises, prêt à émettre.
 **À commander maintenant (≈ 50–60 €) :**
 
 | Quoi | Prix ~ | Pourquoi |
-|------|--------|----------|
+| ---- | ------ | -------- |
 | WeAct STM32G474CEU6 | 12–18 € | le cerveau Ada (déjà prévu) |
 | ST-Link V2 clone (ou STLINK-V3MINIE) | 5–12 € | flash + debug SWD |
 | Adaptateur USB-UART (CP2102/FT232) | 3 € | télémétrie + **brancher le radar au PC sans attendre le STM32** |
@@ -52,7 +52,7 @@ pas comme chemin principal.
 ## 3. Les capteurs, par étage de maturité
 
 | Étage | Module | Prix ~ | Interface | Ce qu'il donne | Rôle dans le projet |
-|-------|--------|--------|-----------|----------------|---------------------|
+| ----- | ------ | ------ | --------- | -------------- | ------------------- |
 | 1 | **HLK-LD2450** (24 GHz FMCW) | 10–15 € | UART 256000 bauds, trames binaires | jusqu'à 3 cibles : x, y (mm), vitesse (cm/s), ~10 Hz, ±60° d'azimut, ~6 m | cibles mobiles réelles tout de suite ; il fait la détection, TON code fait pistage/fusion/affichage |
 | 2 | Acconeer **A121** (module XM125) | 60–80 € | SPI (via lib C d'Acconeer) | profil d'écho par cases de distance (comme ton type `Sweep` !), très précis | scan de pièce fin sur tourelle ; distance mm |
 | 3 | Infineon **BGT60TR13C** (60 GHz FMCW) | 60–120 € | SPI, données IQ **brutes**, 1 TX / 3 RX | les échantillons bruts : FFT distance, FFT Doppler, CFAR, angle par 3 antennes RX — le vrai boulot de radariste | la consécration : TA chaîne de traitement de bout en bout |
@@ -68,6 +68,67 @@ Points de vigilance honnêtes :
   (pas d'élévation). C'est sa force (résultats immédiats) et sa limite.
 - **BGT60TR13C** : le plus formateur, mais le plus difficile (débits SPI,
   buffers IQ, DSP). À garder pour la phase où le reste tourne.
+
+---
+
+## 3 bis. Fabriquer soi-même : ce qui est réaliste (et l'antenne)
+
+La physique décide de ce qui est fabricable à la main :
+
+- la précision en **distance** vient de la **bande passante** du signal —
+  fixée par la puce et la réglementation : pas de levier DIY ;
+- la précision **angulaire** vient de la **taille de l'antenne**
+  (ouverture) : largeur de faisceau ≈ 70 × λ / D degrés. Doubler le
+  diamètre = faisceau deux fois plus fin. **C'est LE levier DIY** ;
+- la **portée** vient du gain d'antenne (qui compte au carré :
+  aller-retour). Autre levier DIY.
+
+Ce que ça donne, capteur par capteur :
+
+| Capteur | Antenne modifiable ? | Levier « je fabrique » |
+| ------- | -------------------- | ---------------------- |
+| LD2450, BGT60 (24/60 GHz) | non : patchs gravés sur PCB, aucun connecteur RF | logiciel + mécanique seulement |
+| A121 (60 GHz) | non, MAIS une **lentille diélectrique** posée devant focalise réellement à λ = 5 mm | kit lentille Acconeer (~15 €) ou lentille **imprimée en 3D** |
+| **HB100** (10,525 GHz, 3–5 €) | oui, indirectement : on construit un cornet ou une parabole **autour** du module | **le terrain de jeu antenne** |
+| Coffee-can 2,4 GHz | antennes 100 % construites main | le radar entier fait main |
+
+### Le projet antenne qui a du sens tout de suite (~10 €)
+
+**HB100 + cornet fait main + ADC du STM32.** Le HB100 est un module
+Doppler à 10,5 GHz qui sort son signal de battement **en bande audio** :
+l'ADC du STM32G474 l'échantillonne, ta FFT en Ada sort la vitesse de la
+cible — un radar Doppler dont **tout** le traitement est à toi. Et à
+λ = 2,85 cm, un cornet de 6–10 cm en tôle (ou carton + aluminium) se
+construit à la règle et au cutter.
+
+Surtout, ça se **mesure** — c'est ça qui a de la valeur : cible fixe
+(plaque métallique), moteur qui balaie l'angle, amplitude Doppler relevée
+point par point → **diagramme de rayonnement avant/après cornet**, tracé
+par ton code. Un mini-mémoire d'antenniste, quantifié, sans VNA ni labo.
+Variante spectaculaire : parabole de récupération (tête d'antenne satellite,
+voire passoire métallique) avec le HB100 au foyer → ~6° de faisceau pour
+30 cm de diamètre.
+
+### Le vrai « j'ai construit mon radar » (~150 €, plus tard)
+
+Le **coffee-can radar du MIT** (FMCW 2,4 GHz) : blocs RF connectorisés
+SMA (VCO, séparateur, LNA, mixeur) et **deux antennes-boîtes de conserve
+construites main**. Version modernisée pour CE projet : remplacer la
+carte son du design d'origine par l'ADC du STM32G474 → la mesure de
+distance FMCW passe dans ta chaîne Ada. RF fait main + Ada embarqué
+prouvé : combinaison rarissime dans un portfolio. À faire quand la
+chaîne STM32 tourne, pas avant.
+
+### Grille de décision acheter / fabriquer
+
+- **≥ 24 GHz** : acheter le module ; « fabriquer » = lentille (A121),
+  mécanique de balayage, et logiciel ;
+- **10 GHz (HB100)** : acheter le module à 3 €, **fabriquer l'antenne
+  autour** — le meilleur ratio apprentissage/prix du projet ;
+- **2,4 GHz** : fabriquer le radar entier (coffee-can) — le badge ultime.
+
+→ Ajouter un **HB100 (~4 €)** à la commande de la section 1 : c'est le
+seul achat qui ouvre un vrai chantier « antenne faite main ».
 
 ---
 
