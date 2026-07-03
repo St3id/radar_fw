@@ -8,7 +8,16 @@ package Radar_Sim_Source is
    type Simulated_Source is new Source with private;
 
    --  Mode SURVEILLANCE : plusieurs tours d'un monde d'objets mobiles.
-   function Make (Sweeps : Positive) return Simulated_Source;
+   --  See_Room = True ajoute les murs de la piece a la scene : c'est le
+   --  cas realiste (mode live), ou il faudra une carte de clutter pour
+   --  distinguer les mobiles du decor.
+   function Make
+     (Sweeps   : Positive;
+      See_Room : Boolean := False) return Simulated_Source;
+
+   --  Nombre de mesures qui composent UN tour complet de cette source
+   --  (tous les azimuts x toutes les elevations).
+   function Per_Turn (Self : Simulated_Source) return Positive;
 
    --  Nombre de pas d'une grille de balayage (au moins 2 : les formules
    --  d'interpolation divisent par Steps - 1).

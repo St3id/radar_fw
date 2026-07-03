@@ -15,13 +15,22 @@ package body Radar_Html is
    ---------------
 
    procedure Put_Float (F : File_Type; V : Float) is
+   begin
+      Put (F, F_Img (V));
+   end Put_Float;
+
+   -----------
+   -- F_Img --
+   -----------
+
+   function F_Img (V : Float) return String is
       Img_F : constant String := Float'Image (V);
    begin
       if Img_F (Img_F'First) = ' ' then
-         Put (F, Img_F (Img_F'First + 1 .. Img_F'Last));
+         return Img_F (Img_F'First + 1 .. Img_F'Last);
       else
-         Put (F, Img_F);
+         return Img_F;
       end if;
-   end Put_Float;
+   end F_Img;
 
 end Radar_Html;
