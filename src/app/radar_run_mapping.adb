@@ -51,10 +51,13 @@ begin
    Put_Line (Out_F, "<!DOCTYPE html><html lang=""fr""><head><meta charset=""UTF-8"">");
    Put_Line (Out_F, "<title>radar_fw - Cartographie 3D</title><style>");
    Put_Line (Out_F, "body{margin:0;background:#0a0f0d;color:#b9d8cc;font-family:monospace;overflow:hidden}");
-   Put_Line (Out_F, "#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.6}");
-   Put_Line (Out_F, "#info b{color:#34e29b}</style></head><body>");
-   Put_Line (Out_F, "<div id=""info""><b>radar_fw</b> - cartographie d'une piece (scan simule)<br>");
-   Put_Line (Out_F, "Glisse pour tourner &middot; molette pour zoomer</div>");
+   Put_Line (Out_F, "#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.6;background:rgba(6,16,12,.6);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
+   Put_Line (Out_F, "#info b{color:#34e29b}");
+   Put_Line (Out_F, "#sel{margin-top:8px;color:#ffd23b;line-height:1.5}");
+   Put_Line (Out_F, ".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
+   Put_Line (Out_F, "<div id=""info""><b>radar_fw</b> - cartographie d'une piece (scan simule)");
+   Put_Line (Out_F, "<div class=""hint"">Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
+   Put_Line (Out_F, "<div id=""sel""></div></div>");
    Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
 
    --  Les points accumules par le scan.
@@ -78,33 +81,78 @@ begin
    Put_Line (Out_F, "rnd.setSize(innerWidth,innerHeight);rnd.setClearColor(0x06100c);");
    Put_Line (Out_F, "document.body.appendChild(rnd.domElement);");
 
-   --  Nuage de points (monde Z vers le haut -> Three.js Y vers le haut).
+   --  Nuage de points (monde Z vers le haut -> Three.js Y vers le haut),
+   --  colore par hauteur pour la lisibilite (sombre en bas, clair en haut).
    Put_Line (Out_F, "const geo=new THREE.BufferGeometry();");
-   Put_Line (Out_F, "const pos=[];PTS.forEach(p=>pos.push(p[0],p[2],p[1]));");
+   Put_Line (Out_F, "const pos=[],col=[];let zmin=1e9,zmax=-1e9;");
+   Put_Line (Out_F, "PTS.forEach(p=>{if(p[2]<zmin)zmin=p[2];if(p[2]>zmax)zmax=p[2];});");
+   Put_Line (Out_F, "const c0=new THREE.Color(0x14523c),c1=new THREE.Color(0x8ef5c8);");
+   Put_Line (Out_F, "PTS.forEach(p=>{pos.push(p[0],p[2],p[1]);const t=(p[2]-zmin)/Math.max(1,zmax-zmin);const c=c0.clone().lerp(c1,t);col.push(c.r,c.g,c.b);});");
    Put_Line (Out_F, "geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));");
-   Put_Line (Out_F, "const mat=new THREE.PointsMaterial({color:0x34e29b,size:40});");
-   Put_Line (Out_F, "scene.add(new THREE.Points(geo,mat));");
+   Put_Line (Out_F, "geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));");
+   Put_Line (Out_F, "const mat=new THREE.PointsMaterial({vertexColors:true,size:45});");
+   Put_Line (Out_F, "const cloud=new THREE.Points(geo,mat);scene.add(cloud);");
 
    --  Marqueur du radar (au centre) + grille de sol.
    Put_Line (Out_F, "const r=new THREE.Mesh(new THREE.SphereGeometry(80,16,16),");
    Put_Line (Out_F, "new THREE.MeshBasicMaterial({color:0xff5d3b}));scene.add(r);");
    Put_Line (Out_F, "scene.add(new THREE.GridHelper(6000,12,0x1c3a2e,0x1c3a2e));");
 
-   --  Rotation a la souris (controle minimal maison).
-   Put_Line (Out_F, "let rotY=0.6,rotX=0.4,down=false,px=0,py=0,dist=5000;");
-   Put_Line (Out_F, "addEventListener('mousedown',e=>{down=true;px=e.clientX;py=e.clientY;});");
-   Put_Line (Out_F, "addEventListener('mouseup',()=>down=false);");
-   Put_Line (Out_F, "addEventListener('mousemove',e=>{if(!down)return;");
-   Put_Line (Out_F, "rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;px=e.clientX;py=e.clientY;});");
-   Put_Line (Out_F, "addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);});");
+   --  Marqueur du point selectionne (sphere jaune en fil de fer).
+   Put_Line (Out_F, "const selM=new THREE.Mesh(new THREE.SphereGeometry(70,12,12),new THREE.MeshBasicMaterial({color:0xffd23b,wireframe:true}));");
+   Put_Line (Out_F, "selM.visible=false;scene.add(selM);");
+   Put_Line (Out_F, "const selDiv=document.getElementById('sel');");
+
+   --  Camera : orbite autour d'un CENTRE DEPLACABLE (ctr). Glisser =
+   --  tourner autour de ctr ; ZQSD/WASD = deplacer ctr ; molette = zoom.
+   Put_Line (Out_F, "let rotY=0.6,rotX=0.4,dist=5000;");
+   Put_Line (Out_F, "const ctr=new THREE.Vector3(0,0,0);");
+   Put_Line (Out_F, "let down=false,px=0,py=0,moved=0;");
+   Put_Line (Out_F, "addEventListener('mousedown',e=>{down=true;moved=0;px=e.clientX;py=e.clientY;});");
+   Put_Line (Out_F, "addEventListener('mouseup',e=>{down=false;if(moved<5)pick(e);});");
+   Put_Line (Out_F, "addEventListener('mousemove',e=>{if(!down)return;moved+=Math.abs(e.clientX-px)+Math.abs(e.clientY-py);");
+   Put_Line (Out_F, "rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
+   Put_Line (Out_F, "addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(200,Math.min(30000,dist));});");
+
+   --  Clavier (ZQSD azerty, WASD qwerty, R/F vertical). Le deplacement
+   --  suit l'orientation de la camera, vitesse proportionnelle au zoom.
+   Put_Line (Out_F, "const keys={};");
+   Put_Line (Out_F, "addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);");
+   Put_Line (Out_F, "addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);");
+   Put_Line (Out_F, "function moveCtr(){const sp=dist*0.02;");
+   Put_Line (Out_F, " const fwd=new THREE.Vector3(ctr.x-cam.position.x,0,ctr.z-cam.position.z).normalize();");
+   Put_Line (Out_F, " const rgt=new THREE.Vector3(-fwd.z,0,fwd.x);");
+   Put_Line (Out_F, " if(keys['z']||keys['w'])ctr.addScaledVector(fwd,sp);");
+   Put_Line (Out_F, " if(keys['s'])ctr.addScaledVector(fwd,-sp);");
+   Put_Line (Out_F, " if(keys['q']||keys['a'])ctr.addScaledVector(rgt,-sp);");
+   Put_Line (Out_F, " if(keys['d'])ctr.addScaledVector(rgt,sp);");
+   Put_Line (Out_F, " if(keys['r'])ctr.y+=sp;");
+   Put_Line (Out_F, " if(keys['f'])ctr.y-=sp;}");
+
+   --  Clic sur un point : details (position, distance, angles). Le clic
+   --  est distingue du glisser par le mouvement cumule (<5 px).
+   Put_Line (Out_F, "const ray=new THREE.Raycaster();ray.params.Points.threshold=80;");
+   Put_Line (Out_F, "function pick(e){");
+   Put_Line (Out_F, " const m=new THREE.Vector2(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);");
+   Put_Line (Out_F, " ray.setFromCamera(m,cam);");
+   Put_Line (Out_F, " const hits=ray.intersectObject(cloud);");
+   Put_Line (Out_F, " if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
+   Put_Line (Out_F, " const i=hits[0].index,p=PTS[i];");
+   Put_Line (Out_F, " selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
+   Put_Line (Out_F, " const d=Math.sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);");
+   Put_Line (Out_F, " let az=Math.atan2(p[1],p[0])*180/Math.PI;if(az<0)az+=360;");
+   Put_Line (Out_F, " const el=Math.asin(p[2]/Math.max(1,d))*180/Math.PI;");
+   Put_Line (Out_F, " selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+");
+   Put_Line (Out_F, "  '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}");
+
    Put_Line (Out_F, "addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;");
    Put_Line (Out_F, "cam.updateProjectionMatrix();rnd.setSize(innerWidth,innerHeight);});");
 
    --  Boucle d'animation.
-   Put_Line (Out_F, "function loop(){requestAnimationFrame(loop);");
-   Put_Line (Out_F, "cam.position.x=Math.cos(rotY)*Math.cos(rotX)*dist;");
-   Put_Line (Out_F, "cam.position.z=Math.sin(rotY)*Math.cos(rotX)*dist;");
-   Put_Line (Out_F, "cam.position.y=Math.sin(rotX)*dist;cam.lookAt(0,0,0);");
+   Put_Line (Out_F, "function loop(){requestAnimationFrame(loop);moveCtr();");
+   Put_Line (Out_F, "cam.position.x=ctr.x+Math.cos(rotY)*Math.cos(rotX)*dist;");
+   Put_Line (Out_F, "cam.position.z=ctr.z+Math.sin(rotY)*Math.cos(rotX)*dist;");
+   Put_Line (Out_F, "cam.position.y=ctr.y+Math.sin(rotX)*dist;cam.lookAt(ctr);");
    Put_Line (Out_F, "rnd.render(scene,cam);}loop();");
    Put_Line (Out_F, "</script></body></html>");
 
