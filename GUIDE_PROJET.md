@@ -158,11 +158,13 @@ Chaque phase = un jalon montrable. Les phases 1–3 ne demandent **aucun matéri
    Les deux modes diffèrent par le traitement des balayages (suivi temps réel
    vs accumulation), pas par la source de données.
 
-   *→ Première version FAITE : `radar_fw track` (surveillance, défaut) et
-   `radar_fw map` (cartographie : murs dans `Radar_World`, source
-   `Make_Room_Scan`, nuage accumulé via `Detect_Clustered`, sortie
-   `radar_3d.html`). Reste : bruit réaliste, accumulation multi-passes,
-   densité configurable.*
+   *→ FAIT en simulé, trois modes : `radar_fw track` (rejeu), `radar_fw
+   map` (cartographie navigable : déplacement ZQSD, clic-inspection) et
+   `radar_fw live` (temps réel : serveur HTTP en Ada pur, page 3D
+   auto-rafraîchie, **MTI par carte de clutter** — `Radar_Clutter`,
+   embarquable, cross-compilé ARM en CI : le décor appris au tour 1 est
+   soustrait, seuls les mobiles font des pistes). Reste : bruit réaliste,
+   horodatage (mm/s), accumulation multi-passes.*
 
 ---
 
