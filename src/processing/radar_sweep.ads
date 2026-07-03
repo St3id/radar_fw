@@ -104,14 +104,29 @@ is
      (Natural'Max (CFAR_Floor,
                    CFAR_Factor * Natural (Noise_Estimate (S, B))));
 
+   --  DISTANCE AVEUGLE (8 cases = 625 mm, l'ordre de grandeur de la
+   --  portee minimale d'un vrai module 24 GHz) : les premieres cases ne
+   --  sont jamais declarees cibles. Sur un vrai radar, la fuite directe
+   --  TX -> RX les sature ; ici, leurs fausses alarmes CFAR ont en plus
+   --  un vice geometrique : a courte distance, tous les azimuts se
+   --  retrouvent PROCHES DE L'ORIGINE, donc les fausses alarmes s'y
+   --  regroupent tour apres tour et fabriquent une piste fantome
+   --  persistante au pied du radar (observe en simulation !). Au-dela
+   --  de 625 mm, deux fausses alarmes ne se regroupent que si leurs
+   --  azimuts coincident : le hasard ne le refait pas deux tours de
+   --  suite, et la regle M-sur-N les elimine.
+   Blind_Bins : constant := 8;
+
    --  Detection a seuil ADAPTATIF + regroupement des cases voisines.
-   --  C'est elle que le pipeline utilise. Contrat prouve : toute cible
-   --  rapportee depasse le seuil CFAR de SA case (pas de fausse alarme
-   --  par rapport au bruit local).
+   --  C'est elle que le pipeline utilise. Contrats prouves : toute
+   --  cible rapportee depasse le seuil CFAR de SA case (pas de fausse
+   --  alarme par rapport au bruit local) et se trouve au-dela de la
+   --  distance aveugle.
    function Detect_Adaptive (S : Sweep) return Detection
      with Post =>
        (for all K in 1 .. Detect_Adaptive'Result.Count =>
           Natural (S (Detect_Adaptive'Result.Targets (K)))
-            >= CFAR_Threshold (S, Detect_Adaptive'Result.Targets (K)));
+            >= CFAR_Threshold (S, Detect_Adaptive'Result.Targets (K))
+          and then Detect_Adaptive'Result.Targets (K) > Blind_Bins);
 
 end Radar_Sweep;
