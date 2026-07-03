@@ -1,4 +1,6 @@
-package body Radar_Buffer is
+package body Radar_Buffer
+  with SPARK_Mode => On
+is
 
    protected body Mailbox is
 
@@ -16,11 +18,10 @@ package body Radar_Buffer is
       -- Get --
       ---------
 
-      procedure Get (S : out Sweep; Available : out Boolean) is
+      entry Get (S : out Sweep) when Has_Data is
       begin
-         S         := Data;
-         Available := Has_Data;
-         Has_Data  := False;   --  on a consomme la donnee
+         S        := Data;
+         Has_Data := False;   --  on a consomme la donnee
       end Get;
 
    end Mailbox;

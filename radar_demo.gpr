@@ -1,0 +1,41 @@
+--  Demonstrateur de concurrence RAVENSCAR (la vitrine embarquee).
+--  Projet separe de radar_fw.gpr : le profil Ravenscar s'applique a
+--  l'executable ENTIER (via ravenscar.adc), ce qui n'aurait pas de sens
+--  pour le generateur HTML tourne vers le PC (radar_fw.adb).
+--
+--  Ce projet n'importe PAS config/radar_fw_config.gpr : ce dernier tire
+--  aunit.gpr, et les pragmas de configuration globaux s'appliqueraient
+--  alors aussi a AUnit, qui viole le profil (Ada.Calendar est interdit
+--  par la restriction No_Calendar). Les options de compilation sont
+--  donc reprises ici en clair, alignees sur celles du projet principal.
+project Radar_Demo is
+
+   for Source_Dirs use ("src/demo", "src/tasking", "src/processing");
+   for Object_Dir use "obj/demo";
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("radar_demo.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-Og",       --  optimisation adaptee au debug
+         "-g",        --  informations de debug
+         "-gnatwa",   --  tous les warnings
+         "-gnatw.X",  --  sauf ceux lies a No_Exception_Propagation
+         "-gnatVa",   --  toutes les verifications de validite
+         "-gnatW8",   --  sources en UTF-8
+         --  Memes controles de style que le projet principal.
+         "-gnaty3aAbBcefhiIklmnOprStux");
+   end Compiler;
+
+   package Builder is
+      --  C'est CE branchement qui rend le profil Ravenscar obligatoire
+      --  a la compilation ; sans lui, le profil ne serait qu'annonce.
+      for Global_Configuration_Pragmas use "ravenscar.adc";
+   end Builder;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+end Radar_Demo;

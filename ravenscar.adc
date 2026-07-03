@@ -1,0 +1,11 @@
+--  Pragmas de configuration du demonstrateur temps reel (radar_demo.gpr).
+--  Impose le profil Ravenscar a toutes les unites de l'executable :
+--  concurrence deterministe, analysable statiquement (pas de select,
+--  pas d'abort, une seule entry par objet protege, barrieres simples,
+--  delay absolus uniquement...).
+pragma Profile (Ravenscar);
+
+--  Les taches de bibliotheque ne demarrent qu'une fois TOUTE
+--  l'elaboration terminee : pas de course au demarrage. Exige par
+--  SPARK pour analyser du code concurrent (SPARK RM 9(2)).
+pragma Partition_Elaboration_Policy (Sequential);
