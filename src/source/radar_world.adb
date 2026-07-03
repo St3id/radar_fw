@@ -16,10 +16,13 @@ package body Radar_World is
                         X  => 3000.0, Y => 1000.0, Z => 0.0,
                         Vx => -120.0, Vy => 0.0,    Vz => 0.0);
 
-      --  Objet 2 : part en bas, monte lentement.
+      --  Objet 2 : part en bas a gauche, monte en diagonale.
+      --  (Surtout PAS colle a un mur : une cible qui rase un mur tombe
+      --  dans les memes cases de distance que lui, et la carte de
+      --  clutter la masque - comme sur un vrai radar.)
       W.Objects (2) := (Id => 2,
-                        X  => -2000.0, Y => -1500.0, Z => 500.0,
-                        Vx => 0.0,     Vy => 80.0,   Vz => 0.0);
+                        X  => -1200.0, Y => -900.0, Z => 400.0,
+                        Vx => 50.0,    Vy => 80.0,  Vz => 0.0);
 
       W.Count := 2;
       return W;
@@ -68,12 +71,35 @@ package body Radar_World is
    ----------
 
    procedure Step (W : in out World) is
+      --  Les objets REBONDISSENT sur les murs de la piece : la scene
+      --  reste vivante indefiniment (mode live) et les vecteurs vitesse
+      --  changent a chaque rebond. La marge les garde a distance du mur
+      --  pour que la carte de clutter ne les confonde pas avec lui.
+      Margin : constant Float := 400.0;
+      X_Lim  : constant Float := Room_Half_X - Margin;
+      Y_Lim  : constant Float := Room_Half_Y - Margin;
    begin
       --  Chaque objet avance d'un pas : position += vitesse.
       for I in 1 .. W.Count loop
-         W.Objects (I).X := W.Objects (I).X + W.Objects (I).Vx;
-         W.Objects (I).Y := W.Objects (I).Y + W.Objects (I).Vy;
-         W.Objects (I).Z := W.Objects (I).Z + W.Objects (I).Vz;
+         declare
+            O : Object renames W.Objects (I);
+         begin
+            O.X := O.X + O.Vx;
+            O.Y := O.Y + O.Vy;
+            O.Z := O.Z + O.Vz;
+
+            if O.X > X_Lim and then O.Vx > 0.0 then
+               O.Vx := -O.Vx;
+            elsif O.X < -X_Lim and then O.Vx < 0.0 then
+               O.Vx := -O.Vx;
+            end if;
+
+            if O.Y > Y_Lim and then O.Vy > 0.0 then
+               O.Vy := -O.Vy;
+            elsif O.Y < -Y_Lim and then O.Vy < 0.0 then
+               O.Vy := -O.Vy;
+            end if;
+         end;
       end loop;
    end Step;
 
