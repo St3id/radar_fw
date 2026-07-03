@@ -35,15 +35,21 @@ package Radar_Track is
    Confirm_Hits : constant := 3;
 
    --  Met a jour les pistes avec les cibles d'un nouveau tour (frame
-   --  deja regroupee), en quatre temps :
+   --  deja regroupee), en cinq temps :
    --    1. PREDICTION : chaque piste avance selon sa vitesse (une piste
    --       non revue "roule sur son erre" au lieu de geler) ;
-   --    2. ASSOCIATION par proximite avec les positions PREDITES ;
+   --    2. ASSOCIATION GLOBALE avec les positions PREDITES : on prend
+   --       iterativement la paire (piste, detection) la plus proche au
+   --       monde - aucune piste ne "vole" la detection d'une autre
+   --       mieux placee (defaut classique de l'association gloutonne) ;
    --    3. CORRECTION alpha-beta des pistes associees (position et
    --       vitesse lissees : le jitter d'une cible etendue ne part plus
    --       tel quel dans la vitesse) ;
    --    4. VIE ET MORT : confirmation M-sur-N, abandon des pistes
-   --       perdues, creation de tentatives pour les detections orphelines.
+   --       perdues, creation de tentatives pour les detections orphelines ;
+   --    5. FUSION : deux pistes trop proches = un meme objet fragmente
+   --       (cible etendue scindee par la quantification) - la plus
+   --       ancienne absorbe l'autre, pas de piste "ombre".
    procedure Update (T : in out Tracker; F : Frame);
 
 end Radar_Track;
