@@ -3,6 +3,7 @@ with Ada.Text_IO;         use Ada.Text_IO;
 with Radar_Run_Tracking;
 with Radar_Run_Mapping;
 with Radar_Run_Live;
+with Radar_Run_Scan;
 
 --  Point d'entree : choisit le MODE D'EXPLOITATION a la demande.
 --  Tous les modes partagent la meme source de donnees (Radar_Source) et
@@ -20,11 +21,14 @@ begin
       Radar_Run_Mapping;
    elsif Argument (1) = "live" then
       Radar_Run_Live;
+   elsif Argument (1) = "scan" then
+      Radar_Run_Scan;
    else
-      Put_Line ("usage : radar_fw [track|map|live]");
+      Put_Line ("usage : radar_fw [track|map|live|scan]");
       Put_Line ("  track : rejeu du pistage (defaut)");
-      Put_Line ("  map   : cartographie 3D d'une piece statique");
+      Put_Line ("  map   : cartographie 3D d'une piece statique (fichier)");
       Put_Line ("  live  : surveillance temps reel (http://localhost:8080)");
+      Put_Line ("  scan  : cartographie PROGRESSIVE (http://localhost:8080)");
       Set_Exit_Status (Failure);
    end if;
 end Radar_Fw;
