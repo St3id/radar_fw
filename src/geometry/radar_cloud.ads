@@ -2,16 +2,18 @@ with Radar_Geometry;  use Radar_Geometry;
 
 package Radar_Cloud is
 
-   --  Nombre de directions balayees.
-   Azimuth_Steps   : constant := 60;   --  60 pas horizontaux
-   Elevation_Steps : constant := 20;   --  20 pas verticaux
+   --  Conteneur de nuage de points 3D, rempli par le mode cartographie.
+   --  (L'ancien Scan_Room calculait lui-meme la geometrie de la piece,
+   --  en court-circuitant la source radar ; desormais les murs vivent
+   --  dans Radar_World et les points arrivent par la MEME chaine de
+   --  detection que le mode surveillance.)
 
-   --  Taille maximale du nuage : un point par direction.
-   Max_Points : constant := Azimuth_Steps * Elevation_Steps;
+   --  Taille maximale du nuage.
+   Max_Points : constant := 8_192;
 
    subtype Point_Count is Natural range 0 .. Max_Points;
 
---  D'abord on NOMME le type tableau (Ada interdit un tableau anonyme
+   --  D'abord on NOMME le type tableau (Ada interdit un tableau anonyme
    --  directement dans un record).
    type Point_Array is array (1 .. Max_Points) of Point_3D;
 
@@ -21,7 +23,11 @@ package Radar_Cloud is
       Count  : Point_Count;
    end record;
 
-   --  Simule un scan complet d'une "piece" et renvoie le nuage de points.
-   function Scan_Room return Point_Cloud;
+   --  Un nuage vide, pret a etre rempli.
+   function Empty_Cloud return Point_Cloud;
+
+   --  Ajoute un point au nuage. Si le nuage est plein, le point est
+   --  ignore (saturation silencieuse, jamais de debordement).
+   procedure Append (C : in out Point_Cloud; P : Point_3D);
 
 end Radar_Cloud;
