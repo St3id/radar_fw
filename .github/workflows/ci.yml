@@ -82,19 +82,20 @@ jobs:
       # prouve SPARK) compile pour Cortex-M4F avec le runtime reduit
       # "light" - le processeur du STM32G474 vise. Tout ajout au coeur
       # qui dependrait du PC (Text_IO, Calendar...) casse cette etape.
+      # NB : en alr 2.1.0, "alr toolchain" n'a PAS d'option --install
+      # (cause de l'echec du premier run). "alr install --prefix" est la
+      # commande prevue pour rendre une toolchain visible HORS d'Alire :
+      # elle deploie les binaires dans <prefix>/bin.
       - name: Install ARM cross toolchain
-        run: alr toolchain --install gnat_arm_elf
+        run: alr -n install gnat_arm_elf --prefix="$RUNNER_TEMP/arm-toolchain"
 
       - name: Cross-build core (arm-eabi, light runtime)
         run: |
-          ARM_GCC=$(find "$HOME/.local/share/alire" "$HOME/.cache/alire" \
-                    -name 'arm-eabi-gcc' -type f 2>/dev/null | head -n1)
-          if [ -z "$ARM_GCC" ]; then
-            ARM_GCC=$(find "$HOME" -name 'arm-eabi-gcc' -type f 2>/dev/null | head -n1)
+          export PATH="$RUNNER_TEMP/arm-toolchain/bin:$PATH"
+          if ! command -v arm-eabi-gcc >/dev/null; then
+            ARM_GCC=$(find "$RUNNER_TEMP/arm-toolchain" -name 'arm-eabi-gcc' -type f | head -n1)
+            if [ -z "$ARM_GCC" ]; then echo "arm-eabi-gcc introuvable" ; exit 1 ; fi
+            export PATH="$(dirname "$ARM_GCC"):$PATH"
           fi
-          if [ -z "$ARM_GCC" ]; then
-            echo "arm-eabi-gcc introuvable" ; exit 1
-          fi
-          export PATH="$(dirname "$ARM_GCC"):$PATH"
           arm-eabi-gcc --version | head -n1
           alr exec -- gprbuild -p -P radar_core.gpr
