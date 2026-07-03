@@ -1,8 +1,10 @@
 name: Build, Test & Prove
 
 on:
+  # Toutes les branches : chaque commit pousse est compile, teste et
+  # prouve (avant, seule main l'etait : les branches de travail
+  # avancaient sans filet).
   push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -49,6 +51,16 @@ jobs:
       - name: Run tests
         run: alr exec -- ./bin/run_tests
 
+      # ===== Demonstrateur Ravenscar =====
+      # Projet separe (radar_demo.gpr) : le profil Ravenscar est impose a
+      # tout l'executable par ravenscar.adc. La demo tourne REELLEMENT
+      # (8 cycles producteur/consommateur) et se termine toute seule.
+      - name: Build Ravenscar demo
+        run: alr exec -- gprbuild -p -P radar_demo.gpr
+
+      - name: Run Ravenscar demo
+        run: alr exec -- ./bin/radar_demo
+
       # Rejoue la preuve formelle SPARK sur le projet principal.
       # NB : en local "alr gnatprove" est un alias perso (= "alr exec -P1 --
       # gnatprove"). Cet alias n'existe pas en CI, on l'ecrit donc en clair.
@@ -56,5 +68,33 @@ jobs:
       #   --checks-as-errors=on : fait ECHOUER la CI si un check n'est pas
       #                           prouve (sans ca, gnatprove sort en code 0
       #                           meme avec des checks non prouves).
-      - name: SPARK proof
+      - name: SPARK proof (main)
         run: alr exec -- gnatprove -P radar_fw.gpr --report=all --checks-as-errors=on
+
+      # Preuve du projet demo : l'objet protege Mailbox est en SPARK.
+      # L'analyse de code concurrent exige le profil Ravenscar et
+      # l'elaboration sequentielle, fournis par ravenscar.adc.
+      - name: SPARK proof (Ravenscar demo)
+        run: alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
+
+      # ===== Cross-compilation pour la cible embarquee =====
+      # Verifie SANS la carte que le coeur algorithmique (src/processing,
+      # prouve SPARK) compile pour Cortex-M4F avec le runtime reduit
+      # "light" - le processeur du STM32G474 vise. Tout ajout au coeur
+      # qui dependrait du PC (Text_IO, Calendar...) casse cette etape.
+      - name: Install ARM cross toolchain
+        run: alr toolchain --install gnat_arm_elf
+
+      - name: Cross-build core (arm-eabi, light runtime)
+        run: |
+          ARM_GCC=$(find "$HOME/.local/share/alire" "$HOME/.cache/alire" \
+                    -name 'arm-eabi-gcc' -type f 2>/dev/null | head -n1)
+          if [ -z "$ARM_GCC" ]; then
+            ARM_GCC=$(find "$HOME" -name 'arm-eabi-gcc' -type f 2>/dev/null | head -n1)
+          fi
+          if [ -z "$ARM_GCC" ]; then
+            echo "arm-eabi-gcc introuvable" ; exit 1
+          fi
+          export PATH="$(dirname "$ARM_GCC"):$PATH"
+          arm-eabi-gcc --version | head -n1
+          alr exec -- gprbuild -p -P radar_core.gpr
