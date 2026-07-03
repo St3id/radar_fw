@@ -1,4 +1,4 @@
-with Ada.Numerics.Float_Random;
+with Ada.Numerics.Float_Random;  use Ada.Numerics.Float_Random;
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Sweep;     use Radar_Sweep;
 
@@ -6,6 +6,11 @@ package body Radar_Sim_Source is
 
    Beam_Width : constant Float := 3.0;   --  tolerance azimut (degres)
    El_Width   : constant Float := 5.0;   --  tolerance elevation (degres)
+
+   --  Bruit de fond : amplitude max du bruit aleatoire present dans
+   --  chaque case (le monde reel n'est jamais silencieux). C'est le
+   --  CFAR qui s'en accommode ; un seuil fixe ne le pourrait pas.
+   Noise_Level : constant Float := 80.0;
 
    --  ----- Realisme des cibles (ANALYSE_REALISME.md, point 1) -----
 
@@ -22,7 +27,9 @@ package body Radar_Sim_Source is
       (-70.0, -60.0, -100.0));
 
    --  Fluctuation type Swerling : amplitude re-tiree a chaque tour.
-   Min_Echo : constant Amplitude := 150;
+   --  Min_Echo reste au-dessus du seuil CFAR typique (4 x bruit moyen
+   --  ~40 = 160) : un echo present est detectable, sauf malchance.
+   Min_Echo : constant Amplitude := 250;
    Max_Echo : constant Amplitude := 3_500;
 
    --  Probabilite qu'un reflecteur soit eteint ce tour-ci (orientation
@@ -30,13 +37,19 @@ package body Radar_Sim_Source is
    Dropout_Probability   : constant Float := 0.15;
    Deep_Fade_Probability : constant Float := 0.10;
 
+   --  Multitrajet : probabilite qu'un objet produise ce tour-ci un echo
+   --  FANTOME derriere le mur (trajet radar -> mur -> cible -> radar).
+   --  Intermittent par nature : c'est la regle M-sur-N du pistage qui
+   --  doit l'empecher de devenir une piste.
+   Ghost_Probability : constant Float := 0.05;
+   Ghost_Echo        : constant Amplitude := 500;
+
    --  Generateur a GRAINE FIXE : les sorties restent reproductibles
    --  d'une execution a l'autre (CI, comparaisons, mise au point).
    Gen : Ada.Numerics.Float_Random.Generator;
 
    --  Re-tire les amplitudes de tous les reflecteurs pour un tour.
    procedure Roll_Echoes (Self : in out Simulated_Source) is
-      use Ada.Numerics.Float_Random;
    begin
       for I in 1 .. Max_Objects loop
          declare
@@ -52,6 +65,8 @@ package body Radar_Sim_Source is
                     + Amplitude (Random (Gen) * Float (Max_Echo - Min_Echo));
                end if;
             end loop;
+
+            Self.Ghosting (I) := Random (Gen) < Ghost_Probability;
          end;
       end loop;
    end Roll_Echoes;
@@ -105,6 +120,7 @@ package body Radar_Sim_Source is
          El_Steps     => Default_Elevation_Steps,
          See_Room     => See_Room,
          Echoes       => (others => (others => 0)),
+         Ghosting     => (others => False),
          Scene        => Initial_World);
    begin
       Roll_Echoes (S);   --  amplitudes du premier tour
@@ -136,6 +152,7 @@ package body Radar_Sim_Source is
               El_Steps     => El_Steps,
               See_Room     => True,           --  percoit les murs
               Echoes       => (others => (others => 0)),
+              Ghosting     => (others => False),
               Scene        => Empty_World);   --  pas d'objet mobile
    end Make_Room_Scan;
 
@@ -164,8 +181,13 @@ package body Radar_Sim_Source is
          El : constant Float :=
            El_Min + Float (Self.El_Step)
                     * (El_Max - El_Min) / Float (Self.El_Steps - 1);
-         S : Sweep := (others => 5);
+         S : Sweep;
       begin
+         --  Bruit de fond dans chaque case (jamais de silence en reel).
+         for J in Bin_Index loop
+            S (J) := Amplitude (Random (Gen) * Noise_Level);
+         end loop;
+
          --  Les murs de la piece (mode cartographie) : un echo a la
          --  distance du premier mur touche dans cette direction.
          if Self.See_Room then
@@ -205,6 +227,29 @@ package body Radar_Sim_Source is
                      end;
                   end if;
                end loop;
+
+               --  Fantome multitrajet : le signal rebondit sur le mur
+               --  puis sur la cible ; l'echo parait VENIR DE DERRIERE
+               --  le mur (distance mur + (mur - cible)), plus faible.
+               if Self.See_Room and then Self.Ghosting (I) then
+                  declare
+                     R : constant Polar := To_Polar ((O.X, O.Y, O.Z));
+                     G : Float;
+                  begin
+                     if Angle_Diff (R.Azimuth, Az) < Beam_Width
+                       and then abs (R.Elevation - El) < El_Width
+                     then
+                        G := 2.0 * Wall_Distance (Az, El) - R.Distance;
+                        if G > 0.0 and then G < Float (Max_Range_Mm) then
+                           declare
+                              B : constant Bin_Index := Distance_To_Bin (G);
+                           begin
+                              S (B) := Amplitude'Max (S (B), Ghost_Echo);
+                           end;
+                        end if;
+                     end if;
+                  end;
+               end if;
             end;
          end loop;
 
