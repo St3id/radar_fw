@@ -94,10 +94,24 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Cluster;
 
-   --  Test 5 : pistage. Une piste ratee pendant 2 tours puis retrouvee
-   --  300 mm plus loin s'est deplacee sur 3 tours : la vitesse doit etre
-   --  100 mm/tour (regression : avant, on rendait 300, surestime x3).
-   procedure Test_Track_Velocity_After_Miss
+   --  La premiere piste active du tracker (pour les tests).
+   function First_Active (Trk : Tracker) return Track is
+   begin
+      for Tk of Trk.Tracks loop
+         if Tk.Active then
+            return Tk;
+         end if;
+      end loop;
+      return (Id => 0, Pos => (0.0, 0.0, 0.0), Velocity => (0.0, 0.0, 0.0),
+              Missing => 0, Hits => 0, Confirmed => False, Active => False);
+   end First_Active;
+
+   --  Test 5 : cycle de vie et filtre de piste. Une cible qui avance de
+   --  100 mm/tour : la piste nait TENTATIVE (non confirmee), se
+   --  confirme apres 3 detections, sa vitesse FILTREE (alpha-beta)
+   --  converge vers 100 mm/tour, et elle roule sur son erre pendant
+   --  une occultation (coasting).
+   procedure Test_Track_Filter
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
@@ -107,35 +121,66 @@ package body Radar_Pipeline_Tests is
    begin
       Reset (F);
       Reset (Empty);
-
-      --  Tour 1 : creation de la piste en (0,0,0).
       F.Count := 1;
+
+      --  Tour 1 : premiere detection -> tentative, pas confirmee.
       F.Items (1) := (Pos => (0.0, 0.0, 0.0), Distance => 0.0);
       Update (Trk, F);
+      Assert (not First_Active (Trk).Confirmed,
+              "Une seule detection ne devrait pas confirmer la piste");
 
-      --  Tours 2 et 3 : l'objet n'est pas revu.
-      Update (Trk, Empty);
-      Update (Trk, Empty);
+      --  Tours 2 a 10 : la cible avance de 100 mm par tour.
+      for N in 1 .. 9 loop
+         F.Items (1) := (Pos => (Float (N) * 100.0, 0.0, 0.0),
+                         Distance => Float (N) * 100.0);
+         Update (Trk, F);
+      end loop;
 
-      --  Tour 4 : retrouve 300 mm plus loin.
-      F.Items (1) := (Pos => (300.0, 0.0, 0.0), Distance => 300.0);
-      Update (Trk, F);
+      Assert (First_Active (Trk).Confirmed,
+              "La piste devrait etre confirmee (M-sur-N)");
+      Assert (First_Active (Trk).Id = 1,
+              "L'ID d'origine devrait etre conserve");
+      Assert (abs (First_Active (Trk).Velocity.X - 100.0) < 20.0,
+              "La vitesse filtree devrait converger vers 100 mm/tour");
 
+      --  Occultation de 2 tours : la piste confirmee SURVIT et sa
+      --  position continue d'avancer sur son erre.
       declare
-         Found : Boolean := False;
+         Before : constant Float := First_Active (Trk).Pos.X;
       begin
-         for Tk of Trk.Tracks loop
-            if Tk.Active then
-               Assert (not Found, "Une seule piste devrait etre active");
-               Found := True;
-               Assert (Tk.Id = 1, "L'ID de la piste devrait rester 1");
-               Assert (abs (Tk.Velocity.X - 100.0) < 0.001,
-                       "300 mm en 3 tours devraient donner 100 mm/tour");
-            end if;
-         end loop;
-         Assert (Found, "La piste devrait avoir survecu aux tours rates");
+         Update (Trk, Empty);
+         Update (Trk, Empty);
+         Assert (First_Active (Trk).Active
+                 and then First_Active (Trk).Confirmed,
+                 "La piste confirmee devrait survivre a l'occultation");
+         Assert (First_Active (Trk).Pos.X > Before + 100.0,
+                 "Coasting : la position devrait continuer d'avancer");
       end;
-   end Test_Track_Velocity_After_Miss;
+   end Test_Track_Filter;
+
+   --  Test 5bis : une TENTATIVE non re-detectee meurt vite. C'est le
+   --  filtre anti-fantomes : un echo de multitrajet, intermittent,
+   --  ne survit pas assez longtemps pour etre confirme.
+   procedure Test_Tentative_Dies
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk   : Tracker;
+      F     : Frame;
+      Empty : Frame;
+   begin
+      Reset (F);
+      Reset (Empty);
+      F.Count := 1;
+      F.Items (1) := (Pos => (1000.0, 0.0, 0.0), Distance => 1000.0);
+
+      Update (Trk, F);       --  un echo isole -> tentative
+      Update (Trk, Empty);   --  plus rien...
+      Update (Trk, Empty);
+
+      Assert (not First_Active (Trk).Active,
+              "Une tentative jamais revue devrait mourir sans trace");
+   end Test_Tentative_Dies;
 
    --  Test 6 : deux echos sur le MEME rayon (deux objets alignes) =
    --  deux detections (regression : avant, seul le pic etait garde et
@@ -196,18 +241,60 @@ package body Radar_Pipeline_Tests is
    begin
       Clear (C);
 
-      --  Apprentissage : un mur en case 100, direction az=9, el=0.
+      --  1re observation d'un echo en case 100 : PAS encore du decor
+      --  (un mobile qui passe ne doit pas empoisonner la carte).
       Learn (C, 9.0, 0.0, One (100));
+      Assert (Filter (C, 9.0, 0.0, One (100)).Count = 1,
+              "Une seule observation ne devrait pas faire du clutter");
 
+      --  2e observation : la case est confirmee comme decor.
+      Learn (C, 9.0, 0.0, One (100));
       Assert (Filter (C, 9.0, 0.0, One (100)).Count = 0,
-              "L'echo du mur appris devrait etre supprime");
+              "L'echo du mur confirme devrait etre supprime");
       Assert (Filter (C, 9.0, 0.0, One (101)).Count = 0,
               "Un echo dans la marge de garde devrait etre supprime");
       Assert (Filter (C, 9.0, 0.0, One (150)).Count = 1,
               "Un echo a une autre distance devrait passer (mobile)");
       Assert (Filter (C, 90.0, 0.0, One (100)).Count = 1,
               "La meme case dans une AUTRE direction devrait passer");
+
+      --  Oubli lent : deux vieillissements plus tard, le decor disparu
+      --  est oublie et la case redevient libre.
+      Age (C);
+      Age (C);
+      Assert (Filter (C, 9.0, 0.0, One (100)).Count = 1,
+              "Le decor disparu devrait finir par etre oublie");
    end Test_Clutter_Filter;
+
+   --  Test 9 : CFAR. Un pic net au-dessus du bruit local est detecte ;
+   --  un champ UNIFORMEMENT fort n'est PAS une cible (chaque case vaut
+   --  son bruit voisin) - un seuil fixe est incapable de faire ca.
+   procedure Test_CFAR
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      S : Sweep;
+   begin
+      for I in Bin_Index loop
+         S (I) := 50;
+      end loop;
+      S (100) := 1_000;
+
+      declare
+         D : constant Detection := Detect_Adaptive (S);
+      begin
+         Assert (D.Count = 1,
+                 "Un pic net sur bruit uniforme = une cible");
+         Assert (D.Targets (1) = 100,
+                 "La cible devrait etre en case 100");
+      end;
+
+      for I in Bin_Index loop
+         S (I) := 1_000;
+      end loop;
+      Assert (Detect_Adaptive (S).Count = 0,
+              "Un champ uniformement fort n'est pas une cible");
+   end Test_CFAR;
 
    --------------------
    -- Register_Tests --
@@ -226,8 +313,11 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Cluster'Access, "Regroupement de detections 3D");
       Register_Routine
-        (T, Test_Track_Velocity_After_Miss'Access,
-         "Vitesse de piste apres tours rates");
+        (T, Test_Track_Filter'Access,
+         "Pistage : filtre alpha-beta, M-sur-N, coasting");
+      Register_Routine
+        (T, Test_Tentative_Dies'Access,
+         "Pistage : une tentative jamais revue meurt");
       Register_Routine
         (T, Test_Two_Echoes_Same_Ray'Access,
          "Deux echos sur un meme rayon");
@@ -236,7 +326,10 @@ package body Radar_Pipeline_Tests is
          "Distance aux murs de la piece");
       Register_Routine
         (T, Test_Clutter_Filter'Access,
-         "Carte de clutter (MTI)");
+         "Carte de clutter adaptative (MTI)");
+      Register_Routine
+        (T, Test_CFAR'Access,
+         "Seuil adaptatif CFAR");
    end Register_Tests;
 
 end Radar_Pipeline_Tests;
