@@ -20,10 +20,10 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] Traitement d'un balayage : seuil de détection, pic, conversion en
       distance, multi-cibles (`Detect_All`) et regroupement des échos
       voisins (`Detect_Clustered`)
-- [x] Vérification formelle SPARK : **35 checks prouvés, 0 non prouvé**,
-      avec des **contrats fonctionnels** (aucune fausse alarme : toute
-      cible rapportée dépasse réellement le seuil) et la terminaison
-      prouvée automatiquement (`Always_Terminates`)
+- [x] Vérification formelle SPARK : **83 checks prouvés, 0 non prouvé**,
+      avec des **contrats fonctionnels** — dont le **CFAR** (seuil
+      adaptatif au bruit local : « aucune cible rapportée sous son seuil
+      local », prouvé) — et la terminaison (`Always_Terminates`)
 - [x] Pipeline 3D complet sur source simulée : interface abstraite
       (`Radar_Source`), monde simulé mobile, détections 3D, regroupement
       spatial (`Cluster`), **pistage** avec ID stables et vitesses
@@ -43,14 +43,19 @@ rigoureuse, applicable au domaine défense / aéronautique.
       cross-compilé ARM en CI) : le décor statique appris au premier tour
       est soustrait, seuls les objets **mobiles** deviennent des pistes —
       avec ou sans pièce autour
-- [x] **Cibles réalistes** : chaque objet simulé est une cible **étendue**
-      (4 réflecteurs) à l'écho **fluctuant** (type Swerling) avec de vrais
-      trous de détection — le pistage est éprouvé contre des données
-      imparfaites (voir `ANALYSE_REALISME.md`)
+- [x] **Cibles réalistes** : cibles **étendues** (4 réflecteurs), écho
+      **fluctuant** (Swerling), trous de détection, bruit de fond et
+      **fantômes multitrajet** — le pipeline est éprouvé contre des
+      données imparfaites (voir `ANALYSE_REALISME.md`)
+- [x] **Pistage robuste** : prédiction + coasting, filtre **alpha-beta**,
+      confirmation **M-sur-N** (les tentatives et les fantômes ne sont
+      jamais affichés), clutter **adaptatif** (apprentissage de fond,
+      oubli lent)
 - [x] **Serveur HTTP écrit en Ada** (`GNAT.Sockets`, mono-thread à
       selector) : la page 3D live interroge `/state.json` en continu
-- [x] Tests unitaires **AUnit** : 12 tests verts (traitement du balayage +
-      géométrie, regroupement 3D, pistage, murs, clutter)
+- [x] Tests unitaires **AUnit** : 14 tests verts (balayage, CFAR,
+      géométrie, regroupement 3D, cycle de vie du pistage, murs, clutter
+      adaptatif)
 - [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
       build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
       cross-compilation ARM
@@ -133,13 +138,14 @@ le build immédiatement.
 ## Vérification formelle
 
 Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
-**35 checks, 0 non prouvé** :
+**83 checks, 0 non prouvé** :
 
 - absence d'erreur d'exécution (débordements, indices hors bornes) ;
 - contrats fonctionnels : `Peak_Bin` renvoie bien le maximum,
-  `Peak_Distance` vaut exactement `Bin_Distance (Peak_Bin (S))`, et
+  `Peak_Distance` vaut exactement `Bin_Distance (Peak_Bin (S))`,
   `Detect_All` / `Detect_Clustered` ne rapportent **aucune fausse
-  alarme** (toute cible retournée dépasse le seuil) ;
+  alarme**, et `Detect_Adaptive` (CFAR) ne rapporte **aucune cible sous
+  son seuil local** (adaptatif au bruit) ;
 - terminaison des sous-programmes (aspect implicite `Always_Terminates`) ;
 - l'objet protégé `Mailbox` est prouvé dans le contexte Ravenscar
   (projet `radar_demo.gpr`).
@@ -151,11 +157,11 @@ Reproduire les deux preuves :
 
 ## Tests
 
-12 tests AUnit en deux suites : traitement du balayage (pic, seuil,
-multi-cibles, regroupement) et pipeline 3D (aller-retour géométrique,
-normalisation d'azimut, zénith, regroupement 3D, vitesse de piste après
-occultation, deux échos sur un même rayon, distance aux murs, carte de
-clutter) :
+14 tests AUnit en deux suites : traitement du balayage (pic, seuil,
+multi-cibles, regroupement) et pipeline 3D (CFAR, aller-retour
+géométrique, normalisation d'azimut, zénith, regroupement, cycle de vie
+du pistage — filtre, M-sur-N, coasting, mort des tentatives —, deux
+échos sur un même rayon, murs, clutter adaptatif) :
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr
     alr exec -- ./bin/run_tests
