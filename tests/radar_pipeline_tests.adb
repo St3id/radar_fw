@@ -158,6 +158,80 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Track_Filter;
 
+   --  Test 5ter : ASSOCIATION GLOBALE. Deux pistes etablies en x=0 et
+   --  x=500 ; nouvelles detections en 480 et 950. En glouton (ordre des
+   --  pistes), la piste 1 volerait la detection 480 (distance 480 < 600)
+   --  alors qu'elle appartient clairement a la piste 2 (distance 20).
+   --  En association globale, la piste 2 prend 480, la piste 1 ne prend
+   --  rien (950 est hors rayon pour elle).
+   procedure Test_Global_Association
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+      F   : Frame;
+   begin
+      Reset (F);
+      F.Count := 2;
+
+      --  3 tours : deux pistes immobiles en 0 et 500, confirmees.
+      for N in 1 .. 3 loop
+         F.Items (1) := (Pos => (0.0, 0.0, 0.0),   Distance => 0.0);
+         F.Items (2) := (Pos => (500.0, 0.0, 0.0), Distance => 500.0);
+         Update (Trk, F);
+      end loop;
+
+      --  Le tour litigieux.
+      F.Items (1) := (Pos => (480.0, 0.0, 0.0), Distance => 480.0);
+      F.Items (2) := (Pos => (950.0, 0.0, 0.0), Distance => 950.0);
+      Update (Trk, F);
+
+      for Tk of Trk.Tracks loop
+         if Tk.Active and then Tk.Confirmed then
+            if Tk.Id = 1 then
+               Assert (Tk.Pos.X < 100.0,
+                       "La piste 1 ne devrait PAS avoir vole 480");
+               Assert (Tk.Missing = 1,
+                       "La piste 1 devrait etre en coasting");
+            elsif Tk.Id = 2 then
+               Assert (Tk.Pos.X > 400.0 and then Tk.Pos.X < 500.0,
+                       "La piste 2 devrait avoir pris la detection 480");
+            end if;
+         end if;
+      end loop;
+   end Test_Global_Association;
+
+   --  Test 5quater : FUSION anti-fragmentation. Deux echos persistants
+   --  a 350 mm l'un de l'autre (cible etendue scindee) ne doivent
+   --  produire qu'UNE piste - pas de piste "ombre".
+   procedure Test_Track_Merge
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+      F   : Frame;
+   begin
+      Reset (F);
+      F.Count := 2;
+      for N in 1 .. 5 loop
+         F.Items (1) := (Pos => (0.0, 0.0, 0.0),   Distance => 0.0);
+         F.Items (2) := (Pos => (350.0, 0.0, 0.0), Distance => 350.0);
+         Update (Trk, F);
+      end loop;
+
+      declare
+         Actives : Natural := 0;
+      begin
+         for Tk of Trk.Tracks loop
+            if Tk.Active then
+               Actives := Actives + 1;
+            end if;
+         end loop;
+         Assert (Actives = 1,
+                 "Deux echos a 350 mm devraient fusionner en UNE piste");
+      end;
+   end Test_Track_Merge;
+
    --  Test 5bis : une TENTATIVE non re-detectee meurt vite. C'est le
    --  filtre anti-fantomes : un echo de multitrajet, intermittent,
    --  ne survit pas assez longtemps pour etre confirme.
@@ -318,6 +392,12 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Tentative_Dies'Access,
          "Pistage : une tentative jamais revue meurt");
+      Register_Routine
+        (T, Test_Global_Association'Access,
+         "Pistage : association globale (pas de vol)");
+      Register_Routine
+        (T, Test_Track_Merge'Access,
+         "Pistage : fusion anti-fragmentation");
       Register_Routine
         (T, Test_Two_Echoes_Same_Ray'Access,
          "Deux echos sur un meme rayon");
