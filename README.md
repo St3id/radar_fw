@@ -35,10 +35,11 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] **Cross-compilation embarquée sans la carte** : le cœur prouvé
       (`src/processing`) compile pour Cortex-M4F (runtime `light`), vérifié
       en CI (`radar_core.gpr`)
-- [x] **Trois modes d'exploitation** partageant la même source et la même
+- [x] **Quatre modes d'exploitation** partageant la même source et la même
       chaîne prouvée : `radar_fw track` (rejeu du pistage), `radar_fw map`
-      (cartographie 3D navigable d'une pièce) et `radar_fw live`
-      (surveillance **temps réel** dans le navigateur)
+      (cartographie 3D navigable, fichier), `radar_fw live` (surveillance
+      **temps réel** dans le navigateur) et `radar_fw scan` (cartographie
+      **progressive** : le nuage se construit sous vos yeux)
 - [x] **MTI par carte de clutter** (`Radar_Clutter`, embarquable et
       cross-compilé ARM en CI) : le décor statique appris au premier tour
       est soustrait, seuls les objets **mobiles** deviennent des pistes —
@@ -81,7 +82,7 @@ Au-dessus, le pipeline de perception 3D (branche `tracking-3d`) :
 4. `Radar_Track` : association par proximité, ID stables, vecteurs
    vitesse (corrigés du nombre de tours écoulés en cas d'occultation).
 
-## Trois modes d'exploitation
+## Quatre modes d'exploitation
 
 Les modes partagent la même source de données (`Radar_Source`) et la
 même chaîne de détection prouvée ; seul le **traitement des balayages**
@@ -90,6 +91,7 @@ change (c'est le point 9 de la feuille de route) :
     alr run                          # rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
+    alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
 
 - **`track` — rejeu du pistage** : 60 tours d'un monde d'objets mobiles,
   pistage, vitesses → `radar_tracking_3d.html`, un rejeu animé (lissage
@@ -105,7 +107,13 @@ change (c'est le point 9 de la feuille de route) :
   décor est soustrait et seuls les mobiles sont pistés. La page 3D
   (overlay : cibles numérotées, distance, vitesse en m/s, traînées) se
   met à jour seule. Le jour du matériel, seule la source change (UART au
-  lieu du simulateur).
+  lieu du simulateur) ;
+- **`scan` — cartographie progressive** : le scan est cadencé (une
+  colonne d'azimut à la fois, ~11 s en simulation — le vrai prendra des
+  minutes) et **le nuage se construit sous vos yeux** dans le navigateur
+  (progression, compteur) ; à la fin il reste explorable (déplacement,
+  clic-détails). Les modes `live` et `scan` partagent le serveur HTTP
+  Ada (`Radar_Http`).
 
 ## Architecture concurrente (Ravenscar)
 

@@ -119,6 +119,49 @@ distance FMCW passe dans ta chaîne Ada. RF fait main + Ada embarqué
 prouvé : combinaison rarissime dans un portfolio. À faire quand la
 chaîne STM32 tourne, pas avant.
 
+### Et une antenne PESA ?
+
+Rappel des termes : une **PESA** (réseau à balayage électronique passif),
+c'est UN émetteur/récepteur commun + un **déphaseur par élément**
+d'antenne — en jouant sur les phases, le faisceau se déplace
+**électroniquement, sans mécanique**. Une AESA a en plus un module
+émission/réception complet par élément. Notre tourelle pas-à-pas, c'est
+le balayage mécanique, l'ancêtre.
+
+**Physiquement, tu ne la construiras pas** aux fréquences de nos
+modules : à 24/60 GHz, les éléments doivent être espacés de λ/2
+(6 mm / 2,5 mm), les déphaseurs millimétriques sont introuvables en
+hobby, et la calibration de phase sans VNA est illusoire. À 2,4 GHz
+c'est théoriquement artisanal (4 patchs + déphaseurs à varactors), mais
+c'est un projet RF expert à part entière — après le coffee-can, un jour.
+
+**Les deux chemins accessibles qui donnent la MEME compétence :**
+
+1. **La PESA simulée** (0 €, chantier logiciel immédiat) : un paquet
+   `Radar_Array` qui implémente le **facteur de réseau** — la somme des
+   contributions des N éléments selon la direction. Tout ce qui fait
+   une vraie PESA s'y modélise et s'y TESTE :
+   - largeur du faisceau ≈ 102°/N à espacement λ/2 (plus d'éléments =
+     faisceau plus fin) ;
+   - lobes secondaires à −13 dB (puis leur réduction par pondération) ;
+   - lobes de réseau si l'espacement dépasse λ/2 ;
+   - élargissement du faisceau au dépointage (en 1/cos θ) ;
+   - et surtout LE gain système : **temps de pointage nul** → le
+     pistage peut *commander* le faisceau (revisiter une piste à la
+     demande au lieu de subir la rotation de la tourelle). Brancher ça
+     sur `Radar_Track` = du *track-while-scan* adaptatif, l'argument
+     d'emploi réel d'une PESA — démontrable dans le mode live actuel.
+2. **Le beamforming numérique réel** sur BGT60TR13C (3 antennes RX,
+   ~80 €) : la version « à la réception » du balayage électronique —
+   on recombine les signaux des RX avec des phases choisies **en
+   logiciel** et le faisceau de réception se déplace. Mêmes maths que
+   le facteur de réseau, sur du vrai signal.
+
+Verdict : rien à acheter ni à souder ; la PESA de ce projet est
+**logicielle** (facteur de réseau + gestion de faisceau adaptative en
+simulation), et sa concrétisation matérielle sera le beamforming RX du
+BGT60 en phase E.
+
 ### Grille de décision acheter / fabriquer
 
 - **≥ 24 GHz** : acheter le module ; « fabriquer » = lentille (A121),

@@ -126,7 +126,12 @@ Le simulateur modélise un faisceau crayon de 3° balayé mécaniquement.
    10 Hz, 3 cibles max, jitter réaliste, dropouts, fantômes) — le
    pipeline PC sera prêt **avant** l'arrivée du module, qui remplacera
    l'émulateur trame pour trame.
-8. **Mode map progressif** : affichage du nuage au fil du scan.
+8. **Mode map progressif** — ✅ **FAIT** : mode `scan` — le serveur HTTP
+   (extrait en paquet partagé `Radar_Http`) cadence le balayage une
+   colonne d'azimut à la fois et la page se remplit au fil de l'eau
+   (progression, compteur de points) ; scan terminé, le nuage reste
+   servi et explorable (déplacement, clic-détails). Sur le vrai
+   matériel, seule la cadence et la source changeront.
 
 ## 5. Ce qui est déjà réaliste (à garder et à revendiquer)
 
