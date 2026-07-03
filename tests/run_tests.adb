@@ -3,14 +3,16 @@ with AUnit.Reporter.Text;
 with AUnit.Test_Suites;  use AUnit.Test_Suites;
 
 with Radar_Sweep_Tests;
+with Radar_Pipeline_Tests;
 
 procedure Run_Tests is
 
-   --  Construit la suite : on y ajoute notre test case.
+   --  Construit la suite : on y ajoute nos test cases.
    function Suite return Access_Test_Suite is
       S : constant Access_Test_Suite := New_Suite;
    begin
       S.Add_Test (new Radar_Sweep_Tests.Test_Case);
+      S.Add_Test (new Radar_Pipeline_Tests.Test_Case);
       return S;
    end Suite;
 
