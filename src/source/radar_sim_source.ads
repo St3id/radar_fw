@@ -60,6 +60,10 @@ private
    type Scatter_Amps is
      array (1 .. Max_Objects, 1 .. Scatter_Count) of Radar_Sweep.Amplitude;
 
+   --  Multitrajet (point 5) : ce tour-ci, l'objet produit-il en plus un
+   --  echo FANTOME derriere le mur (signal rebondi mur -> cible) ?
+   type Object_Flags is array (1 .. Max_Objects) of Boolean;
+
    type Simulated_Source is new Source with record
       Az_Step      : Natural := 0;   --  position azimut dans le tour
       El_Step      : Natural := 0;   --  position elevation dans le tour
@@ -76,6 +80,9 @@ private
       --  Amplitudes des reflecteurs pour le tour en cours (retirees au
       --  sort a chaque nouveau tour ; 0 = reflecteur eteint ce tour).
       Echoes       : Scatter_Amps := (others => (others => 0));
+
+      --  Fantomes multitrajet actifs ce tour-ci.
+      Ghosting     : Object_Flags := (others => False);
 
       Scene        : World;
    end record;
