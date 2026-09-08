@@ -60,8 +60,8 @@ pas comme chemin principal.
 Points de vigilance honnêtes :
 
 - **A121** : la puce ne se pilote pas registre par registre ; elle exige la
-  bibliothèque C fermée d'Acconeer (RSS). Le « driver SPI 100 % Ada » promis
-  par le GUIDE_PROJET sera en réalité un **binding Ada→C** (pragma Import) +
+  bibliothèque C fermée d'Acconeer (RSS). Le « driver SPI 100 % Ada » visé
+  au départ sera en réalité un **binding Ada→C** (pragma Import) +
   le port bas niveau SPI en Ada. C'est un très bon exercice quand même, mais
   il faut le savoir avant d'acheter.
 - **LD2450** : il sort des cibles déjà détectées (pas d'écho brut) et en 2D
@@ -205,6 +205,157 @@ chantier d'architecture — faisable dès maintenant, en simulé.
 
 ---
 
+## 4 bis. Plan de câblage et de liaison
+
+Principe directeur : **chaque étage ne fait qu'une chose, et chaque étage doit
+pouvoir être testé seul.** Le capteur mesure, le STM32 décide, l'ESP32
+transporte, le PC affiche.
+
+Le format des trames échangées est spécifié dans `CAP_PROJET.md` §7.6.
+
+### Le montage
+
+```text
++--------------+
+|  HLK-LD2450  |  24 GHz, antennes PCB integrees, 10 Hz
++--+--+--+--+--+
+   |  |  |  |
+ 5V | GND | TX -> RX du STM32     (le capteur parle)
+      RX <-|  <- TX du STM32      (configuration, optionnel)
+   v  v  v  v
++--------------------------+
+|    STM32G474CEU6         |  USART1 <- LD2450  (256000 bauds)
+|    (WeAct, Cortex-M4F)   |  USART2 -> ESP32   (115200 bauds)
+|  Ada : CFAR, clutter,    |  SWD    <- ST-Link (flash + debug)
+|        pistage, trames   |  GPIO   -> ULN2003 (plus tard)
++--+-----------------+-----+
+   | USART2          | SWD
+   v                 v
++---------+     +----------+
+| ESP32   |     | ST-Link  |
+| pont    |     | V2       |
++----+----+     +----+-----+
+     | WiFi/TCP       | USB
+     +------> [ PC ] <+
+          serveur HTTP Ada + page 3D
+```
+
+### Alimentation et niveaux logiques
+
+| Élément | Alimentation | Niveaux UART |
+| ------- | ------------ | ------------ |
+| LD2450 | **5 V obligatoire** | 3,3 V |
+| STM32G474 | 3,3 V (régulé sur la carte depuis l'USB) | 3,3 V |
+| ESP32 | 5 V par son USB, ou 3,3 V régulé | 3,3 V |
+
+Trois règles à ne pas violer :
+
+1. **Ne jamais alimenter le LD2450 depuis le 3,3 V du STM32.** Il tire des
+   pointes de courant à l'émission ; le régulateur de la WeAct ne suivra pas,
+   et on obtient des redémarrages aléatoires impossibles à diagnostiquer.
+   Prendre le 5 V de l'USB, directement.
+2. **Aucun adaptateur de niveau n'est nécessaire** : les trois composants
+   communiquent en 3,3 V. C'est une chance, ne pas la gâcher en insérant un
+   décaleur « au cas où ».
+3. **Masses communes.** LD2450, STM32 et ESP32 partagent le même GND, sinon
+   l'UART lit du bruit. C'est la première chose à vérifier quand rien ne
+   marche.
+
+### Débits et affectation
+
+| Liaison | Périphérique | Débit | Pourquoi |
+| ------- | ------------ | ----- | -------- |
+| LD2450 → STM32 | USART1 | 256000 | imposé par le capteur |
+| STM32 → ESP32 | USART2 | 115200 | 1 Ko/s de pistes largement absorbés, robuste sur fils volants |
+| ST-Link → STM32 | SWD | — | flash et débogage, pas de l'UART |
+
+Pourquoi 115200 et pas 921600 tout de suite : sur des fils volants sans masse
+tressée, monter en débit fait apparaître des erreurs de trame difficiles à
+distinguer d'un bug logiciel. Le protocole est **indépendant du débit** — on
+montera le jour où l'A121 enverra des profils bruts.
+
+Ordres de grandeur qui justifient le partage des rôles : des pistes à 10 Hz
+≈ **1 Ko/s** (UART 115200 largement suffisant) ; des profils A121 ≈ 10–20 Ko/s
+(UART 921600 ou WiFi) ; de l'IQ brut BGT60 = **des Mo/s**, impossible à sortir,
+donc décimation **à bord** obligatoire. On transmet des conclusions, pas des
+mesures.
+
+⚠️ **Les numéros de broches exacts sont à confirmer** sur le schéma de la
+WeAct et dans CubeMX. Les affectations classiques (USART1 sur PA9/PA10,
+USART2 sur PA2/PA3) sont probables sur un G474, mais une erreur de brochage
+coûte une soirée.
+
+### Le rôle de l'ESP32 : un pont, rien de plus
+
+L'ESP32 rejoint le WiFi de la maison, écoute sur un port TCP, et recopie
+bêtement l'UART vers le socket. **Zéro logique radar.** Trois raisons :
+
+1. **R1** — toute la logique reste en Ada sur le STM32 ; un pont qui
+   interpréterait les trames ferait fuir de l'intelligence vers du non-Ada.
+2. **Débogage** — si le PC reçoit des données bizarres, il y a deux coupables
+   possibles au lieu de trois.
+3. **C'est standard** — un « gateway » transparent est un composant industriel
+   banal, qui se défend en entretien.
+
+Son firmware fera une trentaine de lignes en C/Arduino ou MicroPython. Ce
+n'est pas une entorse au projet : c'est un câble un peu long.
+
+**TCP plutôt qu'UDP** : le débit est ridicule et la latence sans enjeu à
+10 Hz ; on ne veut pas déboguer des pertes de paquets en plus du reste.
+
+### Montée en puissance : jamais deux inconnues à la fois
+
+| # | Montage | Ce que ça valide | Ce qu'on écrit |
+| - | ------- | ---------------- | -------------- |
+| **A** | LD2450 → USB-UART → **PC** *(sans STM32)* | le capteur marche, et on voit ses vraies trames | le parseur LD2450, en Ada, sur PC |
+| **B** | ST-Link → STM32 : blinky, puis écho UART | la chaîne de flash et la toolchain ARM | rien de radar |
+| **C** | LD2450 → STM32 → USB-UART → PC | le traitement embarqué et le protocole, **par câble** | `Radar_Telemetry`, `Radar_Serial_Source` |
+| **D** | LD2450 → STM32 → **ESP32 → WiFi** → PC | le sans-fil, et lui seul | le firmware du pont |
+
+**L'étape A est la plus rentable et presque personne ne la fait.** Le LD2450
+parle UART : on peut le brancher directement sur l'adaptateur USB-UART, sans
+STM32, et lire ses trames depuis un programme Ada. On valide le capteur, on
+découvre ses artefacts réels, et on écrit son parseur — pendant que le STM32
+est encore dans son sachet.
+
+**La propriété qui compte :** entre C et D, le code PC **ne change pas d'une
+ligne**. Il lit un flux d'octets, qu'il vienne d'un port série ou d'un socket
+TCP. Le sans-fil n'est pas une nouvelle architecture, c'est un tuyau
+différent.
+
+### Flasher la carte
+
+Quatre fils entre le ST-Link et la WeAct : **SWDIO, SWCLK, GND, 3V3**
+(brochage à confirmer). Sous Windows, le plus simple est
+**STM32CubeProgrammer** (interface graphique, fourni par ST, gère les clones
+de ST-Link) : ouvrir le `.elf`, cliquer *Download*. En ligne de commande :
+
+```bash
+openocd -f interface/stlink.cfg -f target/stm32g4x.cfg \
+        -c "program bin/radar_board.elf verify reset exit"
+```
+
+**Il n'y a rien à flasher aujourd'hui.** `radar_core.gpr` **compile** le cœur
+pour ARM sans le **lier** : pas de `for Main`, donc des fichiers objets, pas
+un exécutable. C'est un garde-fou de compilation, pas un firmware. Il manque,
+et c'est le jalon 6 :
+
+1. un `radar_board.adb` — le `main` de la carte ;
+2. un `radar_board.gpr` avec un `for Main` et le runtime **spécifique au
+   G474** (`embedded_stm32g4xx` d'AdaCore, pas le `light-cortex-m4f`
+   générique actuel) : c'est lui qui apporte le script de link et le
+   démarrage ;
+3. OpenOCD ou CubeProgrammer installé ;
+4. la carte.
+
+**Après le flash, le câble de données part — pas l'alimentation.** Le
+programme reste en flash et redémarre à la mise sous tension, mais la carte a
+toujours besoin de 5 V. Pour poser le radar où l'on veut : une **batterie
+externe USB**. On troque le câble de données contre un câble d'alimentation,
+on ne les supprime pas.
+
+---
+
 ## 5. Marche à suivre
 
 ### Phase A — 0 €, tout de suite (sans matériel)
@@ -294,4 +445,4 @@ chantier d'architecture — faisable dès maintenant, en simulé.
   pointes de courant — l'alimenter du 5 V (pas du 3,3 V du STM32),
   niveaux UART en 3,3 V (compatibles).
 - **Budget total** du chemin complet : ~150–200 €, dans l'enveloppe
-  100–300 € du GUIDE_PROJET.
+  100–300 € fixée à l'origine du projet (voir `CAP_PROJET.md` §9).
