@@ -1,7 +1,9 @@
 with AUnit.Assertions;  use AUnit.Assertions;
 with Radar_Geometry;    use Radar_Geometry;
 with Radar_Detect;      use Radar_Detect;
+with Radar_Html;        use Radar_Html;
 with Radar_Track;       use Radar_Track;
+with Radar_Sim_Source;  use Radar_Sim_Source;
 with Radar_Source;      use Radar_Source;
 with Radar_World;       use Radar_World;
 with Radar_Sweep;       use Radar_Sweep;
@@ -370,6 +372,61 @@ package body Radar_Pipeline_Tests is
               "Un champ uniformement fort n'est pas une cible");
    end Test_CFAR;
 
+   --  Test : la source doit etre pilotable A TRAVERS L'INTERFACE.
+   --  C'est le garde-fou de la regle R3. Les quatre modes declarent
+   --  desormais Source'Class : si une operation dont ils ont besoin
+   --  quittait l'interface, ce test cesserait de compiler - et on le
+   --  saurait AVANT de decouvrir, au branchement du vrai capteur,
+   --  qu'un mode etait colle au simulateur.
+   procedure Test_Source_Dispatching
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      --  Volontairement declaree en Source'Class : tous les appels
+      --  ci-dessous sont dispatchants, aucun ne nomme le type concret.
+      Src  : Source'Class := Make_Room_Scan (Az_Steps => 4, El_Steps => 3);
+      M    : Measurement;
+      OK   : Boolean;
+      Seen : Natural := 0;
+   begin
+      Assert (Per_Turn (Src) = 12,
+              "Un tour de 4 azimuts x 3 elevations fait 12 mesures");
+
+      while Src.Has_More loop
+         Src.Next (M, OK);
+         Seen := Seen + 1;
+      end loop;
+
+      Assert (Seen = 12,
+              "Le tour complet devrait livrer 12 mesures, obtenu "
+              & Seen'Image);
+   end Test_Source_Dispatching;
+
+   --  Test : format compact des flottants envoyes a la page.
+   --  Le piege est le nombre strictement entre -1 et 0 : sa partie
+   --  entiere vaut zero, donc le signe se perd si on ne le porte pas
+   --  separement ("-0.5" deviendrait "0.-5"). Les valeurs choisies
+   --  evitent les fins en .x5, ou l'arrondi depend de la
+   --  representation binaire exacte du Float.
+   procedure Test_Float_Format
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert (F_Img (0.0) = "0.0",
+              "Zero devrait s'ecrire 0.0, obtenu " & F_Img (0.0));
+      Assert (F_Img (2265.0) = "2265.0",
+              "Une distance ronde, obtenu " & F_Img (2265.0));
+      Assert (F_Img (-30.0) = "-30.0",
+              "Une elevation negative, obtenu " & F_Img (-30.0));
+      Assert (F_Img (-0.5) = "-0.5",
+              "Le signe doit survivre a une partie entiere nulle, "
+              & "obtenu " & F_Img (-0.5));
+      Assert (F_Img (12.34) = "12.3",
+              "Arrondi au dixieme, obtenu " & F_Img (12.34));
+   end Test_Float_Format;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -378,6 +435,12 @@ package body Radar_Pipeline_Tests is
    procedure Register_Tests (T : in out Test_Case) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine
+        (T, Test_Source_Dispatching'Access,
+         "Source pilotee a travers l'interface (R3)");
+      Register_Routine
+        (T, Test_Float_Format'Access,
+         "Format compact des flottants serialises");
       Register_Routine
         (T, Test_Geometry_Roundtrip'Access, "Aller-retour geometrie");
       Register_Routine

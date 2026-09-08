@@ -81,7 +81,7 @@ is
        (for all K in 1 .. Detect_Clustered'Result.Count =>
           S (Detect_Clustered'Result.Targets (K)) >= Detection_Threshold);
 
-   --  ----- Seuil adaptatif CFAR (ANALYSE_REALISME.md, point 2) -----
+   --  ----- Seuil adaptatif CFAR (CAP_PROJET.md, realisme point 2) -----
    --  Un seuil fixe ne survit pas au monde reel : trop bas, il noie le
    --  pistage de fausses alarmes ; trop haut, il rate les cibles
    --  faibles. CA-CFAR (Cell-Averaging Constant False Alarm Rate) : le

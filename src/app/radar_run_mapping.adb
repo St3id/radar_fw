@@ -1,3 +1,4 @@
+with Ada.Directories;
 with Ada.Text_IO;        use Ada.Text_IO;
 with Radar_Source;       use Radar_Source;
 with Radar_Sim_Source;   use Radar_Sim_Source;
@@ -16,11 +17,19 @@ pragma Style_Checks ("M300");
 --  traitement des balayages change (accumulation au lieu de pistage).
 procedure Radar_Run_Mapping is
 
-   File_Name : constant String := "radar_3d.html";
+   --  Les fichiers generes vont dans out/ : la racine du depot reste
+   --  lisible. Le dossier est cree au besoin (Create ne le fait pas).
+   Out_Dir   : constant String := "out";
+   File_Name : constant String := Out_Dir & "/radar_3d.html";
    Out_F     : File_Type;
 
    --  Un seul tour, grille fine (180 azimuts x 24 elevations).
-   Src   : Simulated_Source := Make_Room_Scan;
+   --
+   --  Declaree en Source'CLASS et non en Simulated_Source : tous les
+   --  appels ci-dessous (Has_More, Next) sont alors DISPATCHANTS. Le
+   --  jour du materiel, seule cette ligne change - c'est la promesse
+   --  de l'interface, et elle n'est tenue que si on la nomme ici.
+   Src   : Source'Class := Make_Room_Scan;
    Cloud : Point_Cloud := Empty_Cloud;
 
    M  : Measurement;
@@ -46,6 +55,7 @@ begin
    end loop;
 
    --  ===== 2. Le visualiseur (nuage de points Three.js autonome) =====
+   Ada.Directories.Create_Path (Out_Dir);
    Create (Out_F, Out_File, File_Name);
 
    Put_Line (Out_F, "<!DOCTYPE html><html lang=""fr""><head><meta charset=""UTF-8"">");
@@ -60,14 +70,25 @@ begin
    Put_Line (Out_F, "<div id=""sel""></div></div>");
    Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
 
-   --  Les points accumules par le scan.
+   --  Les points accumules par le scan, chacun accompagne de sa
+   --  position POLAIRE (distance, azimut, elevation) calculee ICI par
+   --  To_Polar - la fonction Ada couverte par les tests. La page se
+   --  contente de l'afficher : elle ne refait aucune geometrie (R1).
    Put (Out_F, "<script>const PTS=[");
    for I in 1 .. Cloud.Count loop
-      Put (Out_F, "[");
-      Put_Float (Out_F, Cloud.Points (I).X); Put (Out_F, ",");
-      Put_Float (Out_F, Cloud.Points (I).Y); Put (Out_F, ",");
-      Put_Float (Out_F, Cloud.Points (I).Z);
-      Put (Out_F, "]");
+      declare
+         Pt : constant Point_3D := Cloud.Points (I);
+         Pl : constant Polar    := To_Polar (Pt);
+      begin
+         Put (Out_F, "[");
+         Put_Float (Out_F, Pt.X);        Put (Out_F, ",");
+         Put_Float (Out_F, Pt.Y);        Put (Out_F, ",");
+         Put_Float (Out_F, Pt.Z);        Put (Out_F, ",");
+         Put_Float (Out_F, Pl.Distance); Put (Out_F, ",");
+         Put_Float (Out_F, Pl.Azimuth);  Put (Out_F, ",");
+         Put_Float (Out_F, Pl.Elevation);
+         Put (Out_F, "]");
+      end;
       if I /= Cloud.Count then
          Put (Out_F, ",");
       end if;
@@ -139,9 +160,8 @@ begin
    Put_Line (Out_F, " if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
    Put_Line (Out_F, " const i=hits[0].index,p=PTS[i];");
    Put_Line (Out_F, " selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
-   Put_Line (Out_F, " const d=Math.sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);");
-   Put_Line (Out_F, " let az=Math.atan2(p[1],p[0])*180/Math.PI;if(az<0)az+=360;");
-   Put_Line (Out_F, " const el=Math.asin(p[2]/Math.max(1,d))*180/Math.PI;");
+   --  d, az, el arrivent calcules d'Ada : aucun calcul ici (R1).
+   Put_Line (Out_F, " const d=p[3],az=p[4],el=p[5];");
    Put_Line (Out_F, " selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+");
    Put_Line (Out_F, "  '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}");
 
