@@ -110,9 +110,27 @@ Vérification rapide de cohérence avant de commiter : les chiffres de
 
 ## Étape 6 — Proposer le commit, ne pas le faire d'office
 
-1. Annoncer le **message de commit envisagé** : français **sans accents**,
-   préfixe du dépôt (`docs :`, `tests :`, `CI :`, `fix :`, `perf :`, `feat :`)
-   ou sujet direct (`Mode scan : ...`).
+1. Annoncer le **message de commit envisagé**. Le style du dépôt est strict :
+
+   - **une seule ligne, jamais de corps** (14 des 15 derniers commits de
+     l'auteur n'ont aucun paragraphe) ;
+   - français **sans accents**, 50 à 95 caractères ;
+   - forme `sujet : ce qui change`, avec presque toujours **un chiffre
+     concret** ;
+   - préfixe minuscule (`docs :`, `tests :`, `CI :`, `fix :`, `perf :`,
+     `feat :` — espace avant le deux-points) ou sujet capitalisé
+     (`Tracker :`, `Mode scan :`).
+
+   Exemples réels à imiter :
+
+       docs : fragmentation resolue, distance aveugle, 85 checks
+       tests : association globale et fusion anti-fragmentation (16 verts)
+       Distance aveugle prouvee (625 mm) : les fausses alarmes CFAR ne se
+       focalisent plus a l'origine
+
+   Un message de plusieurs paragraphes est une **erreur de style**, même
+   quand le changement est gros : préférer alors plusieurs commits d'une
+   ligne. Et **aucune mention `Co-Authored-By`** ni Claude/Anthropic.
 2. Demander explicitement lequel des trois : **commit seul**, **commit +
    push**, ou **rien pour l'instant**.
 3. Ne jamais committer sans cette confirmation, même quand tout est vert.
