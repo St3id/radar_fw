@@ -87,10 +87,6 @@ la valeur du dépôt aujourd'hui (le cœur prouvé, la CI bloquante, la
 cross-compilation ARM) et il faut la garder en tête en lisant le code existant.
 Elle est remplacée, pas reniée.*
 
-*Note de carrière conservée de cette époque : beaucoup de postes en défense en
-France exigent la nationalité française et une habilitation. Un portfolio
-Ada/SPARK solide reste un atout fort pour décrocher stages et entretiens.*
-
 ---
 
 ## 3. Périmètre
