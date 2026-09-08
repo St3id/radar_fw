@@ -15,6 +15,11 @@ suivre dans le temps et reconstruire une représentation 3D de la scène. Le
 radar est ici un support technique pour démontrer une chaîne embarquée
 rigoureuse, applicable au domaine défense / aéronautique.
 
+Toute la documentation vit dans **`documentation/`** : le cap du projet, son
+périmètre, ses règles et sa feuille de route dans **`CAP_PROJET.md`** ; le
+matériel dans `GUIDE_MATERIEL.md` ; et **`GUIDE_DEPOT.md`** pour savoir où
+trouver quoi dans le dépôt.
+
 ## État d'avancement
 
 - [x] Traitement d'un balayage : seuil de détection, pic, conversion en
@@ -27,7 +32,7 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] Pipeline 3D complet sur source simulée : interface abstraite
       (`Radar_Source`), monde simulé mobile, détections 3D, regroupement
       spatial (`Cluster`), **pistage** avec ID stables et vitesses
-      (`Radar_Track`), visualiseur Three.js généré (`radar_tracking_3d.html`)
+      (`Radar_Track`), visualiseur Three.js généré (`out/radar_tracking_3d.html`)
 - [x] Concurrence **Ravenscar réelle** : exécutable `radar_demo` sous
       `pragma Profile (Ravenscar)` imposé à la compilation, tâche cyclique →
       objet protégé (entry à barrière) → tâche sporadique, objet protégé
@@ -47,7 +52,7 @@ rigoureuse, applicable au domaine défense / aéronautique.
 - [x] **Cibles réalistes** : cibles **étendues** (4 réflecteurs), écho
       **fluctuant** (Swerling), trous de détection, bruit de fond et
       **fantômes multitrajet** — le pipeline est éprouvé contre des
-      données imparfaites (voir `ANALYSE_REALISME.md`)
+      données imparfaites (voir `documentation/CAP_PROJET.md` §6)
 - [x] **Pistage robuste** : prédiction + coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (les tentatives et les fantômes ne sont
       jamais affichés), **association globale** (pas de vol de détection),
@@ -55,9 +60,10 @@ rigoureuse, applicable au domaine défense / aéronautique.
       de fond, oubli lent), **distance aveugle** prouvée (625 mm)
 - [x] **Serveur HTTP écrit en Ada** (`GNAT.Sockets`, mono-thread à
       selector) : la page 3D live interroge `/state.json` en continu
-- [x] Tests unitaires **AUnit** : 16 tests verts (balayage, CFAR,
+- [x] Tests unitaires **AUnit** : 18 tests verts (balayage, CFAR,
       géométrie, regroupement 3D, cycle de vie du pistage, association
-      globale, fusion, murs, clutter adaptatif)
+      globale, fusion, murs, clutter adaptatif, pilotage de la source
+      **par l'interface**, format de sérialisation)
 - [x] Intégration continue **GitHub Actions** sur **toutes les branches** :
       build, tests, démo Ravenscar exécutée, 2 preuves SPARK bloquantes,
       cross-compilation ARM
@@ -89,15 +95,15 @@ même chaîne de détection prouvée ; seul le **traitement des balayages**
 change (c'est le point 9 de la feuille de route) :
 
     alr run                          # rejeu du pistage (defaut)
-    alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
+    alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
 
 - **`track` — rejeu du pistage** : 60 tours d'un monde d'objets mobiles,
-  pistage, vitesses → `radar_tracking_3d.html`, un rejeu animé (lissage
+  pistage, vitesses → `out/radar_tracking_3d.html`, un rejeu animé (lissage
   et vitesse réglables) ;
 - **`map` — cartographie statique** : un tour méticuleux (180 × 24
-  directions) d'une pièce sans objets mobiles → `radar_3d.html`, un nuage
+  directions) d'une pièce sans objets mobiles → `out/radar_3d.html`, un nuage
   dense (~4 300 points) **navigable** : déplacement ZQSD/WASD, clic sur un
   point pour ses détails (position, distance, angles) — c'est cette sortie
   qui alimente la page [GitHub Pages](https://St3id.github.io/radar_fw/) ;
@@ -166,7 +172,7 @@ Reproduire les deux preuves :
 
 ## Tests
 
-14 tests AUnit en deux suites : traitement du balayage (pic, seuil,
+18 tests AUnit en deux suites : traitement du balayage (pic, seuil,
 multi-cibles, regroupement) et pipeline 3D (CFAR, aller-retour
 géométrique, normalisation d'azimut, zénith, regroupement, cycle de vie
 du pistage — filtre, M-sur-N, coasting, mort des tentatives —, deux
@@ -178,8 +184,8 @@ du pistage — filtre, M-sur-N, coasting, mort des tentatives —, deux
 ## Compilation et exécution
 
     alr build
-    alr run                          # tracking -> radar_tracking_3d.html
-    alr exec -- ./bin/radar_fw map   # cartographie -> radar_3d.html
+    alr run                          # tracking -> out/radar_tracking_3d.html
+    alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
 
 Pour `track` et `map`, ouvrez le fichier HTML généré dans un navigateur ;
