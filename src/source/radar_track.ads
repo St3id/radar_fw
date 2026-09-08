@@ -5,7 +5,7 @@ package Radar_Track is
 
    --  Une PISTE : un objet suivi dans le temps.
    --
-   --  Cycle de vie (regle "M-sur-N", ANALYSE_REALISME.md point 3) :
+   --  Cycle de vie (regle "M-sur-N", CAP_PROJET.md realisme point 3) :
    --  une piste nait TENTATIVE (invisible pour l'affichage) et n'est
    --  CONFIRMEE qu'apres Confirm_Hits detections. Une tentative qui
    --  rate un tour de trop meurt aussitot : les fausses alarmes et les

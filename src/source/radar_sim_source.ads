@@ -18,6 +18,7 @@ package Radar_Sim_Source is
 
    --  Nombre de mesures qui composent UN tour complet de cette source
    --  (tous les azimuts x toutes les elevations).
+   overriding
    function Per_Turn (Self : Simulated_Source) return Positive;
 
    --  Nombre de pas d'une grille de balayage (au moins 2 : les formules
@@ -48,7 +49,7 @@ private
    Default_Azimuth_Steps   : constant := 120;  --  azimut : tour complet
    Default_Elevation_Steps : constant := 7;    --  de -30 a +30 deg
 
-   --  ----- Realisme des cibles (voir ANALYSE_REALISME.md, point 1) ----
+   --  ----- Realisme des cibles (CAP_PROJET.md, realisme point 1) ----
    --  Une cible reelle n'est pas un point : c'est un ensemble de
    --  reflecteurs (torse, membres...) dont l'echo FLUCTUE d'un tour a
    --  l'autre selon l'orientation (modeles de Swerling), avec de vrais

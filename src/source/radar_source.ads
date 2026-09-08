@@ -24,4 +24,13 @@ package Radar_Source is
    --  Indique si la source a encore des mesures a fournir.
    function Has_More (Self : Source) return Boolean is abstract;
 
+   --  Combien de mesures composent UN tour complet de balayage (tous
+   --  les azimuts x toutes les elevations). Fait partie du CONTRAT :
+   --  les modes qui cadencent un balayage (surveillance, cartographie
+   --  progressive) doivent pouvoir rythmer les tours et afficher une
+   --  progression SANS savoir quelle source ils pilotent. Sans cela,
+   --  ils sont obliges de nommer le type concret - et l'interface ne
+   --  sert plus a rien.
+   function Per_Turn (Self : Source) return Positive is abstract;
+
 end Radar_Source;

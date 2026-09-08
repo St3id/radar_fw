@@ -12,7 +12,7 @@ package body Radar_Sim_Source is
    --  CFAR qui s'en accommode ; un seuil fixe ne le pourrait pas.
    Noise_Level : constant Float := 80.0;
 
-   --  ----- Realisme des cibles (ANALYSE_REALISME.md, point 1) -----
+   --  ----- Realisme des cibles (CAP_PROJET.md, realisme point 1) -----
 
    --  Position des reflecteurs par rapport au centre de l'objet, en mm
    --  (une cible etendue type humain : torse, membres...).
@@ -131,6 +131,7 @@ package body Radar_Sim_Source is
    -- Per_Turn --
    --------------
 
+   overriding
    function Per_Turn (Self : Simulated_Source) return Positive is
    begin
       return Self.Az_Steps * Self.El_Steps;

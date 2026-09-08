@@ -1,3 +1,4 @@
+with Ada.Directories;
 with Ada.Text_IO;        use Ada.Text_IO;
 with Radar_Source;       use Radar_Source;
 with Radar_Sim_Source;   use Radar_Sim_Source;
@@ -15,7 +16,10 @@ pragma Style_Checks ("M300");
 --  regroupement, pistage, vitesses), rejoue dans un visualiseur anime.
 procedure Radar_Run_Tracking is
 
-   File_Name : constant String := "radar_tracking_3d.html";
+   --  Les fichiers generes vont dans out/ : la racine du depot reste
+   --  lisible. Le dossier est cree au besoin (Create ne le fait pas).
+   Out_Dir   : constant String := "out";
+   File_Name : constant String := Out_Dir & "/radar_tracking_3d.html";
    Out_F     : File_Type;
 
    --  La simulation : on balaie le monde sur 60 tours.
@@ -192,6 +196,7 @@ procedure Radar_Run_Tracking is
    end Process;
 
 begin
+   Ada.Directories.Create_Path (Out_Dir);
    Create (Out_F, Out_File, File_Name);
    Write_Head;
    Process (Src);

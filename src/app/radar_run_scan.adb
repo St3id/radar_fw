@@ -32,7 +32,8 @@ procedure Radar_Run_Scan is
    --  de Make_Room_Scan : le scan complet dure ~11 s).
    Column : constant := 24;
 
-   Src   : Simulated_Source := Make_Room_Scan;
+   --  Source'CLASS : les appels sont dispatchants (voir Radar_Source).
+   Src   : Source'Class := Make_Room_Scan;
    Total : constant Positive := Per_Turn (Src);
 
    Cloud : Point_Cloud := Empty_Cloud;
@@ -139,9 +140,8 @@ procedure Radar_Run_Scan is
       L (" if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
       L (" const i=hits[0].index,p=PTS[i];");
       L (" selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
-      L (" const d=Math.sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);");
-      L (" let az=Math.atan2(p[1],p[0])*180/Math.PI;if(az<0)az+=360;");
-      L (" const el=Math.asin(p[2]/Math.max(1,d))*180/Math.PI;");
+      --  d, az, el arrivent calcules d'Ada : aucun calcul ici (R1).
+      L (" const d=p[3],az=p[4],el=p[5];");
       L (" selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+");
       L ("  '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}");
       L ("addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rnd.setSize(innerWidth,innerHeight);});");
@@ -182,13 +182,24 @@ procedure Radar_Run_Scan is
                   P : constant Point_3D :=
                     To_Point (Float (Bin_Distance (D.Targets (K))),
                               M.Azimuth, M.Elevation);
+
+                  --  Position polaire calculee ICI, en Ada, par la
+                  --  fonction To_Polar couverte par les tests. Elle
+                  --  part avec le point : la page n'a plus aucune
+                  --  geometrie a refaire (regle R1).
+                  Pl : constant Polar := To_Polar (P);
                begin
                   Append (Cloud, P);
                   if Length (Body_Json) > 0 then
                      Append (Body_Json, ",");
                   end if;
-                  Append (Body_Json, "[" & F_Img (P.X) & "," & F_Img (P.Y)
-                                     & "," & F_Img (P.Z) & "]");
+                  Append (Body_Json,
+                          "[" & F_Img (P.X)
+                          & "," & F_Img (P.Y)
+                          & "," & F_Img (P.Z)
+                          & "," & F_Img (Pl.Distance)
+                          & "," & F_Img (Pl.Azimuth)
+                          & "," & F_Img (Pl.Elevation) & "]");
                end;
             end loop;
          end;

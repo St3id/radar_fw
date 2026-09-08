@@ -57,7 +57,8 @@ procedure Radar_Run_Live is
    --  disparait finit par etre oublie.
    Age_Period : constant := 8;
 
-   Src  : Simulated_Source := Make (Sweeps => Positive'Last, See_Room => True);
+   --  Source'CLASS : les appels sont dispatchants (voir Radar_Source).
+   Src  : Source'Class := Make (Sweeps => Positive'Last, See_Room => True);
    Trk  : Tracker;
    Clut : Clutter_Map;
 
