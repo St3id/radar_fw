@@ -7,9 +7,21 @@ use  Ada.Numerics.Elementary_Functions;
 
 package body Radar_Track is
 
-   --  Distance max (mm) pour associer une detection a une piste,
-   --  mesuree par rapport a la position predite de la piste.
-   Match_Radius : constant Float := 600.0;
+   --  Fenetre d association ("gate") : distance max entre une
+   --  detection et la position PREDITE d une piste.
+   --
+   --  Elle ne peut pas etre constante. Le terme fixe couvre le bruit de
+   --  mesure et l etalement de la cible ; le terme proportionnel couvre
+   --  la MANOEUVRE : si la cible change de cap pendant dt, la
+   --  prediction se trompe d environ v x dt. Avec un balayage
+   --  mecanique, dt varie d une fraction de seconde a des dizaines de
+   --  secondes selon la direction - un rayon fige serait beaucoup trop
+   --  large tout de suite, ou beaucoup trop etroit ensuite.
+   Base_Gate : constant Float := 600.0;
+
+   --  dt plancher (1 ms) : evite une division par zero au tout premier
+   --  tour, ou quand deux frames portent le meme horodatage.
+   Min_Dt : constant Float := 0.001;
 
    --  Gains du filtre alpha-beta : part de l'ecart mesure reinjectee
    --  dans la position (Alpha) et dans la vitesse (Beta). Des valeurs
@@ -32,20 +44,32 @@ package body Radar_Track is
    function Dist3D (A, B : Point_3D) return Float is
      (Sqrt ((A.X - B.X) ** 2 + (A.Y - B.Y) ** 2 + (A.Z - B.Z) ** 2));
 
+   function Speed_Of (Tk : Track) return Float is
+     (Sqrt (Tk.Velocity.X ** 2 + Tk.Velocity.Y ** 2 + Tk.Velocity.Z ** 2));
+
+   --  Fenetre d association de CETTE piste pour CE dt.
+   function Gate_Of (Tk : Track; Dt : Float) return Float is
+     (Base_Gate + Speed_Of (Tk) * Dt);
+
    ------------
    -- Update --
    ------------
 
    procedure Update (T : in out Tracker; F : Frame) is
       Matched : array (1 .. Max_Detections) of Boolean := (others => False);
+
+      --  Temps ecoule depuis la frame precedente, en SECONDES.
+      Elapsed : constant Time_Ms :=
+        (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp else 0);
+      Dt : constant Float := Float'Max (Min_Dt, Float (Elapsed) / 1000.0);
    begin
-      --  ----- 1. Prediction : chaque piste avance d'un tour -----
+      --  ----- 1. Prediction : chaque piste avance de v x dt -----
       for I in T.Tracks'Range loop
          if T.Tracks (I).Active then
             T.Tracks (I).Pos :=
-              (X => T.Tracks (I).Pos.X + T.Tracks (I).Velocity.X,
-               Y => T.Tracks (I).Pos.Y + T.Tracks (I).Velocity.Y,
-               Z => T.Tracks (I).Pos.Z + T.Tracks (I).Velocity.Z);
+              (X => T.Tracks (I).Pos.X + T.Tracks (I).Velocity.X * Dt,
+               Y => T.Tracks (I).Pos.Y + T.Tracks (I).Velocity.Y * Dt,
+               Z => T.Tracks (I).Pos.Z + T.Tracks (I).Velocity.Z * Dt);
          end if;
       end loop;
 
@@ -63,7 +87,7 @@ package body Radar_Track is
             declare
                Best_I    : Natural := 0;
                Best_J    : Natural := 0;
-               Best_Dist : Float   := Match_Radius;
+               Best_Dist : Float   := Float'Last;
             begin
                for I in T.Tracks'Range loop
                   if T.Tracks (I).Active and then not Track_Done (I) then
@@ -73,7 +97,9 @@ package body Radar_Track is
                               D : constant Float :=
                                 Dist3D (T.Tracks (I).Pos, F.Items (J).Pos);
                            begin
-                              if D < Best_Dist then
+                              if D <= Gate_Of (T.Tracks (I), Dt)
+                                and then D < Best_Dist
+                              then
                                  Best_Dist := D;
                                  Best_I    := I;
                                  Best_J    := J;
@@ -102,9 +128,9 @@ package body Radar_Track is
                      Y => T.Tracks (Best_I).Pos.Y + Alpha * Ry,
                      Z => T.Tracks (Best_I).Pos.Z + Alpha * Rz);
                   T.Tracks (Best_I).Velocity :=
-                    (X => T.Tracks (Best_I).Velocity.X + Beta * Rx,
-                     Y => T.Tracks (Best_I).Velocity.Y + Beta * Ry,
-                     Z => T.Tracks (Best_I).Velocity.Z + Beta * Rz);
+                    (X => T.Tracks (Best_I).Velocity.X + (Beta / Dt) * Rx,
+                     Y => T.Tracks (Best_I).Velocity.Y + (Beta / Dt) * Ry,
+                     Z => T.Tracks (Best_I).Velocity.Z + (Beta / Dt) * Rz);
                end;
 
                T.Tracks (Best_I).Missing := 0;
@@ -185,6 +211,9 @@ package body Radar_Track is
             end loop;
          end if;
       end loop;
+
+      --  L heure de reference du prochain tour.
+      T.Last_Stamp := F.Stamp;
    end Update;
 
 end Radar_Track;

@@ -68,6 +68,11 @@ private
    --  chaque tour (0 = eteint ce tour-ci).
    Scatter_Count : constant := 4;
 
+   --  Duree simulee dune mesure. Avec la grille de veille par defaut
+   --  (120 x 7 = 840 mesures), un tour dure donc 840 ms - proche des
+   --  800 ms que le mode live utilisait en dur avant la base de temps.
+   Default_Ms_Per_Step : constant Time_Ms := 1;
+
    type Scatter_Amps is
      array (1 .. Max_Objects, 1 .. Scatter_Count) of Radar_Sweep.Amplitude;
 
@@ -94,6 +99,14 @@ private
 
       --  Fantomes multitrajet actifs ce tour-ci.
       Ghosting     : Object_Flags := (others => False);
+
+      --  Horloge VIRTUELLE : avancee de Ms_Per_Step a chaque mesure
+      --  rendue. Volontairement pas l horloge reelle, sinon deux
+      --  executions de la meme graine ne donneraient plus les memes
+      --  horodatages et le banc de test cesserait d etre reproductible
+      --  (regle R4).
+      Clock        : Time_Ms := 0;
+      Ms_Per_Step  : Time_Ms := Default_Ms_Per_Step;
 
       Scene        : World;
    end record;

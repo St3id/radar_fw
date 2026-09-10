@@ -1,5 +1,6 @@
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Detect;    use Radar_Detect;
+with Radar_Source;    use Radar_Source;
 
 --  Radar_Track : le pistage, c'est-a-dire le suivi des cibles d'un tour
 --  a l'autre sous un identifiant stable.
@@ -22,7 +23,7 @@ package Radar_Track is
    type Track is record
       Id        : Natural := 0;        --  identifiant stable (0 = libre)
       Pos       : Point_3D;            --  position estimee (filtree)
-      Velocity  : Point_3D;            --  vitesse estimee (mm/tour)
+      Velocity  : Point_3D;            --  vitesse estimee (mm/s)
       Missing   : Natural := 0;        --  tours consecutifs sans echo
       Hits      : Natural := 0;        --  detections recues en tout
       Confirmed : Boolean := False;    --  regle M-sur-N passee ?
@@ -35,8 +36,15 @@ package Radar_Track is
 
    --  L'ensemble des pistes suivies + le prochain ID a attribuer.
    type Tracker is record
-      Tracks  : Track_Array;
-      Next_Id : Positive := 1;
+      Tracks     : Track_Array;
+      Next_Id    : Positive := 1;
+
+      --  Heure de la derniere frame traitee : la difference avec la
+      --  frame suivante donne le dt reel. Sans lui, tout le pistage
+      --  raisonnerait en "tours", une unite qui ne veut plus rien dire
+      --  des que le balayage est mecanique et que chaque direction est
+      --  revue a un rythme different.
+      Last_Stamp : Time_Ms := 0;
    end record;
 
    --  Nombre de detections pour confirmer une piste (le "M" de M-sur-N).

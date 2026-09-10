@@ -129,7 +129,11 @@ procedure Radar_Run_Live is
       L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),sp=vel.length();");
       L ("  if(sp>1){const len=Math.min(2500,sp*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
       L ("  const d=Math.round(Math.sqrt(tk.x*tk.x+tk.y*tk.y+tk.z*tk.z));");
-      L ("  const ms=(sp*1000/TURN_MS/1000).toFixed(2);");
+      --  Les vitesses arrivent en mm/s : la page divise par 1000 pour
+      --  afficher des m/s, et rien de plus. Avant la base de temps elle
+      --  devait connaitre TURN_MS pour interpreter un "mm/tour" - une
+      --  regle metier dans la page, et fausse des que le dt varie (R1).
+      L ("  const ms=(sp/1000).toFixed(2);");
       L ("  const lab=makeLabel('#'+tk.id+'  '+d+'mm  '+ms+'m/s'+(tk.coast?' *':''));");
       L ("  lab.position.copy(p).add(new THREE.Vector3(0,220,0));dyn.add(lab);");
       L ("  const tp=(trails[tk.id]||[]).map(v3);tp.push(p);");
@@ -224,6 +228,13 @@ procedure Radar_Run_Live is
          exit when not Src.Has_More;
          Src.Next (M, OK);
          exit when not OK;
+
+         --  Ce mode remplit F.Items lui-meme (il insere le filtre de
+         --  clutter entre la detection et la conversion 3D) et court-
+         --  circuite donc Radar_Detect.Add : c est a lui de dater la
+         --  frame. Sans cette ligne, le dt vaut son plancher et les
+         --  vitesses sortent mille fois trop grandes.
+         F.Stamp := M.Stamp;
 
          declare
             D : constant Detection := Detect_Adaptive (M.Data);

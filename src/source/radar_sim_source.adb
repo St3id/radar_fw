@@ -125,6 +125,8 @@ package body Radar_Sim_Source is
          See_Room     => See_Room,
          Echoes       => (others => (others => 0)),
          Ghosting     => (others => False),
+         Clock        => 0,
+         Ms_Per_Step  => Default_Ms_Per_Step,
          Scene        => Initial_World);
    begin
       Roll_Echoes (S);   --  amplitudes du premier tour
@@ -158,6 +160,8 @@ package body Radar_Sim_Source is
               See_Room     => True,           --  percoit les murs
               Echoes       => (others => (others => 0)),
               Ghosting     => (others => False),
+              Clock        => 0,
+              Ms_Per_Step  => Default_Ms_Per_Step,
               Scene        => Empty_World);   --  pas d'objet mobile
    end Make_Room_Scan;
 
@@ -175,7 +179,7 @@ package body Radar_Sim_Source is
       if Self.Current_Turn >= Self.Max_Turns then
          Available := False;
          Result    := (Azimuth => 0.0, Elevation => 0.0,
-                       Data => (others => 0));
+                       Stamp => Self.Clock, Data => (others => 0));
          return;
       end if;
 
@@ -258,9 +262,14 @@ package body Radar_Sim_Source is
             end;
          end loop;
 
-         Result    := (Azimuth => Az, Elevation => El, Data => S);
+         Result    := (Azimuth => Az, Elevation => El,
+                       Stamp   => Self.Clock, Data => S);
          Available := True;
       end;
+
+      --  L horloge virtuelle avance d une mesure : sur le vrai
+      --  materiel, c est le temps de pointage plus l integration.
+      Self.Clock := Self.Clock + Self.Ms_Per_Step;
 
       --  Avancer dans la grille : d'abord l'elevation, puis l'azimut.
       Self.El_Step := Self.El_Step + 1;

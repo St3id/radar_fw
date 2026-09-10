@@ -121,8 +121,18 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    confirmées, et le coasting y est marqué (gris et `*`).
 4. **Filtre alpha-beta** — **mis en œuvre.** Prédiction et coasting — une
    piste non revue roule sur son erre — puis correction alpha (0,5) et beta
-   (0,3). La vitesse filtrée converge : mesuré à 100 mm/tour ± 20 en
-   10 tours.
+   (0,3). La prédiction avance de `v × dt` et le gain beta est divisé par
+   `dt`, si bien que la vitesse estimée ne dépend **pas** de la cadence de
+   balayage : la même cible vue à 1 ou 2 tours par seconde donne la même
+   valeur en mm/s (vérifié par un test).
+
+   La fenêtre d'association suit la même logique : `600 mm + v × dt`. Le
+   terme fixe couvre le bruit de mesure et l'étalement de la cible, le terme
+   proportionnel couvre la manœuvre — si la cible change de cap pendant
+   `dt`, la prédiction se trompe d'environ `v × dt`. Avec un balayage
+   mécanique, `dt` varie d'une fraction de seconde à des dizaines de
+   secondes selon la direction : un rayon figé serait aussitôt trop large,
+   puis très vite trop étroit.
 5. **Fantômes multitrajet** — **mis en œuvre.** 5 % de probabilité d'écho
    miroir derrière le mur ; c'est la règle M-sur-N qui les étouffe, ce que
    vérifie un test.
