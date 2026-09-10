@@ -13,8 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # v7 et non v4 : les versions v4 tournaient sur Node.js 20, que
+      # GitHub a deprecie. Les ruptures introduites depuis ne concernent
+      # que le checkout de PR venant de forks (pull_request_target,
+      # workflow_run), que ce workflow n'utilise pas.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # On epingle Alire 2.1.0 : c'est la MEME version qu'en local.
       # Chaque version d'alr est liee a une branche d'index communautaire.
