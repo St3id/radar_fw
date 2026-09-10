@@ -19,3 +19,6 @@ id_rsa*
 # Sorties generees par les modes map et track (ne pas versionner)
 /out/
 #  NB : la copie publiee du visualiseur vit dans docs/index.html (versionnee).
+
+# Artefact du serveur de langage Ada
+/.als-alire

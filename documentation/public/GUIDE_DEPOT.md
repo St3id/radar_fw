@@ -1,13 +1,11 @@
 # Guide du dépôt — où trouver quoi
 
-Carte du dépôt `radar_fw`. À ouvrir quand on cherche un fichier, pas quand on
-cherche une décision (pour ça, c'est `CAP_PROJET.md`).
+Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 
 > **Règle qui garde ce guide vrai :** il ne contient **aucun chiffre
 > d'avancement** (nombre de tests, de checks SPARK, de paquets). Ces chiffres
-> vivent dans `CAP_PROJET.md` §5, à un seul endroit. Ce guide ne devient donc
-> faux **que si un fichier bouge** — et dans ce cas, il faut le mettre à jour
-> dans le même commit (voir `CLAUDE.md`, étape 5).
+> vivent dans le `README.md`, à un seul endroit. Ce guide ne devient donc
+> faux **que si un fichier bouge**.
 
 ---
 
@@ -15,17 +13,12 @@ cherche une décision (pour ça, c'est `CAP_PROJET.md`).
 
 | Ma question | Où aller |
 | ----------- | -------- |
-| C'est quoi ce projet ? | `README.md` (racine) |
-| Où va le projet, qu'est-ce qui est interdit ? | `documentation/CAP_PROJET.md` §1 à §4 |
-| Où en est-on vraiment ? Combien de tests ? | `documentation/CAP_PROJET.md` §5 |
-| Quoi faire ensuite ? | `documentation/CAP_PROJET.md` §9 (feuille de route) |
-| Qu'est-ce qu'on achète, et comment ça se câble ? | `documentation/GUIDE_MATERIEL.md` |
-| Comment je branche le STM32, l'ESP32, le capteur ? | `documentation/GUIDE_MATERIEL.md` §4 bis |
-| Comment je flashe la carte ? | `documentation/GUIDE_MATERIEL.md` §4 bis (fin) |
-| Quel format ont les trames carte → PC ? | `documentation/CAP_PROJET.md` §7.6 |
-| Pourquoi le code fait ça comme ça ? | `documentation/CAP_PROJET.md` §6 (réalisme) et §8 (dettes) |
-| Comment un agent doit travailler ici ? | `CLAUDE.md` (racine) |
+| C'est quoi ce projet, où en est-il ? | `README.md` (racine) |
+| Pourquoi le code fait-il ça comme ça ? | `documentation/public/ARCHITECTURE.md` §1 (réalisme radar) |
+| Comment le matériel est-il agencé ? | `documentation/public/ARCHITECTURE.md` §2 |
+| Quel format ont les trames carte → PC ? | `documentation/public/ARCHITECTURE.md` §2.6 |
 | Où est tel fichier ? | ce guide, sections 2 et 3 |
+| Comment on compile, teste et prouve ? | ce guide, section 5 |
 
 ---
 
@@ -33,12 +26,11 @@ cherche une décision (pour ça, c'est `CAP_PROJET.md`).
 
 | Élément | Quoi | Versionné |
 | ------- | ---- | --------- |
-| `README.md` | la vitrine publique GitHub | oui |
-| `CLAUDE.md` | la procédure de session (chargée automatiquement par Claude Code) | oui |
-| `documentation/` | les documents projet | oui |
+| `README.md` | la présentation du projet et son état d'avancement | oui |
+| `documentation/public/` | la documentation technique | oui |
 | `src/` | le code Ada, rangé par domaine | oui |
 | `tests/` | les suites de tests AUnit | oui |
-| `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`) — ne pas confondre avec `documentation/` | oui |
+| `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`) | oui |
 | `alire.toml` | le manifeste Alire (dépendances, exécutable) | oui |
 | `radar_fw.gpr` et les 3 autres `.gpr` | les projets de compilation (voir §4) | oui |
 | `ravenscar.adc` | impose `pragma Profile (Ravenscar)` à la compilation de la démo | oui |
@@ -46,14 +38,12 @@ cherche une décision (pour ça, c'est `CAP_PROJET.md`).
 | `.gitignore`, `.markdownlint.json` | configuration | oui |
 | `out/` | **généré** : les visualiseurs HTML des modes `map` et `track` | non |
 | `obj/` `bin/` `alire/` `config/` `share/` | **généré** : sortie de build Alire/GNAT | non |
-| `REVUE_CRITIQUE_2026-07-02.md` | note de travail **volontairement locale** (exclue via `.git/info/exclude`) | non |
 
 **Les deux dossiers qui se ressemblent :**
 
-- `documentation/` = les documents du projet, pour toi.
-- `docs/` = la copie du visualiseur publiée sur le web, pour les visiteurs.
-  Ce nom est **imposé par GitHub Pages**, on ne peut pas le changer.
-
+- `documentation/public/` = la documentation technique du projet.
+- `docs/` = la copie du visualiseur publiée sur le web. Ce nom est **imposé
+  par GitHub Pages**, on ne peut pas le changer.
 ---
 
 ## 3. Le code (`src/`), rangé par domaine
