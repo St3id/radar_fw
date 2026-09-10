@@ -1,3 +1,7 @@
+--  Corps de Radar_Buffer. Les deux operations sont volontairement courtes
+--  et sans boucle : sous Ravenscar, le temps passe dans un objet protege
+--  doit etre borne et previsible.
+
 package body Radar_Buffer
   with SPARK_Mode => On
 is

@@ -1,3 +1,7 @@
+--  Corps de Radar_Html. Ces trois fonctions n'ont l'air de rien, mais
+--  elles decident du poids des pages produites : voir la justification du
+--  format compact dans la specification.
+
 package body Radar_Html is
 
    ---------
@@ -25,7 +29,7 @@ package body Radar_Html is
 
    function F_Img (V : Float) return String is
       --  On travaille en dixiemes, sur un entier : la conversion Ada
-      --  d'un flottant vers un entier ARRONDIT (au plus proche), donc
+      --  d'un flottant vers un entier arrondit (au plus proche), donc
       --  Scaled porte deja la valeur arrondie au dixieme.
       --  Long_Float evite de perdre des chiffres sur les grandes
       --  valeurs, Long_Integer donne une marge tres large devant les

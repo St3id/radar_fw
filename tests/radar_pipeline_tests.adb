@@ -9,6 +9,11 @@ with Radar_World;       use Radar_World;
 with Radar_Sweep;       use Radar_Sweep;
 with Radar_Clutter;     use Radar_Clutter;
 
+--  Corps de la suite 2. Les scenarios sont deroules tour par tour, comme
+--  le ferait un mode d'exploitation, afin que ce qui est teste soit bien
+--  la chaine reelle et non une version simplifiee pour les besoins du
+--  test.
+
 package body Radar_Pipeline_Tests is
 
    ----------
@@ -69,7 +74,7 @@ package body Radar_Pipeline_Tests is
               "L'elevation au zenith devrait etre 90 deg");
    end Test_Zenith;
 
-   --  Test 4 : regroupement. Deux echos d'une MEME cible etendue
+   --  Test 4 : regroupement. Deux echos d'une meme cible etendue
    --  (500 mm d'ecart : reflecteurs + quantification en elevation)
    --  fusionnent ; un objet a 2 m reste une cible distincte.
    procedure Test_Cluster
@@ -109,8 +114,8 @@ package body Radar_Pipeline_Tests is
    end First_Active;
 
    --  Test 5 : cycle de vie et filtre de piste. Une cible qui avance de
-   --  100 mm/tour : la piste nait TENTATIVE (non confirmee), se
-   --  confirme apres 3 detections, sa vitesse FILTREE (alpha-beta)
+   --  100 mm/tour : la piste nait tentative (non confirmee), se
+   --  confirme apres 3 detections, sa vitesse filtree (alpha-beta)
    --  converge vers 100 mm/tour, et elle roule sur son erre pendant
    --  une occultation (coasting).
    procedure Test_Track_Filter
@@ -145,7 +150,7 @@ package body Radar_Pipeline_Tests is
       Assert (abs (First_Active (Trk).Velocity.X - 100.0) < 20.0,
               "La vitesse filtree devrait converger vers 100 mm/tour");
 
-      --  Occultation de 2 tours : la piste confirmee SURVIT et sa
+      --  Occultation de 2 tours : la piste confirmee survit et sa
       --  position continue d'avancer sur son erre.
       declare
          Before : constant Float := First_Active (Trk).Pos.X;
@@ -160,7 +165,7 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Track_Filter;
 
-   --  Test 5ter : ASSOCIATION GLOBALE. Deux pistes etablies en x=0 et
+   --  Test 5ter : association globale. Deux pistes etablies en x=0 et
    --  x=500 ; nouvelles detections en 480 et 950. En glouton (ordre des
    --  pistes), la piste 1 volerait la detection 480 (distance 480 < 600)
    --  alors qu'elle appartient clairement a la piste 2 (distance 20).
@@ -203,9 +208,9 @@ package body Radar_Pipeline_Tests is
       end loop;
    end Test_Global_Association;
 
-   --  Test 5quater : FUSION anti-fragmentation. Deux echos persistants
+   --  Test 5quater : fusion anti-fragmentation. Deux echos persistants
    --  a 350 mm l'un de l'autre (cible etendue scindee) ne doivent
-   --  produire qu'UNE piste - pas de piste "ombre".
+   --  produire qu'une piste - pas de piste "ombre".
    procedure Test_Track_Merge
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -234,7 +239,7 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Track_Merge;
 
-   --  Test 5bis : une TENTATIVE non re-detectee meurt vite. C'est le
+   --  Test 5bis : une tentative non re-detectee meurt vite. C'est le
    --  filtre anti-fantomes : un echo de multitrajet, intermittent,
    --  ne survit pas assez longtemps pour etre confirme.
    procedure Test_Tentative_Dies
@@ -258,7 +263,7 @@ package body Radar_Pipeline_Tests is
               "Une tentative jamais revue devrait mourir sans trace");
    end Test_Tentative_Dies;
 
-   --  Test 6 : deux echos sur le MEME rayon (deux objets alignes) =
+   --  Test 6 : deux echos sur le meme rayon (deux objets alignes) =
    --  deux detections (regression : avant, seul le pic etait garde et
    --  le second objet etait invisible).
    procedure Test_Two_Echoes_Same_Ray
@@ -317,7 +322,7 @@ package body Radar_Pipeline_Tests is
    begin
       Clear (C);
 
-      --  1re observation d'un echo en case 100 : PAS encore du decor
+      --  1re observation d'un echo en case 100 : pas encore du decor
       --  (un mobile qui passe ne doit pas empoisonner la carte).
       Learn (C, 9.0, 0.0, One (100));
       Assert (Filter (C, 9.0, 0.0, One (100)).Count = 1,
@@ -343,7 +348,7 @@ package body Radar_Pipeline_Tests is
    end Test_Clutter_Filter;
 
    --  Test 9 : CFAR. Un pic net au-dessus du bruit local est detecte ;
-   --  un champ UNIFORMEMENT fort n'est PAS une cible (chaque case vaut
+   --  un champ uniformement fort n'est pas une cible (chaque case vaut
    --  son bruit voisin) - un seuil fixe est incapable de faire ca.
    procedure Test_CFAR
      (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -372,11 +377,11 @@ package body Radar_Pipeline_Tests is
               "Un champ uniformement fort n'est pas une cible");
    end Test_CFAR;
 
-   --  Test : la source doit etre pilotable A TRAVERS L'INTERFACE.
+   --  Test : la source doit etre pilotable A travers L'interface.
    --  C'est le garde-fou de la regle R3. Les quatre modes declarent
    --  desormais Source'Class : si une operation dont ils ont besoin
    --  quittait l'interface, ce test cesserait de compiler - et on le
-   --  saurait AVANT de decouvrir, au branchement du vrai capteur,
+   --  saurait avant de decouvrir, au branchement du vrai capteur,
    --  qu'un mode etait colle au simulateur.
    procedure Test_Source_Dispatching
      (T : in out AUnit.Test_Cases.Test_Case'Class)

@@ -2,6 +2,10 @@ with Radar_Sweep;  use Radar_Sweep;
 with Ada.Numerics.Elementary_Functions;
 use  Ada.Numerics.Elementary_Functions;
 
+--  Corps de Radar_Detect. Le regroupement est un parcours simple en
+--  O(n^2) sur au plus Max_Detections elements : a cette taille, une
+--  structure d'acceleration couterait plus cher qu'elle ne rapporte.
+
 package body Radar_Detect is
 
    -----------

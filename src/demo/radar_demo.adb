@@ -2,9 +2,9 @@ with Ada.Synchronous_Task_Control;  use Ada.Synchronous_Task_Control;
 with GNAT.OS_Lib;
 with Radar_Tasks;
 
---  Demonstrateur RAVENSCAR : tout le travail se passe dans les taches de
+--  Demonstrateur Ravenscar : tout le travail se passe dans les taches de
 --  Radar_Tasks, demarrees a la fin de l'elaboration (politique
---  Sequential). Le profil Ravenscar est impose a TOUT cet executable par
+--  Sequential). Le profil Ravenscar est impose a tout cet executable par
 --  ravenscar.adc (voir radar_demo.gpr) : le compilateur refuse alors
 --  select, abort, entries multiples, delay relatif... C'est ce pragma
 --  qui transforme "Ravenscar" d'une intention en garantie verifiee.

@@ -1,29 +1,32 @@
 with Radar_Sweep;  use Radar_Sweep;
 
+--  Radar_Clutter : la carte de clutter, qui memorise direction par
+--  direction les cases de distance occupees par l'environnement statique.
+--
+--  En surveillance, tout echo retombant sur une case confirmee, a la
+--  marge pres, est supprime : ne restent que les objets mobiles. C'est le
+--  principe du MTI (Moving Target Indication) des radars de veille au
+--  sol.
+--
+--  La carte est adaptative : chaque case porte un compteur de confiance
+--  sur 2 bits plutot qu'un simple drapeau.
+--    - Learn incremente en saturant : un echo repete devient du decor ;
+--    - Age decremente l'ensemble, a appeler periodiquement : le decor qui
+--      disparait finit par etre oublie ;
+--    - une case ne compte comme clutter qu'a partir de Confirm_Level
+--      observations, si bien qu'un mobile qui ne fait que passer, vu une
+--      seule fois, n'empoisonne pas la carte.
+--  Revers assume et conforme au comportement d'un vrai radar : un mobile
+--  qui se gare finit par fondre dans le decor.
+--
+--  Concu pour la cible embarquee : arithmetique entiere, memoire statique
+--  bornee (environ 54 Ko, compactee a 2 bits par case).
+
 package Radar_Clutter is
 
-   --  Carte de CLUTTER ADAPTATIVE : memorise, direction par direction,
-   --  les cases de distance occupees par l'environnement STATIQUE.
-   --  En surveillance, tout echo qui retombe sur une case confirmee
-   --  (a la marge pres) est supprime : ne restent que les objets
-   --  MOBILES. C'est le principe du MTI des radars de veille au sol.
-   --
-   --  ADAPTATIVE : chaque case porte un petit compteur de confiance
-   --  (2 bits) au lieu d'un simple drapeau.
-   --    - Learn incremente (sature) : un echo repete devient du decor ;
-   --    - Age decremente tout (a appeler periodiquement) : le decor
-   --      qui disparait finit par etre oublie ;
-   --    - une case n'est traitee en clutter qu'a partir de
-   --      Confirm_Level observations : un mobile qui ne fait que
-   --      passer (1 observation) n'empoisonne pas la carte. Revers
-   --      realiste : un mobile qui se GARE finit par fondre dans le
-   --      decor, comme sur un vrai radar.
-   --
-   --  Concu pour la cible embarquee : arithmetique simple, memoire
-   --  statique bornee (~54 Ko compactee a 2 bits par case).
-
-   --  Quantification des directions. DOIT correspondre a la grille de
-   --  balayage de la source (grille par defaut du mode surveillance).
+   --  Quantification des directions. Elle doit correspondre a la grille
+   --  de balayage de la source, convention que le compilateur ne verifie
+   --  pas : c'est une dette connue du projet.
    Az_Cells : constant := 120;   --  0 .. 360 degres
    El_Cells : constant := 7;     --  -30 .. +30 degres
 
@@ -55,7 +58,7 @@ package Radar_Clutter is
    procedure Age (C : in out Clutter_Map);
 
    --  Filtrage MTI : rend D prive de toute cible tombant sur (ou pres
-   --  d')une case de clutter CONFIRMEE pour cette direction.
+   --  d')une case de clutter confirmee pour cette direction.
    function Filter
      (C              : Clutter_Map;
       Az_Deg, El_Deg : Float;

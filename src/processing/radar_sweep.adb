@@ -1,3 +1,7 @@
+--  Corps de Radar_Sweep. Les boucles portent des invariants explicites :
+--  ce sont eux qui permettent au prouveur d'etablir les postconditions
+--  fonctionnelles, et non la seule absence d'erreur d'execution.
+
 package body Radar_Sweep
   with SPARK_Mode => On
 is
@@ -45,7 +49,7 @@ is
       return Bin_Distance (Peak_Bin (S));
    end Peak_Distance;
 
-----------------
+   ----------------
    -- Detect_All --
    ----------------
 
@@ -54,7 +58,7 @@ is
                              Count   => 0);
    begin
       for I in Bin_Index loop
-         --  Si l'echo depasse le seuil ET qu'il reste de la place, on note.
+         --  Si l'echo depasse le seuil et qu'il reste de la place, on note.
          if S (I) >= Detection_Threshold and then Result.Count < Max_Targets
          then
             Result.Count := Result.Count + 1;
@@ -73,7 +77,7 @@ is
       return Result;
    end Detect_All;
 
-----------------------
+   ----------------------
    -- Detect_Clustered --
    ----------------------
 
@@ -199,7 +203,7 @@ is
       Best_Amp : Amplitude := 0;
    begin
       --  Meme regroupement que Detect_Clustered, mais chaque case est
-      --  comparee a SON seuil CFAR au lieu d'un seuil global fixe.
+      --  comparee a son seuil CFAR au lieu d'un seuil global fixe.
       --  Les cases de la distance aveugle ne sont jamais des cibles.
       for I in Bin_Index loop
          if I > Blind_Bins

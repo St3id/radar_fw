@@ -3,12 +3,16 @@ with Ada.Text_IO;    use Ada.Text_IO;
 with Radar_Sweep;    use Radar_Sweep;
 with Radar_Buffer;   use Radar_Buffer;
 
+--  Corps de Radar_Tasks : le motif Ravenscar canonique, une tache
+--  cyclique produisant vers une tache sporadique a travers un objet
+--  protege.
+
 package body Radar_Tasks is
 
    Period     : constant Time_Span := Milliseconds (250);
    Max_Cycles : constant := 8;
 
-   --  ===== Tache PRODUCTEUR (cyclique) =====
+   --  ----- Tache producteur (cyclique) -----
    --  Cadence stricte par "delay until" (jamais de delay relatif en
    --  Ravenscar) : produit un balayage simule toutes les 250 ms.
    task body Producer is
@@ -33,8 +37,8 @@ package body Radar_Tasks is
       end loop;
    end Producer;
 
-   --  ===== Tache CONSOMMATEUR (sporadique) =====
-   --  Pas d'horloge propre : elle BLOQUE sur l'entry Get et n'est
+   --  ----- Tache consommateur (sporadique) -----
+   --  Pas d'horloge propre : elle bloque sur l'entry Get et n'est
    --  reveillee que lorsqu'une donnee arrive (barriere de l'objet
    --  protege). Zero polling, zero attente active.
    task body Consumer is

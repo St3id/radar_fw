@@ -19,12 +19,12 @@ Objectif de cette section : mesurer l'écart entre le simulateur et ce que
 donneront les essais réels, en s'appuyant sur des projets existants
 documentés.
 
-Verdict d'ensemble d'origine : **l'architecture est juste, le monde simulé
-était un conte de fées**. Cibles ponctuelles parfaites, amplitude constante,
-zéro bruit, zéro fausse alarme, faisceau crayon idéal : chacune de ces
-hypothèses casse en réel. La bonne nouvelle, appliquée depuis : chacune peut
-être cassée *en simulation*, une par une — et 7 des 8 chantiers listés plus
-bas sont faits.
+Point de départ : **l'architecture était juste, le monde simulé beaucoup trop
+docile**. Cibles ponctuelles parfaites, amplitude constante, zéro bruit, zéro
+fausse alarme, faisceau crayon idéal — chacune de ces hypothèses tombe en
+conditions réelles. Chacune peut en revanche être levée *en simulation*, une
+par une, sans attendre le capteur : c'est l'objet de la checklist de la
+section 1.4.
 
 ### 1.1 Une cible réelle n'est pas une sphère
 
@@ -45,10 +45,11 @@ bas sont faits.
   de clutter : c'est tout le fond de commerce des capteurs de « présence »
   (LD2410) qui détectent la respiration.
 
-Ce que ces réalités cassaient dans le code d'alors — et la parade retenue :
+Ce que ces réalités mettent en défaut dans une conception naïve, et la
+parade retenue :
 
-| Hypothèse d'origine | Réalité | Conséquence et parade |
-| ------------------- | ------- | --------------------- |
+| Hypothèse naïve | Réalité | Conséquence et parade |
+| --------------- | ------- | --------------------- |
 | Vitesse = différence de positions brutes | jitter ± 20–30 cm par mesure | vitesse inutilisable sans **filtre** (alpha-beta, puis Kalman) |
 | `Cluster_Radius` fixe 300 mm | cible étendue + jitter | fragmentation d'une personne en 2–3 pistes, ou fusion de 2 personnes proches |
 | Association gloutonne au plus proche | deux personnes qui se croisent | **échanges d'ID** quasi garantis (parade : association globale type hongrois/GNN) |
@@ -87,7 +88,7 @@ capteur envisagé ne fait ça nativement** :
   artefacts réels — ventilateurs, instabilités d'alimentation en 3,3 V,
   rafraîchissement 10 Hz — et les parades logicielles simples. C'est un aperçu
   fidèle de ce que notre pipeline recevra.
-- **Henrik Forstén (hforsten.com)** : LA référence du radar FMCW amateur —
+- **Henrik Forstén (hforsten.com)** : la référence du radar FMCW amateur —
   6 GHz, PCB maison (~350 composants), détection d'un humain à 100 m, puis
   **SAR embarqué sur drone** avec autofocus. Deux leçons : le sommet du
   réalisable en amateur est très haut, et l'essentiel du travail est dans le
@@ -102,46 +103,49 @@ capteur envisagé ne fait ça nativement** :
 Numérotation **stable** : plusieurs commentaires du code source y renvoient
 (« realisme point N »). Ne pas renuméroter.
 
-1. **Cibles étendues + Swerling** — ✅ **FAIT** : chaque objet est simulé par
-   4 réflecteurs (± 150 mm), amplitude retirée au sort à chaque tour (graine
-   fixe : reproductible), 15 % d'extinction par réflecteur et 10 %
-   d'évanouissement profond par objet. `Cluster_Radius` est passé à 600 mm en
-   conséquence (cible étendue + quantification d'élévation : ~520 mm d'écart
-   possible entre échos du même objet à 3 m) — revers assumé : deux objets
-   réels à moins de 600 mm fusionnent, c'est la résolution réelle du capteur
-   simulé.
-2. **Bruit de fond + CFAR** — ✅ **FAIT** : bruit aléatoire dans chaque case ;
-   seuil CA-CFAR (fenêtre 8, garde 2, facteur 4) **prouvé SPARK**
-   (`Detect_Adaptive` : « aucune cible sous son seuil local ») ; c'est lui que
-   tout le pipeline utilise.
-3. **Cycle de vie M-sur-N** — ✅ **FAIT** : piste tentative invisible avant
-   3 détections, tentative jamais revue morte en 2 tours ; l'affichage (veille
-   et rejeu) ne montre que les pistes confirmées, le coasting est marqué
-   (gris + `*`).
-4. **Filtre alpha-beta** — ✅ **FAIT** : prédiction + coasting (une piste non
-   revue roule sur son erre) et correction alpha (0,5) / beta (0,3) ; la
-   vitesse filtrée converge (testé : 100 mm/tour ± 20 en 10 tours).
-5. **Fantômes multitrajet** — ✅ **FAIT** : 5 % de probabilité d'écho miroir
-   derrière le mur ; c'est M-sur-N qui les étouffe (testé).
-6. **Clutter adaptatif** — ✅ **FAIT** : compteurs de confiance 2 bits,
-   confirmation à 2 observations, apprentissage de fond (1 tour sur 4) et
-   oubli lent (`Age` tous les 8 tours) : le décor qui apparaît est appris,
-   celui qui disparaît est oublié, un mobile qui passe n'empoisonne pas la
-   carte — et un mobile qui se gare y fond (réalisme assumé).
-   *Limite qui avait été observée : la fragmentation d'une cible étendue
-   pouvait confirmer une piste « ombre » (3 pistes pour 2 objets par moments).
-   Résolue depuis, par l'association globale et la fusion de pistes.*
-7. **Émulateur LD2450** — ❌ **À FAIRE** : une source de niveau
-   détection (x, y, vitesse, 10 Hz, 3 cibles max, jitter réaliste, dropouts,
-   fantômes) — le pipeline PC sera prêt **avant** l'arrivée du module, qui
-   remplacera l'émulateur trame pour trame.
-8. **Mode cartographie progressif** — ✅ **FAIT** : mode `scan` — le serveur
-   HTTP (paquet partagé `Radar_Http`) cadence le balayage une colonne d'azimut
-   à la fois et la page se remplit au fil de l'eau (progression, compteur de
-   points) ; scan terminé, le nuage reste servi et explorable. Sur le vrai
-   matériel, seules la cadence et la source changeront.
+1. **Cibles étendues et Swerling** — **mis en œuvre.** Chaque objet est
+   simulé par 4 réflecteurs (± 150 mm), dont l'amplitude est tirée au sort à
+   chaque tour (graine fixe, donc reproductible), avec 15 % d'extinction par
+   réflecteur et 10 % d'évanouissement profond par objet. `Cluster_Radius`
+   est porté à 600 mm en conséquence : une cible étendue vue à travers une
+   quantification d'élévation peut écarter deux échos du même objet
+   d'environ 520 mm à 3 m. Revers assumé : deux objets réels à moins de
+   600 mm fusionnent — c'est la résolution réelle du capteur simulé.
+2. **Bruit de fond et CFAR** — **mis en œuvre.** Bruit aléatoire dans chaque
+   case et seuil CA-CFAR (fenêtre 8, garde 2, facteur 4) **prouvé SPARK**
+   (`Detect_Adaptive` : « aucune cible sous son seuil local »). C'est cette
+   détection qu'utilise tout le pipeline.
+3. **Cycle de vie M-sur-N** — **mis en œuvre.** Une piste tentative reste
+   invisible avant 3 détections, et une tentative non revue meurt en
+   2 tours ; l'affichage, en veille comme en rejeu, ne montre que les pistes
+   confirmées, et le coasting y est marqué (gris et `*`).
+4. **Filtre alpha-beta** — **mis en œuvre.** Prédiction et coasting — une
+   piste non revue roule sur son erre — puis correction alpha (0,5) et beta
+   (0,3). La vitesse filtrée converge : mesuré à 100 mm/tour ± 20 en
+   10 tours.
+5. **Fantômes multitrajet** — **mis en œuvre.** 5 % de probabilité d'écho
+   miroir derrière le mur ; c'est la règle M-sur-N qui les étouffe, ce que
+   vérifie un test.
+6. **Clutter adaptatif** — **mis en œuvre.** Compteurs de confiance sur
+   2 bits, confirmation à 2 observations, apprentissage de fond (1 tour sur
+   4) et oubli lent (`Age` tous les 8 tours) : le décor qui apparaît est
+   appris, celui qui disparaît est oublié, et un mobile qui ne fait que
+   passer n'empoisonne pas la carte — tandis qu'un mobile qui se gare y fond,
+   réalisme assumé. Limite connue du mécanisme : la fragmentation d'une cible
+   étendue peut confirmer une piste « ombre » ; ce sont l'association globale
+   et la fusion de pistes, dans `Radar_Track`, qui l'écartent.
+7. **Émulateur LD2450** — **non implémenté.** Il s'agirait d'une source de
+   niveau détection (x, y, vitesse, 10 Hz, 3 cibles au plus, jitter
+   réaliste, dropouts, fantômes), afin que le pipeline PC soit prêt **avant**
+   l'arrivée du module, qui remplacerait alors l'émulateur trame pour trame.
+8. **Cartographie progressive** — **mise en œuvre.** Le mode `scan` : le
+   serveur HTTP (paquet partagé `Radar_Http`) cadence le balayage une colonne
+   d'azimut à la fois et la page se remplit au fil de l'eau, avec sa
+   progression et son compteur de points ; le scan terminé, le nuage reste
+   servi et explorable. Sur du matériel réel, seules la cadence et la source
+   changeront.
 
-### 1.5 Ce qui est déjà réaliste (à garder et à revendiquer)
+### 1.5 Ce qui est déjà réaliste (à conserver)
 
 - Le **MTI par carte de clutter** est le vrai principe des radars de veille au
   sol — et l'épisode « cible collée au mur invisible » rencontré pendant le
@@ -198,10 +202,10 @@ cross-compilés pour le Cortex-M4F, tournent **sur la carte**.
 Répartition des rôles :
 
 - Le **STM32 fait le temps réel et le formatage des données, en Ada** — c'est
-  la vitrine embarquée. Pas de FFT lourde sur le MCU.
+  la part embarquée du traitement. Pas de FFT lourde sur le MCU.
 - Le **PC** fait le traitement lourd et le rendu 3D.
-- Le **driver capteur est écrit en Ada**. Nuance apportée depuis : pour l'A121,
-  la bibliothèque RSS d'Acconeer étant fermée, ce sera en pratique un
+- Le **driver capteur est écrit en Ada**. Nuance : pour l'A121, la
+  bibliothèque RSS d'Acconeer étant fermée, ce sera en pratique un
   **binding Ada → C** (`pragma Import`) plutôt qu'un driver SPI intégralement
   écrit à la main.
 
@@ -226,22 +230,23 @@ On ne « touche » jamais l'onde : la puce radar fait tout le RF.
 Le vrai multi-faisceaux (phased array type **AESA**) n'est pas réalisable au
 budget hobby. La version abordable est le **beamforming par balayage
 mécanique** (on pointe → on synthétise l'angle), éventuellement complété par du
-beamforming numérique. À présenter comme tel, pas comme de l'AESA. Attente
-réaliste sur le rendu : nuage de points 3D **épars** (bonne résolution en
-distance, résolution angulaire grossière), pas une maquette CAO.
+beamforming numérique : c'est de cela qu'il s'agit ici, et non d'une antenne
+AESA. Attente réaliste sur le rendu : un nuage de points 3D **épars** — bonne
+résolution en distance, résolution angulaire grossière — et non une maquette
+CAO.
 
-### 2.4 Télémétrie : comment les résultats arrivent jusqu'à toi
+### 2.4 Télémétrie : comment les résultats remontent jusqu'au PC
 
 | Lien | Portée | Ce que ça demande | Verdict |
 | ---- | ------ | ----------------- | ------- |
 | UART + câble USB | 1–2 m (PC à côté) | un adaptateur USB-UART | **par là qu'on commence** : zéro inconnue, debug facile |
-| **UART → ESP32 → WiFi** | toute la maison | l'ESP32 déjà possédé, en pont « bête » | **la cible** : l'operateur est dans une autre pièce, le serveur de veille reçoit du TCP au lieu du simulateur |
+| **UART → ESP32 → WiFi** | toute la maison | un ESP32 en pont « bête » | **la cible** : l'opérateur est dans une autre pièce, le serveur de veille reçoit du TCP au lieu du simulateur |
 | BLE | ~10 m | plus de travail, moins de débit | pas utile ici |
 
 Le point d'architecture qui compte : l'ESP32 reste un **pont transparent**
 (UART entrant → TCP sortant, zéro logique radar). Toute l'intelligence reste
-dans le STM32 en Ada — la vitrine du projet est intacte, et le pont est un
-composant standard de l'industrie (« gateway »).
+dans le STM32 en Ada, et le pont reste un composant standard de l'industrie
+(« gateway »).
 
 Débits, pour fixer les idées : des pistes (id, x, y, z, vitesse) à 10 Hz =
 **~1 Ko/s** (rien du tout : UART 115200 suffit) ; des profils bruts A121
@@ -264,8 +269,9 @@ le traitement sur le STM32.
   - le cas particulier du **coffee-can 2,4 GHz** (projet DIY ultérieur) : lui
     partage la bande WiFi — interférences dans les deux sens, à faire loin des
     points d'accès.
-- Sens inverse (le radar perturbe-t-il le WiFi, ou toi ?) : puissance émise de
-  l'ordre du **milliwatt**, en bande libre réglementée — sans enjeu.
+- Sens inverse (le radar perturbe-t-il le WiFi, ou les personnes présentes ?) :
+  puissance émise de l'ordre du **milliwatt**, en bande libre réglementée —
+  sans enjeu.
 
 Conséquence utile : à 60 GHz les ondes **ne traversent pas les cloisons**. Le
 radar ne verra jamais la pièce d'à côté (à 24 GHz, une cloison légère est
@@ -273,16 +279,14 @@ partiellement transparente — les capteurs domotique sont parfois cachés
 derrière un panneau). Le WiFi, lui, traverse : on peut donc être ailleurs dans
 la maison pendant que le radar scanne.
 
----
-
 ### 2.6 Le protocole de télémétrie (spécification)
 
 **Rien de tout cela n'existe encore dans le
 code** — cette section est la spécification à implémenter, pas un compte rendu.
 
 Trame de longueur variable, **petit-boutiste** (le Cortex-M4, l'ESP32 et le PC
-le sont tous — mais on l'écrit, parce que c'est exactement le genre de non-dit
-qui coûte une soirée).
+le sont tous — mais on l'écrit, parce qu'un tel non-dit se paie au moment du
+débogage, quand plus rien ne permet de dire qui des deux bouts a tort).
 
 | Offset | Taille | Champ | Rôle |
 | ------ | ------ | ----- | ---- |
@@ -333,17 +337,18 @@ On n'a pas à décider tout de suite *qui* fait le pistage :
   et le pistage avec `Radar_Detect` et `Radar_Track`, **déjà écrits et
   testés**. C'est par là qu'on commence.
 - **`KIND = 2`** — la carte piste elle-même et n'envoie que des conclusions.
-  C'est la vitrine embarquée finale.
+  C'est la cible finale du portage embarqué.
 
 Le transport ne change pas entre les deux. On bascule quand la carte est
 prête, pas avant.
 
-#### La représentation Ada — c'est la vitrine
+#### La représentation Ada : la trame est la structure
 
 Pas de décalages calculés à la main, pas de `memcpy` : la structure **est** la
-trame. Ce paquet est testable **sans matériel** (fabriquer un tableau d'octets,
-le lire, vérifier les champs) — et c'est le test de parsing qui manque
-aujourd'hui au dépôt.
+trame. Un tel paquet se teste **sans matériel** — fabriquer un tableau
+d'octets, le donner à lire, vérifier les champs obtenus — et c'est la seule
+manière raisonnable de mettre au point un parseur binaire avant que le
+capteur existe.
 
     with Interfaces;  use Interfaces;
     with System;
@@ -395,10 +400,7 @@ aujourd'hui au dépôt.
 | Rien du tout | masse commune absente, TX/RX inversés | vérifier le câblage **avant** le code |
 
 Ces compteurs (trames reçues, CRC faux, trames perdues) doivent être
-**visibles dans la page** , via une route `/health.json`.
+**visibles dans la page**, via une route `/health.json`.
 C'est la différence entre un démonstrateur et un instrument : quand la qualité
 du lien se dégrade, il faut le voir **avant** que les pistes deviennent
 farfelues.
-
----
-

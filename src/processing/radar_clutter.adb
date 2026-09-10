@@ -1,3 +1,7 @@
+--  Corps de Radar_Clutter. Arithmetique entiere uniquement, tableaux de
+--  taille fixe, aucune allocation : le code doit rester executable sur le
+--  microcontrolleur, ou aucune de ces facilites n'existe.
+
 package body Radar_Clutter is
 
    --  Quantifie une direction (angles en degres) vers les indices de la
@@ -111,7 +115,7 @@ package body Radar_Clutter is
             Hi         : constant Bin_Index :=
               Bin_Index'Min (Bin_Index'Last, B + Guard_Bins);
          begin
-            --  Clutter si une case CONFIRMEE existe dans la marge.
+            --  Clutter si une case confirmee existe dans la marge.
             for G in Lo .. Hi loop
                if C.Cells (Az_Idx, El_Idx) (G) >= Confirm_Level then
                   Is_Clutter := True;
