@@ -15,6 +15,7 @@ package body Radar_Detect is
    procedure Reset (F : in out Frame) is
    begin
       F.Count := 0;
+      F.Stamp := 0;
    end Reset;
 
    ---------
@@ -27,6 +28,11 @@ package body Radar_Detect is
       --  fausse alarme par rapport au bruit ambiant").
       D : constant Detection := Detect_Adaptive (M.Data);
    begin
+      --  La frame porte l heure de sa DERNIERE mesure : Add etant
+      --  appele pour chaque direction du tour, c est l instant ou le
+      --  tour s acheve.
+      F.Stamp := M.Stamp;
+
       for K in 1 .. D.Count loop
          exit when F.Count = Max_Detections;
 
@@ -60,6 +66,7 @@ package body Radar_Detect is
 
    begin
       Reset (Result);
+      Result.Stamp := F.Stamp;   --  le regroupement ne change pas l heure
 
       --  Pour chaque detection pas encore regroupee...
       for I in 1 .. F.Count loop

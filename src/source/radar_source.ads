@@ -9,12 +9,22 @@ with Radar_Sweep;  use Radar_Sweep;
 
 package Radar_Source is
 
+   --  Base de temps du systeme : millisecondes ecoulees depuis le
+   --  demarrage de la source.
+   --
+   --  Un entier borne, et pas Ada.Real_Time.Time : ce type doit
+   --  survivre au portage sur carte, ou Calendar et Real_Time ne sont
+   --  pas garantis (regle R7), et c est deja le format du champ
+   --  TIMESTAMP du protocole de telemetrie.
+   type Time_Ms is range 0 .. 2 ** 31 - 1;
+
    --  Une mesure brute : un balayage capte dans une direction donnee.
    --  (azimut + elevation = ou pointait le radar ; Data = les echos recus).
    type Measurement is record
-      Azimuth   : Float;     --  direction horizontale, en degres
-      Elevation : Float;     --  direction verticale, en degres
-      Data      : Sweep;     --  les amplitudes recues le long de cette ligne
+      Azimuth   : Float;         --  direction horizontale, en degres
+      Elevation : Float;         --  direction verticale, en degres
+      Stamp     : Time_Ms;  --  QUAND la mesure a ete prise
+      Data      : Sweep;         --  les amplitudes de cette ligne
    end record;
 
    --  ----- Le contrat -----

@@ -24,9 +24,14 @@ package Radar_Detect is
    type Detection_List is array (1 .. Max_Detections) of Detection_3D;
 
    --  Le resultat d'un tour : les objets vus + leur nombre.
+   --  Le resultat d un tour : les objets vus, leur nombre, et QUAND le
+   --  tour s est acheve. L horodatage voyage avec la frame jusqu au
+   --  pistage : c est lui qui donne le dt entre deux regards, et donc
+   --  des vitesses en mm/s au lieu de mm/tour.
    type Frame is record
       Items : Detection_List;
       Count : Detection_Count;
+      Stamp : Time_Ms := 0;
    end record;
 
    --  Ajoute une detection a la frame (si une mesure contient une cible).

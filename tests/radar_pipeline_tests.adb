@@ -28,6 +28,21 @@ package body Radar_Pipeline_Tests is
         ("Pipeline 3D : geometrie, regroupement, pistage");
    end Name;
 
+   --  Cadence des tours dans les tests : une seconde. Le pistage
+   --  raisonne desormais en TEMPS et non en tours, donc chaque frame
+   --  doit porter son heure ; sans cela le dt vaudrait zero et la
+   --  vitesse n aurait aucun sens.
+   Turn_Ms : constant Time_Ms := 1_000;
+
+   --  Avance l horloge d un tour, puis passe la frame au pistage.
+   procedure Tick
+     (Trk : in out Tracker; F : in out Frame; Now : in out Time_Ms) is
+   begin
+      Now     := Now + Turn_Ms;
+      F.Stamp := Now;
+      Update (Trk, F);
+   end Tick;
+
    --  Test 1 : aller-retour geometrie. (distance, angles) -> point 3D ->
    --  (distance, angles) doit redonner la mesure de depart (a un epsilon
    --  pres : calcul flottant).
@@ -123,6 +138,7 @@ package body Radar_Pipeline_Tests is
    is
       pragma Unreferenced (T);
       Trk   : Tracker;
+      Now   : Time_Ms := 0;
       F     : Frame;
       Empty : Frame;
    begin
@@ -132,7 +148,7 @@ package body Radar_Pipeline_Tests is
 
       --  Tour 1 : premiere detection -> tentative, pas confirmee.
       F.Items (1) := (Pos => (0.0, 0.0, 0.0), Distance => 0.0);
-      Update (Trk, F);
+      Tick (Trk, F, Now);
       Assert (not First_Active (Trk).Confirmed,
               "Une seule detection ne devrait pas confirmer la piste");
 
@@ -140,7 +156,7 @@ package body Radar_Pipeline_Tests is
       for N in 1 .. 9 loop
          F.Items (1) := (Pos => (Float (N) * 100.0, 0.0, 0.0),
                          Distance => Float (N) * 100.0);
-         Update (Trk, F);
+         Tick (Trk, F, Now);
       end loop;
 
       Assert (First_Active (Trk).Confirmed,
@@ -148,15 +164,15 @@ package body Radar_Pipeline_Tests is
       Assert (First_Active (Trk).Id = 1,
               "L'ID d'origine devrait etre conserve");
       Assert (abs (First_Active (Trk).Velocity.X - 100.0) < 20.0,
-              "La vitesse filtree devrait converger vers 100 mm/tour");
+              "La vitesse filtree devrait converger vers 100 mm/s");
 
       --  Occultation de 2 tours : la piste confirmee survit et sa
       --  position continue d'avancer sur son erre.
       declare
          Before : constant Float := First_Active (Trk).Pos.X;
       begin
-         Update (Trk, Empty);
-         Update (Trk, Empty);
+         Tick (Trk, Empty, Now);
+         Tick (Trk, Empty, Now);
          Assert (First_Active (Trk).Active
                  and then First_Active (Trk).Confirmed,
                  "La piste confirmee devrait survivre a l'occultation");
@@ -176,6 +192,7 @@ package body Radar_Pipeline_Tests is
    is
       pragma Unreferenced (T);
       Trk : Tracker;
+      Now : Time_Ms := 0;
       F   : Frame;
    begin
       Reset (F);
@@ -185,13 +202,13 @@ package body Radar_Pipeline_Tests is
       for N in 1 .. 3 loop
          F.Items (1) := (Pos => (0.0, 0.0, 0.0),   Distance => 0.0);
          F.Items (2) := (Pos => (500.0, 0.0, 0.0), Distance => 500.0);
-         Update (Trk, F);
+         Tick (Trk, F, Now);
       end loop;
 
       --  Le tour litigieux.
       F.Items (1) := (Pos => (480.0, 0.0, 0.0), Distance => 480.0);
       F.Items (2) := (Pos => (950.0, 0.0, 0.0), Distance => 950.0);
-      Update (Trk, F);
+      Tick (Trk, F, Now);
 
       for Tk of Trk.Tracks loop
          if Tk.Active and then Tk.Confirmed then
@@ -216,6 +233,7 @@ package body Radar_Pipeline_Tests is
    is
       pragma Unreferenced (T);
       Trk : Tracker;
+      Now : Time_Ms := 0;
       F   : Frame;
    begin
       Reset (F);
@@ -223,7 +241,7 @@ package body Radar_Pipeline_Tests is
       for N in 1 .. 5 loop
          F.Items (1) := (Pos => (0.0, 0.0, 0.0),   Distance => 0.0);
          F.Items (2) := (Pos => (350.0, 0.0, 0.0), Distance => 350.0);
-         Update (Trk, F);
+         Tick (Trk, F, Now);
       end loop;
 
       declare
@@ -247,6 +265,7 @@ package body Radar_Pipeline_Tests is
    is
       pragma Unreferenced (T);
       Trk   : Tracker;
+      Now   : Time_Ms := 0;
       F     : Frame;
       Empty : Frame;
    begin
@@ -255,9 +274,9 @@ package body Radar_Pipeline_Tests is
       F.Count := 1;
       F.Items (1) := (Pos => (1000.0, 0.0, 0.0), Distance => 1000.0);
 
-      Update (Trk, F);       --  un echo isole -> tentative
-      Update (Trk, Empty);   --  plus rien...
-      Update (Trk, Empty);
+      Tick (Trk, F, Now);       --  un echo isole -> tentative
+      Tick (Trk, Empty, Now);   --  plus rien...
+      Tick (Trk, Empty, Now);
 
       Assert (not First_Active (Trk).Active,
               "Une tentative jamais revue devrait mourir sans trace");
@@ -271,6 +290,7 @@ package body Radar_Pipeline_Tests is
    is
       pragma Unreferenced (T);
       M : Measurement := (Azimuth => 0.0, Elevation => 0.0,
+                          Stamp   => 0,
                           Data    => (others => 5));
       F : Frame;
    begin
@@ -432,6 +452,52 @@ package body Radar_Pipeline_Tests is
               "Arrondi au dixieme, obtenu " & F_Img (12.34));
    end Test_Float_Format;
 
+   --  Test : la vitesse ne doit PAS dependre de la cadence de balayage.
+   --  C est tout l objet de la base de temps.
+   --
+   --  Une meme cible physique avance a 100 mm/s. Elle est vue par deux
+   --  radars : l un fait un tour par seconde (elle avance de 100 mm
+   --  entre deux regards), l autre deux tours par seconde (50 mm).
+   --  AVANT la base de temps, le premier aurait rapporte "100" et le
+   --  second "50" - deux nombres pour la meme realite. Desormais les
+   --  deux doivent converger vers la meme valeur en mm/s.
+   procedure Test_Speed_Rate_Independent
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      --  Fait avancer une cible a 100 mm/s, vue tous les Period_Ms.
+      function Measured_Speed (Period_Ms : Time_Ms) return Float is
+         Trk  : Tracker;
+         F    : Frame;
+         Now  : Time_Ms := 0;
+         Step : constant Float := 100.0 * Float (Period_Ms) / 1000.0;
+      begin
+         Reset (F);
+         F.Count := 1;
+         for N in 0 .. 19 loop
+            Now := Now + Period_Ms;
+            F.Stamp := Now;
+            F.Items (1) := (Pos      => (Float (N) * Step, 0.0, 0.0),
+                            Distance => Float (N) * Step);
+            Update (Trk, F);
+         end loop;
+         return First_Active (Trk).Velocity.X;
+      end Measured_Speed;
+
+      Slow : constant Float := Measured_Speed (1_000);   --  1 tour/s
+      Fast : constant Float := Measured_Speed (500);     --  2 tours/s
+   begin
+      Assert (abs (Slow - 100.0) < 10.0,
+              "A 1 tour/s la vitesse devrait valoir 100 mm/s, obtenu "
+              & Slow'Image);
+      Assert (abs (Fast - 100.0) < 10.0,
+              "A 2 tours/s elle devrait valoir 100 mm/s AUSSI, obtenu "
+              & Fast'Image);
+      Assert (abs (Slow - Fast) < 10.0,
+              "Les deux cadences doivent donner la meme vitesse");
+   end Test_Speed_Rate_Independent;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -440,6 +506,9 @@ package body Radar_Pipeline_Tests is
    procedure Register_Tests (T : in out Test_Case) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine
+        (T, Test_Speed_Rate_Independent'Access,
+         "Vitesse en mm/s independante de la cadence");
       Register_Routine
         (T, Test_Source_Dispatching'Access,
          "Source pilotee a travers l'interface (R3)");
