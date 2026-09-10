@@ -1,6 +1,13 @@
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Source;    use Radar_Source;
 
+--  Radar_Detect : le passage des cibles d'un balayage aux detections 3D
+--  d'un tour complet, puis leur regroupement spatial.
+--
+--  Un meme objet reel est vu par plusieurs directions de balayage voisines
+--  et produit donc plusieurs detections ; le regroupement les ramene a une
+--  cible unique avant que le pistage n'entre en jeu.
+
 package Radar_Detect is
 
    --  Une detection 3D : la position dans l'espace d'un objet vu ce tour.
@@ -32,7 +39,7 @@ package Radar_Detect is
    --  Rayon de regroupement : deux detections a moins de cette distance
    --  (en mm) sont considerees comme le meme objet reel.
    --
-   --  600 mm et pas moins, parce qu'une cible ETENDUE (reflecteurs a
+   --  600 mm et pas moins, parce qu'une cible etendue (reflecteurs a
    --  +/-150 mm) vue par une grille d'elevation a pas de 10 degres peut
    --  voir ses echos "claquer" sur deux lignes d'elevation voisines :
    --  a 3 m, cela ecarte deux detections du meme objet d'environ

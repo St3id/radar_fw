@@ -1,13 +1,21 @@
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Detect;    use Radar_Detect;
 
+--  Radar_Track : le pistage, c'est-a-dire le suivi des cibles d'un tour
+--  a l'autre sous un identifiant stable.
+--
+--  Une detection dit "quelque chose est la" ; une piste dit "c'est le
+--  meme objet qu'au tour precedent, il va dans cette direction". Tout le
+--  paquet existe pour tenir cette seconde affirmation malgre le bruit,
+--  les trous de detection et les cibles qui se croisent.
+
 package Radar_Track is
 
-   --  Une PISTE : un objet suivi dans le temps.
+   --  Une piste : un objet suivi dans le temps.
    --
    --  Cycle de vie (regle "M-sur-N", ARCHITECTURE.md realisme point 3) :
-   --  une piste nait TENTATIVE (invisible pour l'affichage) et n'est
-   --  CONFIRMEE qu'apres Confirm_Hits detections. Une tentative qui
+   --  une piste nait tentative (invisible pour l'affichage) et n'est
+   --  confirmee qu'apres Confirm_Hits detections. Une tentative qui
    --  rate un tour de trop meurt aussitot : les fausses alarmes et les
    --  fantomes de multitrajet, intermittents par nature, ne survivent
    --  pas assez longtemps pour etre confirmes.
@@ -36,18 +44,18 @@ package Radar_Track is
 
    --  Met a jour les pistes avec les cibles d'un nouveau tour (frame
    --  deja regroupee), en cinq temps :
-   --    1. PREDICTION : chaque piste avance selon sa vitesse (une piste
+   --    1. prediction : chaque piste avance selon sa vitesse (une piste
    --       non revue "roule sur son erre" au lieu de geler) ;
-   --    2. ASSOCIATION GLOBALE avec les positions PREDITES : on prend
+   --    2. association globale avec les positions predites : on prend
    --       iterativement la paire (piste, detection) la plus proche au
    --       monde - aucune piste ne "vole" la detection d'une autre
    --       mieux placee (defaut classique de l'association gloutonne) ;
-   --    3. CORRECTION alpha-beta des pistes associees (position et
+   --    3. correction alpha-beta des pistes associees (position et
    --       vitesse lissees : le jitter d'une cible etendue ne part plus
    --       tel quel dans la vitesse) ;
-   --    4. VIE ET MORT : confirmation M-sur-N, abandon des pistes
+   --    4. vie et mort : confirmation M-sur-N, abandon des pistes
    --       perdues, creation de tentatives pour les detections orphelines ;
-   --    5. FUSION : deux pistes trop proches = un meme objet fragmente
+   --    5. fusion : deux pistes trop proches = un meme objet fragmente
    --       (cible etendue scindee par la quantification) - la plus
    --       ancienne absorbe l'autre, pas de piste "ombre".
    procedure Update (T : in out Tracker; F : Frame);

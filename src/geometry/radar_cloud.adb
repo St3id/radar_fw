@@ -1,3 +1,6 @@
+--  Corps de Radar_Cloud. Deux operations seulement, sans etat cache :
+--  le nuage est une donnee que l'appelant transporte.
+
 package body Radar_Cloud is
 
    -----------------

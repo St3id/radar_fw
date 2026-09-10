@@ -2,6 +2,10 @@ with Ada.Numerics.Float_Random;  use Ada.Numerics.Float_Random;
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Sweep;     use Radar_Sweep;
 
+--  Corps de Radar_Sim_Source. Le generateur aleatoire part d'une graine
+--  fixe : deux executions donnent exactement le meme flux de mesures, ce
+--  qui permet de rejouer un defaut de pistage sans materiel.
+
 package body Radar_Sim_Source is
 
    Beam_Width : constant Float := 3.0;   --  tolerance azimut (degres)
@@ -33,18 +37,18 @@ package body Radar_Sim_Source is
    Max_Echo : constant Amplitude := 3_500;
 
    --  Probabilite qu'un reflecteur soit eteint ce tour-ci (orientation
-   --  defavorable), et qu'un objet ENTIER s'evanouisse (fading profond).
+   --  defavorable), et qu'un objet entier s'evanouisse (fading profond).
    Dropout_Probability   : constant Float := 0.15;
    Deep_Fade_Probability : constant Float := 0.10;
 
    --  Multitrajet : probabilite qu'un objet produise ce tour-ci un echo
-   --  FANTOME derriere le mur (trajet radar -> mur -> cible -> radar).
+   --  fantome derriere le mur (trajet radar -> mur -> cible -> radar).
    --  Intermittent par nature : c'est la regle M-sur-N du pistage qui
    --  doit l'empecher de devenir une piste.
    Ghost_Probability : constant Float := 0.05;
    Ghost_Echo        : constant Amplitude := 500;
 
-   --  Generateur a GRAINE FIXE : les sorties restent reproductibles
+   --  Generateur a graine fixe : les sorties restent reproductibles
    --  d'une execution a l'autre (CI, comparaisons, mise au point).
    Gen : Ada.Numerics.Float_Random.Generator;
 
@@ -93,7 +97,7 @@ package body Radar_Sim_Source is
       Raw : Integer;
    begin
       --  Float'Floor et pas une conversion directe : en Ada, Integer (X)
-      --  ARRONDIT au plus proche, alors que la conversion inverse
+      --  arrondit au plus proche, alors que la conversion inverse
       --  (Bin_Distance) tronque. Les deux sens doivent partager la meme
       --  convention (debut de tranche), sinon l'aller-retour
       --  distance -> case -> distance derive d'une demi-case.
@@ -176,7 +180,7 @@ package body Radar_Sim_Source is
       end if;
 
       declare
-         --  Direction visee : azimut ET elevation.
+         --  Direction visee : azimut et elevation.
          Az : constant Float :=
            Float (Self.Az_Step) * 360.0 / Float (Self.Az_Steps);
          El : constant Float :=
@@ -195,7 +199,7 @@ package body Radar_Sim_Source is
             S (Distance_To_Bin (Wall_Distance (Az, El))) := 2_500;
          end if;
 
-         --  Les objets : chaque REFLECTEUR visible ce tour-ci (Echoes
+         --  Les objets : chaque reflecteur visible ce tour-ci (Echoes
          --  tire au sort par Roll_Echoes) produit son propre echo, a sa
          --  propre position. Une cible reelle est etendue : son centre
          --  percu "se promene" selon le reflecteur dominant du moment.
@@ -213,8 +217,8 @@ package body Radar_Sim_Source is
                         R : constant Polar := To_Polar (P);
                         B : Bin_Index;
                      begin
-                        --  Le reflecteur doit etre dans le faisceau EN
-                        --  AZIMUT ET EN ELEVATION. L'azimut se compare
+                        --  Le reflecteur doit etre dans le faisceau en
+                        --  azimut et en elevation. L'azimut se compare
                         --  modulo 360 (Angle_Diff) : un objet a 359
                         --  degres est bien dans le faisceau vise a 0.
                         if Angle_Diff (R.Azimuth, Az) < Beam_Width
@@ -230,7 +234,7 @@ package body Radar_Sim_Source is
                end loop;
 
                --  Fantome multitrajet : le signal rebondit sur le mur
-               --  puis sur la cible ; l'echo parait VENIR DE DERRIERE
+               --  puis sur la cible ; l'echo parait venir de derriere
                --  le mur (distance mur + (mur - cible)), plus faible.
                if Self.See_Room and then Self.Ghosting (I) then
                   declare
@@ -282,6 +286,6 @@ package body Radar_Sim_Source is
    end Has_More;
 
 begin
-   --  Graine FIXE : memes tirages a chaque execution (reproductible).
+   --  Graine fixe : memes tirages a chaque execution (reproductible).
    Ada.Numerics.Float_Random.Reset (Gen, 42);
 end Radar_Sim_Source;

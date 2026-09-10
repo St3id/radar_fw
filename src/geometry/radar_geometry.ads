@@ -1,3 +1,10 @@
+--  Radar_Geometry : passage entre la visee du radar (distance, azimut,
+--  elevation) et les coordonnees cartesiennes utilisees par le nuage de
+--  points et par le pistage.
+--
+--  Conventions du projet : les longueurs sont en millimetres, les angles
+--  en degres, et le radar occupe l'origine du repere.
+
 package Radar_Geometry is
 
    --  Un point dans l'espace 3D, en millimetres.
@@ -26,8 +33,10 @@ package Radar_Geometry is
       Elevation : Float;    --  direction verticale, en degres
    end record;
 
-   --  Conversion INVERSE de To_Point : d'un point (X,Y,Z) vers
-   --  sa direction et sa distance vues depuis le radar (a l'origine).
+   --  Conversion inverse de To_Point : d'un point (X, Y, Z) vers sa
+   --  direction et sa distance vues depuis le radar. C'est cette
+   --  fonction, et non un calcul refait dans les pages HTML, qui fournit
+   --  les coordonnees polaires affichees a l'utilisateur.
    function To_Polar (P : Point_3D) return Polar;
 
 end Radar_Geometry;

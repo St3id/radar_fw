@@ -5,13 +5,13 @@ with Radar_Run_Mapping;
 with Radar_Run_Live;
 with Radar_Run_Scan;
 
---  Point d'entree : choisit le MODE D'EXPLOITATION a la demande.
+--  Point d'entree : choisit le mode D'exploitation a la demande.
 --  Tous les modes partagent la meme source de donnees (Radar_Source) et
 --  la meme chaine de detection prouvee ; ils ne different que par le
 --  traitement des balayages :
 --    track : rejeu enregistre (objets mobiles, pistage, vitesses)
 --    map   : cartographie statique (nuage de points dense d'une piece)
---    live  : surveillance TEMPS REEL dans le navigateur (serveur HTTP
+--    live  : surveillance temps reel dans le navigateur (serveur HTTP
 --            Ada + carte de clutter : decor statique et cibles mobiles)
 procedure Radar_Fw is
 begin

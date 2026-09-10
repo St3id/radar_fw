@@ -1,12 +1,12 @@
 name = "radar_fw"
-description = "Firmware Ada/SPARK pour radar de scan 3D sur STM32"
+description = "Chaine radar 3D en Ada/SPARK : detection prouvee, pistage, rendu 3D"
 version = "0.1.0-dev"
 
 authors = ["Boles Lucas"]
 maintainers = ["Boles Lucas <sissilucas7@gmail.com>"]
 maintainers-logins = ["St3id"]
 licenses = "MIT"
-website = ""
+website = "https://St3id.github.io/radar_fw/"
 tags = ["embedded", "stm32", "radar", "spark", "real-time"]
 
 executables = ["radar_fw"]

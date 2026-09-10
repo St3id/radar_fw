@@ -16,23 +16,24 @@ with Radar_Track;            use Radar_Track;
 --  Ce programme melange Ada et HTML/JS : lignes longues assumees.
 pragma Style_Checks ("M300");
 
---  MODE LIVE : surveillance temps reel servie dans le navigateur.
+--  Mode live : surveillance temps reel servie dans le navigateur.
 --
 --  Un serveur HTTP minimal, ecrit en Ada pur (GNAT.Sockets), fait
 --  tourner la simulation en continu (un tour de scan toutes les
 --  Turn_Ms millisecondes) et sert :
 --    /            la page 3D (Three.js), qui se met a jour seule ;
 --    /state.json  les pistes courantes (id, position, vitesse) ;
---    /cloud.json  le decor statique appris au 1er tour (les murs).
+--    /cloud.json  le decor statique appris a la calibration (les murs).
 --
---  Le TOUR 1 sert de CALIBRATION : tout echo est memorise dans la
---  carte de clutter (Radar_Clutter) comme decor statique. Ensuite,
---  seuls les echos qui s'en ecartent deviennent des pistes : c'est le
---  MTI (Moving Target Indication) d'un radar de veille au sol. Un
---  objet immobile pendant la calibration est invisible jusqu'a ce
---  qu'il bouge - comportement normal d'une carte de clutter.
+--  Les Calibration_Turns premiers tours servent de calibration : tout
+--  echo y est memorise dans la carte de clutter (Radar_Clutter) comme
+--  appartenant au decor. Ensuite, seuls les echos qui s'en ecartent
+--  deviennent des pistes : c'est le MTI (Moving Target Indication) d'un
+--  radar de veille au sol. Un objet reste immobile pendant la
+--  calibration est donc invisible jusqu'a ce qu'il bouge, comportement
+--  normal et voulu d'une carte de clutter.
 --
---  Architecture volontairement MONO-THREAD : entre deux tours, le
+--  Architecture volontairement mono-thread : entre deux tours, le
 --  serveur attend les connexions avec un selector a timeout. Pas de
 --  taches ici - la concurrence Ravenscar vit dans radar_demo et, a
 --  terme, sur la carte ; le jour du materiel, seule la source change
@@ -57,7 +58,7 @@ procedure Radar_Run_Live is
    --  disparait finit par etre oublie.
    Age_Period : constant := 8;
 
-   --  Source'CLASS : les appels sont dispatchants (voir Radar_Source).
+   --  Source'Class : les appels sont dispatchants (voir Radar_Source).
    Src  : Source'Class := Make (Sweeps => Positive'Last, See_Room => True);
    Trk  : Tracker;
    Clut : Clutter_Map;
@@ -71,7 +72,7 @@ procedure Radar_Run_Live is
 
    Srv : Radar_Http.Server;
 
-   --  ================= LA PAGE (visualiseur live) =================
+   --  ----- La page (visualiseur live) -----
 
    function Build_Page return Unbounded_String is
       P : Unbounded_String;
@@ -99,7 +100,7 @@ procedure Radar_Run_Live is
       L ("document.body.appendChild(rnd.domElement);");
       L ("scene.add(new THREE.GridHelper(8000,16,0x1c3a2e,0x1c3a2e));");
       L ("scene.add(new THREE.Mesh(new THREE.SphereGeometry(90,16,16),new THREE.MeshBasicMaterial({color:0xff5d3b})));");
-      --  Decor statique : charge UNE fois (il ne change pas).
+      --  Decor statique : charge une fois (il ne change pas).
       L ("fetch('/cloud.json').then(r=>r.json()).then(c=>{");
       L (" const g=new THREE.BufferGeometry(),pos=[];");
       L (" c.points.forEach(p=>pos.push(p[0],p[2],p[1]));");
@@ -174,7 +175,7 @@ procedure Radar_Run_Live is
 
    Page : constant Unbounded_String := Build_Page;
 
-   --  ================= LE PIPELINE (un tour de scan) =================
+   --  ----- Le pipeline (un tour de scan) -----
 
    function Build_State return Unbounded_String is
       R     : Unbounded_String;
@@ -182,7 +183,7 @@ procedure Radar_Run_Live is
    begin
       Append (R, "{""turn"":" & Img (Turn) & ",""turn_ms"":"
                  & Img (Turn_Ms) & ",""tracks"":[");
-      --  Seules les pistes CONFIRMEES (M-sur-N) sont publiees : les
+      --  Seules les pistes confirmees (M-sur-N) sont publiees : les
       --  tentatives et les fantomes de multitrajet restent invisibles.
       --  "coast" = 1 : piste non revue ce tour, position extrapolee.
       for I in Trk.Tracks'Range loop
@@ -254,7 +255,7 @@ procedure Radar_Run_Live is
             end if;
 
             --  Surveillance (apres calibration) : le clutter est
-            --  soustrait, seuls les echos NOUVEAUX (= mobiles)
+            --  soustrait, seuls les echos nouveaux (= mobiles)
             --  alimentent le pistage.
             if Turn >= Calibration_Turns then
                declare
@@ -296,7 +297,7 @@ procedure Radar_Run_Live is
       State_Json := Build_State;
    end Process_Turn;
 
-   --  ================= LES ROUTES HTTP =================
+   --  ----- Les routes HTTP -----
 
    procedure Route (Path : String; Sock : Socket_Type) is
    begin

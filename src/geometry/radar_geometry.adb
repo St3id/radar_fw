@@ -2,6 +2,10 @@ with Ada.Numerics;                     use Ada.Numerics;
 with Ada.Numerics.Elementary_Functions;
 use  Ada.Numerics.Elementary_Functions;
 
+--  Corps de Radar_Geometry. Les formules sont celles du passage
+--  spherique <-> cartesien ; le seul point delicat est le bornage de
+--  l'argument d'Arcsin, explique dans To_Polar et couvert par un test.
+
 package body Radar_Geometry is
 
    --------------

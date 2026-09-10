@@ -1,5 +1,9 @@
 with Ada.Streams;  use Ada.Streams;
 
+--  Corps de Radar_Http. Seule la premiere ligne de la requete est
+--  analysee : ce serveur ne repond qu'a des GET sur des chemins connus,
+--  et tout le reste est ignore volontairement.
+
 package body Radar_Http is
 
    CRLF : constant String := ASCII.CR & ASCII.LF;

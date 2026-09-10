@@ -2,13 +2,23 @@ with Radar_Source;  use Radar_Source;
 with Radar_Sweep;
 with Radar_World;   use Radar_World;
 
+--  Radar_Sim_Source : la source simulee, qui balaie une grille azimut par
+--  elevation et fait avancer le monde d'un pas entre deux tours.
+--
+--  Elle n'est pas un bouche-trou en attendant le materiel : c'est le banc
+--  de test du projet, et elle le restera. Sa graine aleatoire est fixe,
+--  donc un defaut de detection ou de pistage se rejoue a l'identique,
+--  autant de fois qu'il le faut, sans rebrancher quoi que ce soit.
+--
+--  Les imperfections qu'elle simule (bruit, echos fluctuants, trous de
+--  detection, fantomes multitrajet) sont decrites dans
+--  documentation/public/ARCHITECTURE.md, section 1.
+
 package Radar_Sim_Source is
 
-   --  Source SIMULEE : balaie une grille azimut x elevation (scan 3D),
-   --  sur plusieurs tours ; entre chaque tour, le monde avance d'un pas.
    type Simulated_Source is new Source with private;
 
-   --  Mode SURVEILLANCE : plusieurs tours d'un monde d'objets mobiles.
+   --  Mode surveillance : plusieurs tours d'un monde d'objets mobiles.
    --  See_Room = True ajoute les murs de la piece a la scene : c'est le
    --  cas realiste (mode live), ou il faudra une carte de clutter pour
    --  distinguer les mobiles du decor.
@@ -16,7 +26,7 @@ package Radar_Sim_Source is
      (Sweeps   : Positive;
       See_Room : Boolean := False) return Simulated_Source;
 
-   --  Nombre de mesures qui composent UN tour complet de cette source
+   --  Nombre de mesures qui composent un tour complet de cette source
    --  (tous les azimuts x toutes les elevations).
    overriding
    function Per_Turn (Self : Simulated_Source) return Positive;
@@ -25,7 +35,7 @@ package Radar_Sim_Source is
    --  d'interpolation divisent par Steps - 1).
    subtype Grid_Steps is Positive range 2 .. 1_024;
 
-   --  Mode CARTOGRAPHIE : UN tour meticuleux d'un monde statique (les
+   --  Mode cartographie : un tour meticuleux d'un monde statique (les
    --  murs de la piece, sans objets mobiles), avec une grille fine.
    --  Meme interface, meme chaine de traitement : seul le contenu de la
    --  scene et la finesse du balayage changent.
@@ -49,9 +59,9 @@ private
    Default_Azimuth_Steps   : constant := 120;  --  azimut : tour complet
    Default_Elevation_Steps : constant := 7;    --  de -30 a +30 deg
 
-   --  ----- Realisme des cibles (ARCHITECTURE.md, realisme point 1) ----
+   --  ----- Realisme des cibles (ARCHITECTURE.md, realisme point 1) -----
    --  Une cible reelle n'est pas un point : c'est un ensemble de
-   --  reflecteurs (torse, membres...) dont l'echo FLUCTUE d'un tour a
+   --  reflecteurs (torse, membres...) dont l'echo fluctue d'un tour a
    --  l'autre selon l'orientation (modeles de Swerling), avec de vrais
    --  trous de detection. Chaque objet est donc simule par
    --  Scatter_Count reflecteurs dont l'amplitude est retiree au sort a
@@ -62,7 +72,7 @@ private
      array (1 .. Max_Objects, 1 .. Scatter_Count) of Radar_Sweep.Amplitude;
 
    --  Multitrajet (point 5) : ce tour-ci, l'objet produit-il en plus un
-   --  echo FANTOME derriere le mur (signal rebondi mur -> cible) ?
+   --  echo fantome derriere le mur (signal rebondi mur -> cible) ?
    type Object_Flags is array (1 .. Max_Objects) of Boolean;
 
    type Simulated_Source is new Source with record

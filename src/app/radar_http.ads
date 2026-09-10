@@ -2,13 +2,15 @@ with Ada.Real_Time;          use Ada.Real_Time;
 with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
 with GNAT.Sockets;           use GNAT.Sockets;
 
-package Radar_Http is
+--  Radar_Http : un serveur HTTP minimal ecrit en Ada pur (GNAT.Sockets),
+--  partage par les modes de surveillance et de cartographie progressive.
+--
+--  Volontairement mono-thread : l'appelant alterne un tour de traitement
+--  radar et un appel a Serve_Until, qui attend passivement les connexions
+--  jusqu'a une echeance. Aucune tache ici ; la concurrence Ravenscar vit
+--  dans radar_demo et, a terme, sur la carte.
 
-   --  Mini serveur HTTP en Ada pur (GNAT.Sockets), partage par les
-   --  modes "live" et "scan". Volontairement MONO-THREAD : l'appelant
-   --  alterne traitement radar et Serve_Until (attente passive des
-   --  connexions, avec echeance) - pas de taches ici, la concurrence
-   --  Ravenscar vit dans radar_demo et, a terme, sur la carte.
+package Radar_Http is
 
    type Server is limited record
       Sock : Socket_Type;

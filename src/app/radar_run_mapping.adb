@@ -7,12 +7,12 @@ with Radar_Geometry;     use Radar_Geometry;
 with Radar_Cloud;        use Radar_Cloud;
 with Radar_Html;         use Radar_Html;
 
---  Ce programme GENERE du HTML : lignes longues assumees (script Three.js).
+--  Ce programme genere du HTML : lignes longues assumees (script Three.js).
 pragma Style_Checks ("M300");
 
---  MODE CARTOGRAPHIE : un tour de scan meticuleux d'un environnement
---  STATIQUE (les murs de la piece), accumule en nuage de points dense,
---  puis rendu 3D fige et explorable. La MEME source abstraite et la MEME
+--  Mode cartographie : un tour de scan meticuleux d'un environnement
+--  statique (les murs de la piece), accumule en nuage de points dense,
+--  puis rendu 3D fige et explorable. La meme source abstraite et la meme
 --  chaine de detection prouvee que le mode surveillance : seul le
 --  traitement des balayages change (accumulation au lieu de pistage).
 procedure Radar_Run_Mapping is
@@ -25,8 +25,8 @@ procedure Radar_Run_Mapping is
 
    --  Un seul tour, grille fine (180 azimuts x 24 elevations).
    --
-   --  Declaree en Source'CLASS et non en Simulated_Source : tous les
-   --  appels ci-dessous (Has_More, Next) sont alors DISPATCHANTS. Le
+   --  Declaree en Source'Class et non en Simulated_Source : tous les
+   --  appels ci-dessous (Has_More, Next) sont alors dispatchants. Le
    --  jour du materiel, seule cette ligne change - c'est la promesse
    --  de l'interface, et elle n'est tenue que si on la nomme ici.
    Src   : Source'Class := Make_Room_Scan;
@@ -36,7 +36,7 @@ procedure Radar_Run_Mapping is
    OK : Boolean;
 
 begin
-   --  ===== 1. Le scan : chaque balayage passe par Detect_Clustered =====
+   --  ----- 1. Le scan : chaque balayage passe par Detect_Clustered -----
    --  (la fonction prouvee : zero fausse alarme), et chaque cible devient
    --  un point 3D du nuage via la geometrie et la distance de sa case.
    while Src.Has_More loop
@@ -54,7 +54,7 @@ begin
       end;
    end loop;
 
-   --  ===== 2. Le visualiseur (nuage de points Three.js autonome) =====
+   --  ----- 2. Le visualiseur (nuage de points Three.js autonome) -----
    Ada.Directories.Create_Path (Out_Dir);
    Create (Out_F, Out_File, File_Name);
 
@@ -71,7 +71,7 @@ begin
    Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
 
    --  Les points accumules par le scan, chacun accompagne de sa
-   --  position POLAIRE (distance, azimut, elevation) calculee ICI par
+   --  position polaire (distance, azimut, elevation) calculee ici par
    --  To_Polar - la fonction Ada couverte par les tests. La page se
    --  contente de l'afficher : elle ne refait aucune geometrie (R1).
    Put (Out_F, "<script>const PTS=[");
@@ -124,7 +124,7 @@ begin
    Put_Line (Out_F, "selM.visible=false;scene.add(selM);");
    Put_Line (Out_F, "const selDiv=document.getElementById('sel');");
 
-   --  Camera : orbite autour d'un CENTRE DEPLACABLE (ctr). Glisser =
+   --  Camera : orbite autour d'un centre deplacable (ctr). Glisser =
    --  tourner autour de ctr ; ZQSD/WASD = deplacer ctr ; molette = zoom.
    Put_Line (Out_F, "let rotY=0.6,rotX=0.4,dist=5000;");
    Put_Line (Out_F, "const ctr=new THREE.Vector3(0,0,0);");
@@ -160,7 +160,8 @@ begin
    Put_Line (Out_F, " if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
    Put_Line (Out_F, " const i=hits[0].index,p=PTS[i];");
    Put_Line (Out_F, " selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
-   --  d, az, el arrivent calcules d'Ada : aucun calcul ici (R1).
+   --  Distance et angles arrivent calcules du cote Ada : la page n'en
+   --  recalcule aucun (R1).
    Put_Line (Out_F, " const d=p[3],az=p[4],el=p[5];");
    Put_Line (Out_F, " selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+");
    Put_Line (Out_F, "  '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}");

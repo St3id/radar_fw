@@ -6,13 +6,13 @@ with Radar_Detect;       use Radar_Detect;
 with Radar_Track;        use Radar_Track;
 with Radar_Html;         use Radar_Html;
 
---  Ce programme GENERE du HTML : certaines lignes (script Three.js embarque)
+--  Ce programme genere du HTML : certaines lignes (script Three.js embarque)
 --  depassent volontairement la limite de 79 colonnes. On releve donc la
---  limite de longueur de ligne pour CE seul fichier, sans toucher aux autres
+--  limite de longueur de ligne pour ce seul fichier, sans toucher aux autres
 --  regles de style ni aux autres fichiers.
 pragma Style_Checks ("M300");
 
---  MODE SURVEILLANCE : suivi temps reel d'objets MOBILES (detections,
+--  Mode surveillance : suivi temps reel d'objets mobiles (detections,
 --  regroupement, pistage, vitesses), rejoue dans un visualiseur anime.
 procedure Radar_Run_Tracking is
 
@@ -29,7 +29,7 @@ procedure Radar_Run_Tracking is
    --  Combien de tours on a reellement enregistres (pour le message final).
    Turn_Count : Natural := 0;
 
-   --  ================= EN-TETE HTML + tableau de donnees =================
+   --  ----- En-tete HTML + tableau de donnees -----
    procedure Write_Head is
    begin
       Put_Line (Out_F, "<!DOCTYPE html><html lang=""fr""><head><meta charset=""UTF-8"">");
@@ -48,12 +48,12 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "<div class=""note"">Decoche = positions reellement mesurees, tour par tour (la verite de la perception, saccadee).<br>Coche = interpolation visuelle entre deux mesures (positions intermediaires inventees).</div>");
       Put_Line (Out_F, "</div>");
       Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
-      --  FRAMES : un tableau par tour ; chaque tour = la liste des pistes
-      --  PERCUES (ce que le tracking a reellement suivi). Rien d'autre.
+      --  Frames : un tableau par tour ; chaque tour = la liste des pistes
+      --  percues (ce que le tracking a reellement suivi). Rien d'autre.
       Put (Out_F, "<script>const FRAMES=[");
    end Write_Head;
 
-   --  ================= LE VISUALISEUR (rejeu du flux percu) =================
+   --  ----- Le visualiseur (rejeu du flux percu) -----
    procedure Write_Viewer is
    begin
       Put_Line (Out_F, "];");
@@ -90,7 +90,7 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, " dyn.traverse(o=>{if(o!==dyn){if(o.geometry)o.geometry.dispose();if(o.material){if(o.material.map)o.material.map.dispose();o.material.dispose();}}});");
       Put_Line (Out_F, " while(dyn.children.length)dyn.remove(dyn.children[0]);}");
       Put_Line (Out_F, "function lerp(a,b,k){return a+(b-a)*k;}");
-      --  Dessine la scene a l'instant 'a' (0..1) DANS le tour courant :
+      --  Dessine la scene a l'instant 'a' (0..1) dans le tour courant :
       --  a=0 -> position du tour precedent ; a=1 -> position du tour courant.
       --  Les positions intermediaires (0<a<1) sont interpolees = inventees.
       Put_Line (Out_F, "function drawScene(a){");
@@ -107,7 +107,7 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "  if(speed>1){const len=Math.min(2500,speed*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
       --  Label : identifiant + distance au radar (a la position affichee).
       Put_Line (Out_F, "  const lab=makeLabel('#'+tk.id+'  '+distOf(ip)+'mm');lab.position.copy(p).add(new THREE.Vector3(0,200,0));dyn.add(lab);");
-      --  Trainee : positions REELLES passees (max 7) + la position courante.
+      --  Trainee : positions reelles passees (max 7) + la position courante.
       Put_Line (Out_F, "  const tp=[],start=Math.max(0,turn-7);");
       Put_Line (Out_F, "  for(let f=start;f<turn;f++){const o=FRAMES[f].find(x=>x.id===tk.id);if(o)tp.push(v3(o));}");
       Put_Line (Out_F, "  tp.push(p);");
@@ -139,7 +139,7 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "</script></body></html>");
    end Write_Viewer;
 
-   --  ================= LE PIPELINE DE PERCEPTION =================
+   --  ----- Le pipeline de perception -----
    procedure Process (Radar : in out Source'Class) is
       M       : Measurement;
       OK      : Boolean;
@@ -152,7 +152,7 @@ procedure Radar_Run_Tracking is
       begin
          Update (Trk, C);
 
-         --  On serialise UNIQUEMENT les pistes CONFIRMEES (M-sur-N) :
+         --  On serialise uniquement les pistes confirmees (M-sur-N) :
          --  les tentatives et les fantomes n'apparaissent jamais.
          Put (Out_F, "[");
          for I in Trk.Tracks'Range loop

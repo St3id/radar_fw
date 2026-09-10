@@ -19,6 +19,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | Quel format ont les trames carte → PC ? | `documentation/public/ARCHITECTURE.md` §2.6 |
 | Où est tel fichier ? | ce guide, sections 2 et 3 |
 | Comment on compile, teste et prouve ? | ce guide, section 5 |
+| Sous quelle licence puis-je le réutiliser ? | `LICENSE` (racine) : MIT |
 
 ---
 
@@ -27,6 +28,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | Élément | Quoi | Versionné |
 | ------- | ---- | --------- |
 | `README.md` | la présentation du projet et son état d'avancement | oui |
+| `LICENSE` | la licence MIT du dépôt | oui |
 | `documentation/public/` | la documentation technique | oui |
 | `src/` | le code Ada, rangé par domaine | oui |
 | `tests/` | les suites de tests AUnit | oui |
@@ -35,7 +37,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `radar_fw.gpr` et les 3 autres `.gpr` | les projets de compilation (voir §4) | oui |
 | `ravenscar.adc` | impose `pragma Profile (Ravenscar)` à la compilation de la démo | oui |
 | `.github/workflows/ci.yml` | l'intégration continue | oui |
-| `.gitignore`, `.markdownlint.json` | configuration | oui |
+| `.gitignore`, `.markdownlint.json`, `.vscode/settings.json` | configuration | oui |
 | `out/` | **généré** : les visualiseurs HTML des modes `map` et `track` | non |
 | `obj/` `bin/` `alire/` `config/` `share/` | **généré** : sortie de build Alire/GNAT | non |
 
@@ -44,6 +46,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 - `documentation/public/` = la documentation technique du projet.
 - `docs/` = la copie du visualiseur publiée sur le web. Ce nom est **imposé
   par GitHub Pages**, on ne peut pas le changer.
+
 ---
 
 ## 3. Le code (`src/`), rangé par domaine

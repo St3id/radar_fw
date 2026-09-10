@@ -1,10 +1,14 @@
 with Ada.Numerics.Elementary_Functions;
 use  Ada.Numerics.Elementary_Functions;
 
+--  Corps de Radar_Track. Les cinq etapes d'un tour de pistage sont
+--  numerotees dans Update et decrites dans la specification ; leur ordre
+--  n'est pas indifferent, la prediction devant preceder l'association.
+
 package body Radar_Track is
 
    --  Distance max (mm) pour associer une detection a une piste,
-   --  mesuree par rapport a la position PREDITE de la piste.
+   --  mesuree par rapport a la position predite de la piste.
    Match_Radius : constant Float := 600.0;
 
    --  Gains du filtre alpha-beta : part de l'ecart mesure reinjectee
@@ -14,8 +18,8 @@ package body Radar_Track is
    Alpha : constant Float := 0.5;
    Beta  : constant Float := 0.3;
 
-   --  Tours manques toleres : une piste CONFIRMEE "roule sur son erre"
-   --  pendant les evanouissements (Swerling) ; une TENTATIVE, elle,
+   --  Tours manques toleres : une piste confirmee "roule sur son erre"
+   --  pendant les evanouissements (Swerling) ; une tentative, elle,
    --  meurt vite - c'est le filtre anti-fantomes.
    Max_Missing_Confirmed : constant := 3;
    Max_Missing_Tentative : constant := 1;
@@ -35,7 +39,7 @@ package body Radar_Track is
    procedure Update (T : in out Tracker; F : Frame) is
       Matched : array (1 .. Max_Detections) of Boolean := (others => False);
    begin
-      --  --- 1. PREDICTION : chaque piste avance d'un tour. ---
+      --  ----- 1. Prediction : chaque piste avance d'un tour -----
       for I in T.Tracks'Range loop
          if T.Tracks (I).Active then
             T.Tracks (I).Pos :=
@@ -45,9 +49,9 @@ package body Radar_Track is
          end if;
       end loop;
 
-      --  --- 2 et 3. ASSOCIATION GLOBALE puis CORRECTION alpha-beta. ---
+      --  ----- 2 et 3. Association globale puis correction alpha-beta -----
       --  On prend iterativement la paire (piste, detection) la plus
-      --  proche AU MONDE, sous le rayon d'association. Contrairement au
+      --  proche au monde, sous le rayon d'association. Contrairement au
       --  "chaque piste prend son plus proche" (glouton, dependant de
       --  l'ordre des pistes), aucune piste ne vole la detection d'une
       --  autre mieux placee.
@@ -113,7 +117,7 @@ package body Radar_Track is
             end;
          end loop;
 
-         --  --- 4a. Pistes non revues ce tour-ci. ---
+         --  ----- 4a. Pistes non revues ce tour-ci -----
          for I in T.Tracks'Range loop
             if T.Tracks (I).Active and then not Track_Done (I) then
                T.Tracks (I).Missing := T.Tracks (I).Missing + 1;
@@ -129,7 +133,7 @@ package body Radar_Track is
          end loop;
       end;
 
-      --  --- 4b. Une TENTATIVE pour chaque detection orpheline. ---
+      --  ----- 4b. Une tentative pour chaque detection orpheline -----
       for J in 1 .. F.Count loop
          if not Matched (J) then
             for I in T.Tracks'Range loop
@@ -149,7 +153,7 @@ package body Radar_Track is
          end if;
       end loop;
 
-      --  --- 5. FUSION des pistes fragmentees. ---
+      --  ----- 5. Fusion des pistes fragmentees -----
       --  Deux pistes actives a moins de Merge_Radius sont le meme objet
       --  (cible etendue scindee par la quantification, ou tentative nee
       --  d'un eclat) : la plus ancienne (plus de detections) absorbe

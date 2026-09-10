@@ -1,3 +1,11 @@
+--  Radar_World : la verite terrain du simulateur, c'est-a-dire ce que le
+--  radar est cense voir.
+--
+--  Ce paquet ne sait rien du radar : il decrit une scene (objets mobiles
+--  qui rebondissent, murs d'une piece) que la source simulee observera
+--  ensuite avec ses propres imperfections. Separer les deux permet de
+--  comparer ce qui est detecte a ce qui existe reellement.
+
 package Radar_World is
 
    --  Un objet reel dans le monde simule : sa position, sa vitesse, son ID.
@@ -28,7 +36,7 @@ package Radar_World is
    --  Cree une scene de depart avec quelques objets mobiles.
    function Initial_World return World;
 
-   --  Un monde SANS objet mobile : sert au mode cartographie, ou l'on
+   --  Un monde sans objet mobile : sert au mode cartographie, ou l'on
    --  scanne l'environnement statique (les murs) sans etre pollue par
    --  des objets en mouvement.
    function Empty_World return World;

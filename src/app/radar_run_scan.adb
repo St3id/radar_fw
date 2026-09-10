@@ -14,9 +14,9 @@ with Radar_Sweep;            use Radar_Sweep;
 --  Ce programme melange Ada et HTML/JS : lignes longues assumees.
 pragma Style_Checks ("M300");
 
---  MODE SCAN : cartographie PROGRESSIVE dans le navigateur.
+--  Mode scan : cartographie progressive dans le navigateur.
 --
---  Sur le vrai materiel, un scan de piece prendra des MINUTES (tourelle
+--  Sur le vrai materiel, un scan de piece prendra des minutes (tourelle
 --  pas-a-pas + temps d'integration par direction) : l'attente doit se
 --  voir. Ici le balayage est cadence (une colonne d'azimut par pas de
 --  Step_Ms) et la page se remplit au fil de l'eau, avec la progression.
@@ -32,7 +32,7 @@ procedure Radar_Run_Scan is
    --  de Make_Room_Scan : le scan complet dure ~11 s).
    Column : constant := 24;
 
-   --  Source'CLASS : les appels sont dispatchants (voir Radar_Source).
+   --  Source'Class : les appels sont dispatchants (voir Radar_Source).
    Src   : Source'Class := Make_Room_Scan;
    Total : constant Positive := Per_Turn (Src);
 
@@ -55,7 +55,7 @@ procedure Radar_Run_Scan is
          & ",""count"":" & Img (Cloud.Count)
          & ",""progress"":" & Img (100 * Processed / Total) & "}"));
 
-   --  ================= LA PAGE (nuage progressif) =================
+   --  ----- La page (nuage progressif) -----
 
    function Build_Page return Unbounded_String is
       P : Unbounded_String;
@@ -140,7 +140,8 @@ procedure Radar_Run_Scan is
       L (" if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
       L (" const i=hits[0].index,p=PTS[i];");
       L (" selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
-      --  d, az, el arrivent calcules d'Ada : aucun calcul ici (R1).
+      --  Distance et angles arrivent calcules du cote Ada : la page n'en
+      --  recalcule aucun (R1).
       L (" const d=p[3],az=p[4],el=p[5];");
       L (" selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+");
       L ("  '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}");
@@ -156,7 +157,7 @@ procedure Radar_Run_Scan is
 
    Page : constant Unbounded_String := Build_Page;
 
-   --  ================= LE SCAN (une colonne par pas) =================
+   --  ----- Le scan (une colonne par pas) -----
 
    procedure Process_Column is
       M  : Measurement;
@@ -183,7 +184,7 @@ procedure Radar_Run_Scan is
                     To_Point (Float (Bin_Distance (D.Targets (K))),
                               M.Azimuth, M.Elevation);
 
-                  --  Position polaire calculee ICI, en Ada, par la
+                  --  Position polaire calculee ici, en Ada, par la
                   --  fonction To_Polar couverte par les tests. Elle
                   --  part avec le point : la page n'a plus aucune
                   --  geometrie a refaire (regle R1).
@@ -210,7 +211,7 @@ procedure Radar_Run_Scan is
       end if;
    end Process_Column;
 
-   --  ================= LES ROUTES HTTP =================
+   --  ----- Les routes HTTP -----
 
    procedure Route (Path : String; Sock : Socket_Type) is
    begin

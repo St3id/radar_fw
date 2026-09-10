@@ -1,6 +1,10 @@
 with Ada.Numerics;                      use Ada.Numerics;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
+--  Corps de Radar_World. Le mouvement est volontairement simple
+--  (translation puis rebond sur les parois) : le simulateur doit etre
+--  reproductible et lisible, pas physiquement exact.
+
 package body Radar_World is
 
    -------------------
@@ -17,7 +21,7 @@ package body Radar_World is
                         Vx => -120.0, Vy => 0.0,    Vz => 0.0);
 
       --  Objet 2 : part en bas a gauche, monte en diagonale.
-      --  (Surtout PAS colle a un mur : une cible qui rase un mur tombe
+      --  (Surtout pas colle a un mur : une cible qui rase un mur tombe
       --  dans les memes cases de distance que lui, et la carte de
       --  clutter la masque - comme sur un vrai radar.)
       W.Objects (2) := (Id => 2,
@@ -71,7 +75,7 @@ package body Radar_World is
    ----------
 
    procedure Step (W : in out World) is
-      --  Les objets REBONDISSENT sur les murs de la piece : la scene
+      --  Les objets rebondissent sur les murs de la piece : la scene
       --  reste vivante indefiniment (mode live) et les vecteurs vitesse
       --  changent a chaque rebond. La marge les garde a distance du mur
       --  pour que la carte de clutter ne les confonde pas avec lui.

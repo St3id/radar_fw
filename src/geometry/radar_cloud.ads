@@ -1,20 +1,24 @@
 with Radar_Geometry;  use Radar_Geometry;
 
-package Radar_Cloud is
+--  Radar_Cloud : le nuage de points 3D accumule par la cartographie.
+--
+--  Le nuage ne calcule aucune geometrie de piece pour son propre compte :
+--  les murs appartiennent au monde simule (Radar_World) et les points
+--  lui parviennent par la meme chaine de detection que le mode
+--  surveillance. Court-circuiter la source pour dessiner une piece
+--  connue d'avance donnerait une carte qui ne prouve rien.
+--
+--  Memoire statique bornee : jamais d'allocation, jamais de debordement.
 
-   --  Conteneur de nuage de points 3D, rempli par le mode cartographie.
-   --  (L'ancien Scan_Room calculait lui-meme la geometrie de la piece,
-   --  en court-circuitant la source radar ; desormais les murs vivent
-   --  dans Radar_World et les points arrivent par la MEME chaine de
-   --  detection que le mode surveillance.)
+package Radar_Cloud is
 
    --  Taille maximale du nuage.
    Max_Points : constant := 8_192;
 
    subtype Point_Count is Natural range 0 .. Max_Points;
 
-   --  D'abord on NOMME le type tableau (Ada interdit un tableau anonyme
-   --  directement dans un record).
+   --  Le type tableau est nomme : Ada interdit un tableau anonyme
+   --  directement dans un record.
    type Point_Array is array (1 .. Max_Points) of Point_3D;
 
    --  Le nuage : un tableau de points + combien sont reellement utilises.
@@ -26,8 +30,9 @@ package Radar_Cloud is
    --  Un nuage vide, pret a etre rempli.
    function Empty_Cloud return Point_Cloud;
 
-   --  Ajoute un point au nuage. Si le nuage est plein, le point est
-   --  ignore (saturation silencieuse, jamais de debordement).
+   --  Ajoute un point au nuage. Le nuage plein, le point est ignore :
+   --  la borne protege la memoire, mais la perte n'est pas signalee, et
+   --  un nuage tronque ressemble alors a une piece plus petite.
    procedure Append (C : in out Point_Cloud; P : Point_3D);
 
 end Radar_Cloud;
