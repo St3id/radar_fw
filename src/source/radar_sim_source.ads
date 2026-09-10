@@ -49,7 +49,7 @@ private
    Default_Azimuth_Steps   : constant := 120;  --  azimut : tour complet
    Default_Elevation_Steps : constant := 7;    --  de -30 a +30 deg
 
-   --  ----- Realisme des cibles (CAP_PROJET.md, realisme point 1) ----
+   --  ----- Realisme des cibles (ARCHITECTURE.md, realisme point 1) ----
    --  Une cible reelle n'est pas un point : c'est un ensemble de
    --  reflecteurs (torse, membres...) dont l'echo FLUCTUE d'un tour a
    --  l'autre selon l'orientation (modeles de Swerling), avec de vrais

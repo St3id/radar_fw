@@ -15,10 +15,10 @@ suivre dans le temps et reconstruire une représentation 3D de la scène. Le
 radar est ici un support technique pour démontrer une chaîne embarquée
 rigoureuse, applicable au domaine défense / aéronautique.
 
-Toute la documentation vit dans **`documentation/`** : le cap du projet, son
-périmètre, ses règles et sa feuille de route dans **`CAP_PROJET.md`** ; le
-matériel dans `GUIDE_MATERIEL.md` ; et **`GUIDE_DEPOT.md`** pour savoir où
-trouver quoi dans le dépôt.
+La documentation technique vit dans **`documentation/public/`** :
+**`ARCHITECTURE.md`** explique la physique radar que le logiciel doit
+affronter et l'architecture matérielle visée ; **`GUIDE_DEPOT.md`** est la
+carte du dépôt.
 
 ## État d'avancement
 
@@ -52,7 +52,7 @@ trouver quoi dans le dépôt.
 - [x] **Cibles réalistes** : cibles **étendues** (4 réflecteurs), écho
       **fluctuant** (Swerling), trous de détection, bruit de fond et
       **fantômes multitrajet** — le pipeline est éprouvé contre des
-      données imparfaites (voir `documentation/CAP_PROJET.md` §6)
+      données imparfaites (voir `documentation/public/ARCHITECTURE.md` §1)
 - [x] **Pistage robuste** : prédiction + coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (les tentatives et les fantômes ne sont
       jamais affichés), **association globale** (pas de vol de détection),
@@ -92,7 +92,7 @@ Au-dessus, le pipeline de perception 3D (branche `tracking-3d`) :
 
 Les modes partagent la même source de données (`Radar_Source`) et la
 même chaîne de détection prouvée ; seul le **traitement des balayages**
-change (c'est le point 9 de la feuille de route) :
+change :
 
     alr run                          # rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html

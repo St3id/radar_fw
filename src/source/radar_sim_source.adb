@@ -12,7 +12,7 @@ package body Radar_Sim_Source is
    --  CFAR qui s'en accommode ; un seuil fixe ne le pourrait pas.
    Noise_Level : constant Float := 80.0;
 
-   --  ----- Realisme des cibles (CAP_PROJET.md, realisme point 1) -----
+   --  ----- Realisme des cibles (ARCHITECTURE.md, realisme point 1) -----
 
    --  Position des reflecteurs par rapport au centre de l'objet, en mm
    --  (une cible etendue type humain : torse, membres...).
