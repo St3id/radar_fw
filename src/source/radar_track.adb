@@ -27,14 +27,35 @@ package body Radar_Track is
    --  dans la position (Alpha) et dans la vitesse (Beta). Des valeurs
    --  moderees lissent le jitter d'une cible etendue sans trop retarder
    --  la reaction aux vrais changements de cap.
+   --
+   --  Alpha = 0,5 : a mi-chemin entre la mesure et la prediction. Proche
+   --  de 1, on croirait la mesure sur parole et le jitter d'une cible
+   --  etendue (son centre percu se promene de 20 a 30 cm d'un tour a
+   --  l'autre) partirait tel quel dans la position. Proche de 0, la
+   --  piste ignorerait la mesure et deriverait sur sa seule erre.
+   --
+   --  Beta est DIVISE par dt a l'usage, et ce n'est pas un detail : un
+   --  meme ecart de position observe sur un intervalle court revele une
+   --  erreur de vitesse plus grande que le meme ecart observe sur un
+   --  intervalle long. Sans cette division, la vitesse estimee
+   --  dependrait de la cadence de balayage - c'est exactement ce que le
+   --  test "vitesse independante de la cadence" interdit.
    Alpha : constant Float := 0.5;
    Beta  : constant Float := 0.3;
 
-   --  Tours manques toleres : une piste confirmee "roule sur son erre"
-   --  pendant les evanouissements (Swerling) ; une tentative, elle,
-   --  meurt vite - c'est le filtre anti-fantomes.
-   Max_Missing_Confirmed : constant := 3;
-   Max_Missing_Tentative : constant := 1;
+   --  Duree de survie sans echo, en MILLISECONDES et non en nombre de
+   --  tours. Une piste confirmee "roule sur son erre" pendant les
+   --  evanouissements (Swerling) ; une tentative, elle, meurt vite -
+   --  c est le filtre anti-fantomes.
+   --
+   --  Compter en tours etait juste tant qu une seule source cadencait le
+   --  systeme. Des que deux sources alimentent le meme pistage (une
+   --  couronne a 10 Hz et une tourelle a 0,04 Hz), chacune appelle
+   --  Update : une piste vue par une seule des deux verrait son compteur
+   --  de tours manques grimper deux fois trop vite et mourrait
+   --  prematurement. Le temps, lui, ne depend d aucune cadence.
+   Max_Coast_Confirmed_Ms : constant Time_Ms := 2_500;
+   Max_Coast_Tentative_Ms : constant Time_Ms :=   900;
 
    --  Deux pistes actives a moins de cette distance (mm) sont le meme
    --  objet fragmente : elles fusionnent (inferieur au rayon de
@@ -43,6 +64,10 @@ package body Radar_Track is
 
    function Dist3D (A, B : Point_3D) return Float is
      (Sqrt ((A.X - B.X) ** 2 + (A.Y - B.Y) ** 2 + (A.Z - B.Z) ** 2));
+
+   --  Temps ecoule depuis la derniere association de cette piste.
+   function Since_Seen (Tk : Track; Now : Time_Ms) return Time_Ms is
+     (if Now > Tk.Last_Seen then Now - Tk.Last_Seen else 0);
 
    function Speed_Of (Tk : Track) return Float is
      (Sqrt (Tk.Velocity.X ** 2 + Tk.Velocity.Y ** 2 + Tk.Velocity.Z ** 2));
@@ -133,8 +158,9 @@ package body Radar_Track is
                      Z => T.Tracks (Best_I).Velocity.Z + (Beta / Dt) * Rz);
                end;
 
-               T.Tracks (Best_I).Missing := 0;
-               T.Tracks (Best_I).Hits    := T.Tracks (Best_I).Hits + 1;
+               T.Tracks (Best_I).Missing   := 0;
+               T.Tracks (Best_I).Last_Seen := F.Stamp;
+               T.Tracks (Best_I).Hits      := T.Tracks (Best_I).Hits + 1;
                if T.Tracks (Best_I).Hits >= Confirm_Hits then
                   T.Tracks (Best_I).Confirmed := True;
                end if;
@@ -148,10 +174,12 @@ package body Radar_Track is
             if T.Tracks (I).Active and then not Track_Done (I) then
                T.Tracks (I).Missing := T.Tracks (I).Missing + 1;
                if (T.Tracks (I).Confirmed
-                   and then T.Tracks (I).Missing > Max_Missing_Confirmed)
+                   and then Since_Seen (T.Tracks (I), F.Stamp)
+                            > Max_Coast_Confirmed_Ms)
                  or else
                   (not T.Tracks (I).Confirmed
-                   and then T.Tracks (I).Missing > Max_Missing_Tentative)
+                   and then Since_Seen (T.Tracks (I), F.Stamp)
+                            > Max_Coast_Tentative_Ms)
                then
                   T.Tracks (I).Active := False;
                end if;
@@ -169,6 +197,7 @@ package body Radar_Track is
                      Pos       => F.Items (J).Pos,
                      Velocity  => (0.0, 0.0, 0.0),  --  inconnue au depart
                      Missing   => 0,
+                     Last_Seen => F.Stamp,
                      Hits      => 1,
                      Confirmed => False,
                      Active    => True);
