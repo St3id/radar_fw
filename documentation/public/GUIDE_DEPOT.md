@@ -16,7 +16,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | C'est quoi ce projet, où en est-il ? | `README.md` (racine) |
 | Pourquoi le code fait-il ça comme ça ? | `documentation/public/ARCHITECTURE.md` §1 (réalisme radar) |
 | Comment le matériel est-il agencé ? | `documentation/public/ARCHITECTURE.md` §2 |
-| Quel format ont les trames carte → PC ? | `documentation/public/ARCHITECTURE.md` §2.6 |
+| Quel format ont les trames carte → PC ? | `documentation/public/ARCHITECTURE.md` §2.7 |
 | Où est tel fichier ? | ce guide, sections 2 et 3 |
 | Comment on compile, teste et prouve ? | ce guide, section 5 |
 | Sous quelle licence puis-je le réutiliser ? | `LICENSE` (racine) : MIT |

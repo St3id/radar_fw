@@ -17,6 +17,18 @@ package Radar_Detect is
    end record;
 
    --  Nombre maximum de detections retenues par tour.
+   --
+   --  32 suffit pour la SURVEILLANCE : sur la grille de veille (120 x 7),
+   --  le decor est soustrait par la carte de clutter et il ne reste que
+   --  les mobiles - une poignee d echos par tour.
+   --
+   --  Ce n est en revanche PAS une structure de cartographie. Un tour fin
+   --  (180 x 24) produit des milliers de points et deborderait cette
+   --  borne cent fois. C est pourquoi les modes map et scan accumulent
+   --  dans Radar_Cloud et ne passent pas par Frame.
+   --
+   --  Au-dela de la borne, les detections suivantes sont jetees sans
+   --  aucun signalement.
    Max_Detections : constant := 32;
 
    subtype Detection_Count is Natural range 0 .. Max_Detections;

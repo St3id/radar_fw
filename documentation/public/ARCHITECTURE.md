@@ -44,6 +44,16 @@ section 1.4.
 - **Personne immobile ≈ invisible** pour une détection par mouvement / carte
   de clutter : c'est tout le fond de commerce des capteurs de « présence »
   (LD2410) qui détectent la respiration.
+- **Mouvement tangentiel ≈ invisible aussi.** Un capteur Doppler mesure une
+  vitesse **radiale** : la composante du déplacement le long de la ligne de
+  visée. Une cible qui décrit un cercle autour du capteur, à distance
+  constante, produit un signal quasi nul — elle disparaît alors même qu'elle
+  bouge franchement. C'est une limite de physique, pas de traitement, et les
+  intégrateurs de ces modules la rapportent explicitement.
+
+  *Conséquence architecturale :* une **couronne** de capteurs fixes orientés
+  dans des directions différentes corrige le défaut sans rien coûter en
+  logiciel. Une cible tangentielle pour l'un est radiale pour son voisin.
 
 Ce que ces réalités mettent en défaut dans une conception naïve, et la
 parade retenue :
@@ -289,7 +299,47 @@ partiellement transparente — les capteurs domotique sont parfois cachés
 derrière un panneau). Le WiFi, lui, traverse : on peut donc être ailleurs dans
 la maison pendant que le radar scanne.
 
-### 2.6 Le protocole de télémétrie (spécification)
+### 2.6 Décoder les trames du capteur — trois pièges
+
+À ne pas confondre avec le protocole de télémétrie de la section suivante :
+ici il s'agit de lire ce que le **module radar** envoie, un format imposé par
+son fabricant. Les points ci-dessous proviennent d'implémentations tierces du
+protocole Hi-Link (famille LD2450 / RD-03D) et restent à confirmer sur le
+manuel du module retenu, mais ils coûtent chacun plusieurs heures à
+redécouvrir.
+
+**Structure de trame** — en-tête `AA FF 03 00`, trois blocs cible de 8 octets,
+queue `55 CC`, soit **30 octets** au total. Trois cibles sont toujours
+transmises : les emplacements inutilisés sont simplement nuls.
+
+**Piège 1 — l'encodage des coordonnées n'est pas du complément à deux.**
+Les coordonnées et les vitesses arrivent en **binaire décalé** : `0x8000`
+représente zéro, au-dessus c'est positif, en dessous négatif.
+
+    valeur = raw - 16#8000#
+
+Déclarer un entier signé 16 bits avec une clause de représentation donnerait
+donc **tous les signes faux**. Le symptôme est perfide : les cibles
+apparaissent en miroir par rapport à l'origine, ce qui reste assez plausible
+pour qu'on cherche longtemps ailleurs.
+
+**Piège 2 — le module oublie sa configuration.** Le mode multi-cible doit
+être demandé explicitement par une séquence de commandes (en-tête
+`FD FC FB FA`, longueur, mot de commande, queue `04 03 02 01`). Sans elle, le
+module démarre dans un état indéterminé et le pistage décroche par
+intermittence. Pire : il peut y **retomber tout seul**, ce qui impose de
+réaffirmer la configuration périodiquement — l'ordre de la minute.
+
+**Piège 3 — la configuration ne doit rien bloquer.** La séquence comporte des
+attentes entre commandes. Les implémenter par des pauses bloquantes affame la
+liaison série et le réseau, et provoque une perte de données par minute. En
+Ada sous profil Ravenscar, cela s'écrit naturellement comme une **tâche
+périodique** et le problème ne se pose pas ; c'est un des endroits où la
+concurrence déterministe paie comptant.
+
+---
+
+### 2.7 Le protocole de télémétrie (spécification)
 
 **Rien de tout cela n'existe encore dans le
 code** — cette section est la spécification à implémenter, pas un compte rendu.

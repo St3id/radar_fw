@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada 2022 ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **19 tests AUnit**, rejoués à chaque commit |
+| Tests | **20 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 4 : `track`, `map`, `live`, `scan` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -51,8 +51,7 @@ change.
   tourner la simulation en continu (murs et objets mobiles). Les deux
   premiers tours calibrent la carte de clutter ; ensuite le décor est
   soustrait et seuls les mobiles sont pistés. La page 3D se met à jour
-  seule : cibles numérotées, distance, vitesse convertie en m/s d'après
-  la cadence de tour, traînées.
+  seule : cibles numérotées, distance, vitesse en m/s, traînées.
 - **`scan` — cartographie progressive.** Le balayage est cadencé une
   colonne d'azimut à la fois — environ 11 s en simulation, des minutes
   sur du matériel réel — et le nuage se construit au fil de l'eau, avec
@@ -98,6 +97,9 @@ Acquis :
 - [x] Pipeline 3D complet sur source simulée : interface abstraite, monde
       simulé mobile, détections 3D, regroupement spatial, pistage à
       identifiants stables et vitesses.
+- [x] **Base de temps réelle** : chaque mesure est horodatée, les vitesses
+      sont en mm/s et ne dépendent plus de la cadence de balayage ; la
+      fenêtre d'association et la durée de coasting se comptent en temps.
 - [x] Pistage robuste : prédiction et coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (ni les tentatives ni les fantômes ne sont
       affichés), association globale, fusion anti-fragmentation, distance
@@ -119,8 +121,6 @@ Acquis :
 
 Reste à faire :
 
-- [ ] Base de temps réelle : les vitesses sont calculées en millimètres
-      par tour, la conversion en m/s suppose une cadence de tour fixe.
 - [ ] Interface de niveau détection, pour les modules qui livrent des
       cibles déjà pistées.
 - [ ] Driver capteur en Ada sur STM32 (matériel requis).
@@ -181,14 +181,15 @@ soit branchée.
 
 ## Tests
 
-**19 tests AUnit** répartis en deux suites :
+**20 tests AUnit** répartis en deux suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
   zénith, regroupement spatial, cycle de vie du pistage (filtre,
   M-sur-N, coasting, mort des tentatives), deux échos sur un même rayon,
   murs, clutter adaptatif, pilotage de la source par l'interface,
-  format de sérialisation, **vitesse en mm/s indépendante de la cadence de balayage**.
+  format de sérialisation, vitesse en mm/s indépendante de la cadence de
+  balayage, cycle de vie des pistes compté en temps.
 
 Compiler puis lancer les suites :
 
@@ -224,6 +225,26 @@ cœur pour la cible ARM.
 
 Ada 2022, SPARK, Alire, GNAT — natif et `gnat_arm_elf` pour la cible
 STM32.
+
+## Remerciements
+
+Merci à [Stevee87](https://github.com/Stevee87) pour ses projets publics de
+fusion LiDAR + radar mmWave sur ESP32
+([Lidar-Radar-combination-Raspberry](https://github.com/Stevee87/Lidar-Radar-combination-Raspberry),
+[Tactical-Radar-System-ESP32-P4](https://github.com/Stevee87/Tactical-Radar-System-ESP32-P4-elcrow-Display),
+MIT). Leur lecture a fait gagner du temps sur trois points précis :
+
+- l'encodage des coordonnées du protocole Hi-Link, en **binaire décalé** et
+  non en complément à deux — de quoi inverser tous les signes sans que rien
+  ne plante ;
+- la **configuration du module, qu'il faut réaffirmer** périodiquement parce
+  qu'il y retombe tout seul ;
+- la **cécité au mouvement tangentiel** d'un capteur Doppler, qui a
+  directement orienté l'architecture vers une couronne de capteurs.
+
+Ces trois points sont détaillés dans
+[`documentation/public/ARCHITECTURE.md`](documentation/public/ARCHITECTURE.md)
+§1.1 et §2.6. Aucun code n'a été repris — seules les leçons.
 
 ## Licence
 

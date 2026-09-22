@@ -125,13 +125,14 @@ package body Radar_Pipeline_Tests is
          end if;
       end loop;
       return (Id => 0, Pos => (0.0, 0.0, 0.0), Velocity => (0.0, 0.0, 0.0),
-              Missing => 0, Hits => 0, Confirmed => False, Active => False);
+              Missing => 0, Last_Seen => 0, Hits => 0,
+              Confirmed => False, Active => False);
    end First_Active;
 
    --  Test 5 : cycle de vie et filtre de piste. Une cible qui avance de
    --  100 mm/tour : la piste nait tentative (non confirmee), se
    --  confirme apres 3 detections, sa vitesse filtree (alpha-beta)
-   --  converge vers 100 mm/tour, et elle roule sur son erre pendant
+   --  converge vers 100 mm/s, et elle roule sur son erre pendant
    --  une occultation (coasting).
    procedure Test_Track_Filter
      (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -180,6 +181,58 @@ package body Radar_Pipeline_Tests is
                  "Coasting : la position devrait continuer d'avancer");
       end;
    end Test_Track_Filter;
+
+   --  Test : le cycle de vie se compte en TEMPS, pas en mises a jour.
+   --
+   --  Scenario multi-source, celui qui a motive le changement : une
+   --  couronne rapide et une tourelle lente alimentent le MEME pistage,
+   --  donc Update est appele bien plus souvent qu avant. Une piste vue
+   --  par une seule des deux sources encaissait, en comptant les tours,
+   --  un "manque" a chaque passage de l autre source et mourait au bout
+   --  de trois appels. En comptant le temps, elle survit tant que le
+   --  delai de coasting n est pas ecoule.
+   procedure Test_Coast_Is_Time_Based
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk   : Tracker;
+      Now   : Time_Ms := 0;
+      F     : Frame;
+      Empty : Frame;
+   begin
+      Reset (F);
+      Reset (Empty);
+      F.Count := 1;
+
+      --  Trois detections espacees de 300 ms : la piste se confirme.
+      for N in 1 .. 3 loop
+         Now := Now + 300;
+         F.Stamp := Now;
+         F.Items (1) := (Pos      => (Float (N) * 30.0, 0.0, 0.0),
+                         Distance => Float (N) * 30.0);
+         Update (Trk, F);
+      end loop;
+      Assert (First_Active (Trk).Confirmed,
+              "La piste devrait etre confirmee apres 3 detections");
+
+      --  Cinq mises a jour vides espacees de 200 ms : 1000 ms au total,
+      --  bien en deca du delai de coasting. En comptant les tours, cinq
+      --  manques auraient tue la piste des le quatrieme.
+      for N in 1 .. 5 loop
+         Now := Now + 200;
+         Empty.Stamp := Now;
+         Update (Trk, Empty);
+      end loop;
+      Assert (First_Active (Trk).Active,
+              "5 mises a jour rapprochees ne font que 1 s : la piste vit");
+
+      --  On laisse maintenant passer largement le delai.
+      Now := Now + 3_000;
+      Empty.Stamp := Now;
+      Update (Trk, Empty);
+      Assert (not First_Active (Trk).Active,
+              "Passe le delai de coasting, la piste doit mourir");
+   end Test_Coast_Is_Time_Based;
 
    --  Test 5ter : association globale. Deux pistes etablies en x=0 et
    --  x=500 ; nouvelles detections en 480 et 950. En glouton (ordre des
@@ -506,6 +559,9 @@ package body Radar_Pipeline_Tests is
    procedure Register_Tests (T : in out Test_Case) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine
+        (T, Test_Coast_Is_Time_Based'Access,
+         "Cycle de vie compte en temps, pas en mises a jour");
       Register_Routine
         (T, Test_Speed_Rate_Independent'Access,
          "Vitesse en mm/s independante de la cadence");
