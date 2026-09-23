@@ -97,9 +97,18 @@ capteur envisagé ne fait ça nativement** :
   notre type `Sweep` (bonne nouvelle), mais le faisceau natif est **large
   (~50–65° selon le plan)** : sur tourelle **sans lentille, le mode
   cartographie serait une bouillie angulaire**. La lentille (kit Acconeer
-  HBL/FZP, ou imprimée) ramène à ~10° : elle fait partie du design, pas des
-  accessoires. S'ajoutent fuite d'antenne en champ proche, lobes secondaires,
-  bruit.
+  HBL/FZP, ou imprimée) ramène à **9–14°** selon sa distance à la puce, pour
+  un gain aller-retour de **+10 à +17 dB** (mesures publiées par Acconeer) :
+  elle fait partie du design, pas des accessoires. S'ajoutent fuite
+  d'antenne en champ proche, lobes secondaires, bruit.
+- **Résolution n'est pas précision.** Un faisceau de 9° couvre 47 cm de
+  large à 3 m : deux objets plus proches fusionnent, c'est la
+  **résolution**. Mais la **position** d'un réflecteur isolé s'estime bien
+  plus finement, en pondérant par l'amplitude les échos de plusieurs pas de
+  balayage successifs — de l'ordre du dixième de faisceau avec un bon
+  rapport signal sur bruit. Deux conséquences : un pas de balayage de la
+  moitié du faisceau suffit (plus fin n'ajoute pas de résolution), et c'est
+  alors le **jeu mécanique** de la tourelle (§2.1) qui limite la précision.
 - **BGT60TR13C** : IQ brut, angle par 3 RX — précision de quelques degrés, pas
   3.
 - **Cadence** : le scan mécanique réel (servo + temps d'intégration) prendra
@@ -180,6 +189,14 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    progression et son compteur de points ; le scan terminé, le nuage reste
    servi et explorable. Sur du matériel réel, seules la cadence et la source
    changeront.
+9. **Murs spéculaires** — **non implémenté.** Le simulateur rend
+   aujourd'hui le même écho pour un mur, quel que soit l'angle sous lequel le
+   faisceau le frappe. En réalité (§1.6), l'écho d'un mur lisse chute dès que
+   l'incidence s'écarte de la normale, tandis que les coins restent
+   brillants. À simuler : une amplitude fonction de l'angle d'incidence, un
+   écho renforcé dans les coins, et les images miroirs sous le sol. Enjeu :
+   le CFAR et le regroupement sont aujourd'hui réglés sur des murs plus
+   faciles que les vrais.
 
 ### 1.5 Ce qui est déjà réaliste (à conserver)
 
@@ -194,6 +211,42 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
   niveau balayage, LD2450 au niveau détection).
 - « Pas de FFT lourde sur le MCU, le PC fait le rendu » : c'est aussi le
   partage des rôles des projets amateurs aboutis (Forstén).
+
+### 1.6 Propagation en intérieur : les murs sont des miroirs
+
+Une surface renvoie l'onde **dans toutes les directions** (diffusion) si ses
+aspérités sont grandes devant la longueur d'onde, et **comme un miroir**
+(réflexion spéculaire) si elles sont petites. Le critère de Rayleigh fixe la
+frontière : une surface est lisse si ses aspérités restent sous
+`λ / (8 cos θ)`, θ étant l'angle d'incidence compté depuis la normale — soit
+**0,6 mm à 60 GHz** et 1,6 mm à 24 GHz en incidence normale, et davantage en
+incidence rasante, où les surfaces paraissent plus lisses encore.
+
+Un mur peint, une porte, une vitre sont donc des **miroirs** aux fréquences
+visées. Conséquences pour la cartographie :
+
+- **Écho fort seulement en incidence quasi normale.** Quand le faisceau
+  frappe un mur de biais, l'énergie repart de l'autre côté de la normale,
+  loin du radar ; seule une faible part diffuse revient (les modèles de
+  propagation millimétrique en intérieur retiennent, pour une plaque de
+  plâtre, un coefficient de diffusion de l'ordre de 0,3 en amplitude).
+- **Les coins sont brillants.** Un dièdre (deux murs) ou un trièdre (deux
+  murs et le sol ou le plafond) renvoie l'onde vers sa source sur une large
+  plage d'angles : ce sont les points les plus visibles d'une pièce, bien
+  plus que les murs eux-mêmes.
+- **Images miroirs.** Une cible vue par rebond sur un mur apparaît derrière
+  ce mur (§1.4 point 5) ; vue par rebond sur le sol, elle apparaît **sous le
+  plancher**. Un point sous le niveau du sol est donc, à coup sûr, un
+  fantôme — un filtre gratuit.
+- **Placement du capteur de cartographie.** Près du centre de la pièce,
+  chaque mur présente une zone vue en incidence normale. Dans un coin, les
+  deux murs adjacents ne sont vus qu'en incidence rasante et disparaissent
+  presque de la carte.
+
+La carte réelle attendue : des **taches** là où le faisceau frappe les murs
+de face, des coins très marqués, et des pans de mur faibles ou absents entre
+les deux. Ces vides relèvent de la physique de la réflexion, pas d'un défaut
+du traitement.
 
 ---
 
@@ -241,6 +294,11 @@ démontré par `radar_demo`, transposé au matériel) :
 Les moteurs n'ont **pas d'encodeur** : la position angulaire vient du
 comptage de pas depuis une prise d'origine sur butée. C'est ce qui rend la
 dérive possible, et ce qui impose de refaire l'origine régulièrement.
+S'y ajoute le **jeu du réducteur**, de l'ordre du degré sur les petits
+moteurs à engrenages : si le balayage alterne les sens, l'aller et le retour
+sont décalés de ce jeu et chaque mur apparaît **en double**. D'où une
+acquisition dans un seul sens, ou une compensation mesurée du jeu — par
+exemple sur un coin réflecteur placé à position connue.
 
 Phase matérielle suivante (A121) : même schéma, mais le capteur parle **SPI**
 et livre un profil d'écho par cases de distance (notre type `Sweep`) — c'est
