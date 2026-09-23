@@ -218,17 +218,29 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
        +-------+--------+
                | GPIO (plus tard : drivers ULN2003)
                v
-       [2 moteurs pas-a-pas : tourelle azimut/elevation - phase mecanique]
+       [2 moteurs : tourelle azimut (rotation CONTINUE) + elevation]
+
+Ce schéma décrit la **première phase** : un capteur unique, pour valider la
+chaîne. La cible est une **couronne** de capteurs fixes orientés dans des
+directions différentes (voir §1.1) plus un capteur de balayage sur tourelle ;
+le microcontrôleur reste le même, seul le nombre de liaisons série change.
 
 La décomposition en tâches visée sur la carte (le motif Ravenscar déjà
 démontré par `radar_demo`, transposé au matériel) :
 
-    [Capteur] --SPI/UART--> [STM32G474 - Ada bare-metal, profil Ravenscar]
-    [Moteur+encodeur] <---> |  tache acquisition  |
-                            |  tache moteur/scan  |  --> objet protege
-                            |  tache telemetrie   |      (tampon, prouve)
-                                     |
-                                     +--UART/USB/WiFi--> [PC : rendu 3D]
+                       +-------------------------+
+    [Capteur] --SPI--> |  tache acquisition      |
+                       |                         |
+    [Moteurs]  <-GPIO- |  tache moteur / scan    | --> objet protege
+                       |                         |     (tampon, prouve)
+    [PC] <-UART/WiFi-- |  tache telemetrie       |
+                       +-------------------------+
+                          STM32G474 - Ada bare-metal
+                              profil Ravenscar
+
+Les moteurs n'ont **pas d'encodeur** : la position angulaire vient du
+comptage de pas depuis une prise d'origine sur butée. C'est ce qui rend la
+dérive possible, et ce qui impose de refaire l'origine régulièrement.
 
 Phase matérielle suivante (A121) : même schéma, mais le capteur parle **SPI**
 et livre un profil d'écho par cases de distance (notre type `Sweep`) — c'est
