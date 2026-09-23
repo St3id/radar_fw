@@ -239,8 +239,9 @@ MIT). Leur lecture a fait gagner du temps sur trois points précis :
   ne plante ;
 - la **configuration du module, qu'il faut réaffirmer** périodiquement parce
   qu'il y retombe tout seul ;
-- la **cécité au mouvement tangentiel** d'un capteur Doppler, qui a
-  directement orienté l'architecture vers une couronne de capteurs.
+- la **cécité au mouvement tangentiel** d'un capteur Doppler, une limite
+  physique qu'une couronne de capteurs ne lève pas et que le pistage doit
+  absorber.
 
 Ces trois points sont détaillés dans
 [`documentation/public/ARCHITECTURE.md`](documentation/public/ARCHITECTURE.md)

@@ -51,9 +51,25 @@ section 1.4.
   bouge franchement. C'est une limite de physique, pas de traitement, et les
   intégrateurs de ces modules la rapportent explicitement.
 
-  *Conséquence architecturale :* une **couronne** de capteurs fixes orientés
-  dans des directions différentes corrige le défaut sans rien coûter en
-  logiciel. Une cible tangentielle pour l'un est radiale pour son voisin.
+  *Ce qu'une couronne de capteurs ne corrige pas :* la vitesse radiale se
+  mesure le long de la ligne **capteur → cible**, et non selon l'axe vers
+  lequel pointe le capteur. Dans une couronne, les capteurs sont à quelques
+  centimètres les uns des autres : vus d'une cible à 3 m, ils partagent
+  pratiquement la même ligne de visée. Une cible qui tourne autour du boîtier
+  reste donc tangentielle **pour tous les capteurs à la fois** — l'orientation
+  de chacun change son gain d'antenne, pas le Doppler qu'il mesure. La
+  couronne apporte la couverture sur 360°, pas la diversité de point de vue.
+
+  Les parades réelles :
+
+  - **par le pistage** : une piste confirmée survit 2,5 s sans détection
+    (coasting, voir §1.4 point 4), ce qui franchit les phases tangentielles,
+    le plus souvent brèves pour une personne qui marche ;
+  - **par la géométrie** : un second capteur **éloigné de plusieurs mètres**
+    du premier. Une trajectoire tangentielle pour l'un devient alors radiale
+    pour l'autre, sauf quand la cible est alignée avec les deux capteurs.
+    Cela suppose de connaître la position de chaque capteur dans la pièce, ce
+    qui sort de l'architecture à boîtier unique décrite ici.
 
 Ce que ces réalités mettent en défaut dans une conception naïve, et la
 parade retenue :
