@@ -54,7 +54,8 @@ piste planaire ; on ne lui invente pas une altitude.
   tourner la simulation en continu (murs et objets mobiles). Les huit
   premiers tours calibrent la carte de clutter ; ensuite le décor est
   soustrait et seuls les mobiles sont pistés. La page 3D se met à jour
-  seule : cibles numérotées, distance, vitesse en m/s, traînées.
+  seule, le serveur lui poussant chaque nouvel état (Server-Sent Events,
+  sans sondage) : cibles numérotées, distance, vitesse en m/s, traînées.
 - **`scan` — cartographie progressive.** Une passe globale rapide (60 × 8)
   apparaît d'abord, puis une passe de détail (180 × 24) l'enrichit. Dans la
   démonstration, la première passe prend environ 1,5 s et le détail 10,8 s ;
