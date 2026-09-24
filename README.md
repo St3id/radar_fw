@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada 2022 ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **20 tests AUnit**, rejoués à chaque commit |
+| Tests | **22 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 4 : `track`, `map`, `live`, `scan` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -51,7 +51,7 @@ piste planaire ; on ne lui invente pas une altitude.
   angles. C'est la sortie qui alimente la
   [page publiée](https://St3id.github.io/radar_fw/).
 - **`live` — surveillance temps réel.** Un serveur HTTP écrit en Ada fait
-  tourner la simulation en continu (murs et objets mobiles). Les deux
+  tourner la simulation en continu (murs et objets mobiles). Les huit
   premiers tours calibrent la carte de clutter ; ensuite le décor est
   soustrait et seuls les mobiles sont pistés. La page 3D se met à jour
   seule : cibles numérotées, distance, vitesse en m/s, traînées.
@@ -192,13 +192,14 @@ soit branchée.
 
 ## Tests
 
-**20 tests AUnit** répartis en deux suites :
+**22 tests AUnit** répartis en deux suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
   zénith, regroupement spatial, cycle de vie du pistage (filtre,
   M-sur-N, coasting, mort des tentatives), deux échos sur un même rayon,
-  murs, clutter adaptatif, pilotage de la source par l'interface,
+  murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif,
+  pilotage de la source par l'interface,
   format de sérialisation, vitesse en mm/s indépendante de la cadence de
   balayage, cycle de vie des pistes compté en temps.
 

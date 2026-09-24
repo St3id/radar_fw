@@ -56,4 +56,14 @@ package Radar_World is
    --  le trajet d'un facteur 1/cos(elevation).
    function Wall_Distance (Azimuth_Deg, Elevation_Deg : Float) return Float;
 
+   --  Angle d'incidence, en degres, entre le rayon vise et la normale du
+   --  mur qu'il touche : 0 quand on regarde le mur de face, pres de 90
+   --  quand le faisceau le rase. C'est de lui que depend l'echo d'un mur
+   --  lisse (ARCHITECTURE.md, section 1.6) : sa composante speculaire ne
+   --  revient vers le radar que s'il est vu presque de face ; ailleurs, il
+   --  ne reste qu'une faible part diffuse.
+   function Wall_Incidence
+     (Azimuth_Deg, Elevation_Deg : Float) return Float
+     with Post => Wall_Incidence'Result in 0.0 .. 90.0;
+
 end Radar_World;

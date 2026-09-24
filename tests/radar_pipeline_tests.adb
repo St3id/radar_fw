@@ -376,6 +376,69 @@ package body Radar_Pipeline_Tests is
               "A 60 deg d'elevation le trajet devrait doubler");
    end Test_Wall_Distance;
 
+   --  Test : angle d'incidence sur les murs (realisme point 9). Le piege
+   --  est le choix du mur : a 60 degres d'azimut, le rayon touche le mur
+   --  LATERAL (y = 1500) avant le mur de face ; son incidence vaut donc
+   --  30 degres, pas 60. Une erreur de mur placerait un echo diffus la
+   --  ou il devrait etre speculaire, et inversement.
+   procedure Test_Wall_Incidence
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+   begin
+      Assert (Wall_Incidence (0.0, 0.0) < 0.01,
+              "Mur de face vise de face : incidence nulle");
+      Assert (Wall_Incidence (90.0, 0.0) < 0.01,
+              "Mur lateral vise de face : incidence nulle");
+      Assert (abs (Wall_Incidence (30.0, 0.0) - 30.0) < 0.01,
+              "A 30 deg d'azimut, mur de face : incidence 30");
+      Assert (abs (Wall_Incidence (60.0, 0.0) - 30.0) < 0.01,
+              "A 60 deg d'azimut, le rayon touche le mur lateral :"
+              & " incidence 30, pas 60");
+      Assert (abs (Wall_Incidence (0.0, 20.0) - 20.0) < 0.01,
+              "Viser 20 deg plus haut incline d'autant sur le mur");
+   end Test_Wall_Incidence;
+
+   --  Test : un mur lisse est un miroir (realisme point 9). Vu de face,
+   --  il renvoie l'echo speculaire complet ; vu sous 30 degres (ici en
+   --  visant 30 degres plus haut ou plus bas), il ne renvoie qu'une part
+   --  diffuse, au moins dix fois plus faible. La grille 4 x 3 vise les
+   --  normales des quatre murs (azimuts 0, 90, 180, 270) aux elevations
+   --  -30, 0 et +30 : aucun coin (ils sont a 36,9 degres), aucun objet.
+   procedure Test_Specular_Wall
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      Src     : Simulated_Source :=
+        Make_Room_Scan (Az_Steps => 4, El_Steps => 3);
+      M       : Measurement;
+      OK      : Boolean;
+      Peak    : Amplitude;
+      Facing  : Amplitude := Amplitude'Last;  --  plus faible vu de face
+      Oblique : Amplitude := 0;               --  plus fort vu de biais
+   begin
+      while Src.Has_More loop
+         Src.Next (M, OK);
+         Peak := M.Data (Peak_Bin (M.Data));
+         if abs M.Elevation < 1.0 then
+            Facing := Amplitude'Min (Facing, Peak);
+         else
+            Oblique := Amplitude'Max (Oblique, Peak);
+         end if;
+      end loop;
+
+      Assert (Facing >= 2_000,
+              "Un mur vu de face devrait renvoyer l'echo speculaire, obtenu"
+              & Facing'Image);
+      --  En Natural : un echo oblique anormalement fort ferait deborder
+      --  Amplitude (0 .. 4095) en le multipliant, et le test planterait
+      --  au lieu d'echouer proprement.
+      Assert (Natural (Oblique) * 10 <= Natural (Facing),
+              "Un mur vu sous 30 deg devrait renvoyer dix fois moins, obtenu"
+              & Oblique'Image & " contre" & Facing'Image);
+   end Test_Specular_Wall;
+
    --  Test 8 : carte de clutter (MTI). Un echo appris comme decor est
    --  supprime (meme a une case pres : marge de garde) ; un echo a une
    --  autre distance ou dans une autre direction passe.
@@ -597,6 +660,12 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Wall_Distance'Access,
          "Distance aux murs de la piece");
+      Register_Routine
+        (T, Test_Wall_Incidence'Access,
+         "Incidence sur les murs : choix du bon mur");
+      Register_Routine
+        (T, Test_Specular_Wall'Access,
+         "Mur lisse : speculaire de face, diffus de biais");
       Register_Routine
         (T, Test_Clutter_Filter'Access,
          "Carte de clutter adaptative (MTI)");
