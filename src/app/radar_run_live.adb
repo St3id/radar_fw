@@ -22,6 +22,7 @@ pragma Style_Checks ("M300");
 --  tourner la simulation en continu (un tour de scan toutes les
 --  Turn_Ms millisecondes) et sert :
 --    /            la page 3D (Three.js), qui se met a jour seule ;
+--    /events      le flux pousse des etats (Server-Sent Events) ;
 --    /state.json  les pistes courantes (id, position, vitesse) ;
 --    /cloud.json  le decor statique appris a la calibration (les murs).
 --
@@ -158,12 +159,15 @@ procedure Radar_Run_Live is
       L (" }");
       L (" status.innerHTML=s.calibrating?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
       L (" tgts.innerHTML=list;}");
-      L ("async function tick(){");
-      L (" try{const s=await(await fetch('/state.json')).json();TURN_MS=s.turn_ms;");
-      L ("  if(s.turn!==lastTurn){lastTurn=s.turn;");
-      L ("   for(const tk of s.tracks){(trails[tk.id]=trails[tk.id]||[]).push({x:tk.x,y:tk.y,z:tk.z});if(trails[tk.id].length>10)trails[tk.id].shift();}}");
-      L ("  draw(s);}catch(e){status.innerHTML='serveur arrete';}}");
-      L ("setInterval(tick,250);");
+      --  Flux pousse par le serveur (Server-Sent Events, route /events) :
+      --  chaque etat arrive des qu'il est calcule, au lieu d'etre redemande
+      --  toutes les 250 ms. EventSource se reconnecte seul si le lien tombe.
+      L ("const es=new EventSource('/events');");
+      L ("es.onmessage=ev=>{const s=JSON.parse(ev.data);TURN_MS=s.turn_ms;");
+      L (" if(s.turn!==lastTurn){lastTurn=s.turn;");
+      L ("  for(const tk of s.tracks){(trails[tk.id]=trails[tk.id]||[]).push({x:tk.x,y:tk.y,z:tk.z});if(trails[tk.id].length>10)trails[tk.id].shift();}}");
+      L (" draw(s);};");
+      L ("es.onerror=()=>{status.innerHTML='liaison perdue, reconnexion...';};");
       --  Camera : orbite autour d'un centre deplacable (memes commandes
       --  que le mode cartographie).
       L ("let rotY=0.6,rotX=0.4,dist=7000;const ctr=new THREE.Vector3(0,0,0);");
@@ -361,6 +365,8 @@ begin
    Next_Turn := Clock;
    loop
       Process_Turn;
+      --  Pousse le nouvel etat aux pages abonnees des qu'il existe.
+      Broadcast (Srv, To_String (State_Json));
       Next_Turn := Next_Turn + Milliseconds (Turn_Ms);
       Serve_Until (Srv, Next_Turn, Route'Access);
    end loop;
