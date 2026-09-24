@@ -46,7 +46,9 @@ piste planaire ; on ne lui invente pas une altitude.
   `out/radar_tracking_3d.html` (lissage et vitesse de rejeu réglables).
 - **`map` — cartographie statique.** Un tour méticuleux de 180 × 24
   directions sur une pièce sans objets mobiles, rendu en un nuage
-  d'environ 4 300 points dans `out/radar_3d.html` : navigation au clavier
+  d'environ 4 000 points dans `out/radar_3d.html`. Les murs vus de biais y
+  sont plus clairsemés que ceux vus de face, et les coins ressortent : l'écho
+  dépend de l'angle d'incidence (ARCHITECTURE §1.6). Navigation au clavier
   (ZQSD/WASD), clic sur un point pour sa position, sa distance et ses
   angles. C'est la sortie qui alimente la
   [page publiée](https://St3id.github.io/radar_fw/).
