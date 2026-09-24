@@ -26,9 +26,10 @@ procedure Radar_Run_Mapping is
    --  Un seul tour, grille fine (180 azimuts x 24 elevations).
    --
    --  Declaree en Source'Class et non en Simulated_Source : tous les
-   --  appels ci-dessous (Has_More, Next) sont alors dispatchants. Le
-   --  jour du materiel, seule cette ligne change - c'est la promesse
-   --  de l'interface, et elle n'est tenue que si on la nomme ici.
+   --  appels ci-dessous (Has_More, Next) sont alors dispatchants, et une
+   --  autre source de profils se brancherait ici sans toucher au reste du
+   --  mode. Un pilote reel devra respecter ce contrat de profil de
+   --  distance, adapte a ses donnees et a ses metadonnees.
    Src   : Source'Class := Make_Room_Scan;
    Cloud : Point_Cloud := Empty_Cloud;
 
@@ -36,9 +37,9 @@ procedure Radar_Run_Mapping is
    OK : Boolean;
 
 begin
-   --  ----- 1. Le scan : chaque balayage passe par Detect_Clustered -----
-   --  (la fonction prouvee : zero fausse alarme), et chaque cible devient
-   --  un point 3D du nuage via la geometrie et la distance de sa case.
+   --  ----- 1. Le scan simule : chaque balayage passe par Detect_Adaptive -----
+   --  (preuve de seuil logiciel, pas de validation de fausse alarme physique)
+   --  et chaque cible simulee devient un point 3D du nuage.
    while Src.Has_More loop
       Src.Next (M, OK);
       exit when not OK;
@@ -66,6 +67,10 @@ begin
    Put_Line (Out_F, "#sel{margin-top:8px;color:#ffd23b;line-height:1.5}");
    Put_Line (Out_F, ".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
    Put_Line (Out_F, "<div id=""info""><b>radar_fw</b> - cartographie d'une piece (scan simule)");
+   if Cloud.Dropped > 0 then
+      Put_Line (Out_F, "<div class=""hint"" style=""color:#ff8b72"">Attention : " &
+                Img (Cloud.Dropped) & " points ignores, carte incomplete.</div>");
+   end if;
    Put_Line (Out_F, "<div class=""hint"">Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
    Put_Line (Out_F, "<div id=""sel""></div></div>");
    Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
@@ -180,4 +185,8 @@ begin
    Close (Out_F);
 
    Put_Line ("Genere " & File_Name & " (" & Img (Cloud.Count) & " points).");
+   if Cloud.Dropped > 0 then
+      Put_Line ("ATTENTION : " & Img (Cloud.Dropped) &
+                " points ignores ; la carte est incomplete.");
+   end if;
 end Radar_Run_Mapping;

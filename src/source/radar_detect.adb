@@ -23,9 +23,9 @@ package body Radar_Detect is
    ---------
 
    procedure Add (F : in out Frame; M : Measurement) is
-      --  Toutes les cibles du balayage, via la detection CFAR prouvee
-      --  en SPARK (seuil adaptatif au bruit local : contrat "aucune
-      --  fausse alarme par rapport au bruit ambiant").
+      --  Toutes les cases qui depassent le seuil local calcule par la
+      --  detection CFAR prouvee en SPARK. Cette preuve porte sur le code,
+      --  pas sur un taux de fausse alarme mesure ni sur une cible reelle.
       D : constant Detection := Detect_Adaptive (M.Data);
    begin
       --  La frame porte l heure de sa DERNIERE mesure : Add etant
@@ -37,8 +37,8 @@ package body Radar_Detect is
          exit when F.Count = Max_Detections;
 
          declare
-            --  Distance physique de la case detectee (Bin_Distance est
-            --  la conversion prouvee, partagee avec Peak_Distance).
+            --  Distance simulee de la case detectee (Bin_Distance est
+            --  partagee avec Peak_Distance).
             Dist : constant Float := Float (Bin_Distance (D.Targets (K)));
 
             --  Position 3D : on combine la direction visee (azimut,

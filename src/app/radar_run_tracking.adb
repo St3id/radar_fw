@@ -22,8 +22,9 @@ procedure Radar_Run_Tracking is
    File_Name : constant String := Out_Dir & "/radar_tracking_3d.html";
    Out_F     : File_Type;
 
-   --  La simulation : on balaie le monde sur 60 tours.
-   Src : Simulated_Source := Make (Sweeps => 60);
+   --  Le constructeur choisit ici la simulation (60 tours), mais la variable
+   --  reste classe-wide : le traitement ne depend pas du type concret de source.
+   Src : Source'Class := Make (Sweeps => 60);
    Trk : Tracker;
 
    --  Combien de tours on a reellement enregistres (pour le message final).

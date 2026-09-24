@@ -36,12 +36,15 @@ pragma Style_Checks ("M300");
 --  Architecture volontairement mono-thread : entre deux tours, le
 --  serveur attend les connexions avec un selector a timeout. Pas de
 --  taches ici - la concurrence Ravenscar vit dans radar_demo et, a
---  terme, sur la carte ; le jour du materiel, seule la source change
---  (UART au lieu du simulateur).
+--  terme, sur la carte. Un vrai capteur demandera un adaptateur de son
+--  format de sortie ; le LD2450 ne produit pas le Sweep simule.
 procedure Radar_Run_Live is
 
    Port    : constant := 8080;
-   Turn_Ms : constant := 800;
+   --  La grille simule 120 x 7 profils, horodates a 1 ms chacun.
+   --  Garder l'animation alignee sur cette base de temps evite que les
+   --  vitesses affichees et la cadence murale racontent deux chronologies.
+   Turn_Ms : constant := 840;
 
    --  Tours de calibration : le decor est appris a chaque tour jusqu'a
    --  atteindre le niveau de confirmation de la carte de clutter ; le
@@ -66,7 +69,7 @@ procedure Radar_Run_Live is
    Turn : Natural := 0;
 
    State_Json : Unbounded_String :=
-     To_Unbounded_String ("{""turn"":0,""turn_ms"":800,""tracks"":[]}");
+     To_Unbounded_String ("{""turn"":0,""turn_ms"":840,""tracks"":[]}");
    Cloud_Json : Unbounded_String :=
      To_Unbounded_String ("{""points"":[]}");
 

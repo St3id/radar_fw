@@ -45,15 +45,14 @@ package body Radar_Track is
 
    --  Duree de survie sans echo, en MILLISECONDES et non en nombre de
    --  tours. Une piste confirmee "roule sur son erre" pendant les
-   --  evanouissements (Swerling) ; une tentative, elle, meurt vite -
+   --  fading et trous de detection ; une tentative, elle, meurt vite -
    --  c est le filtre anti-fantomes.
    --
    --  Compter en tours etait juste tant qu une seule source cadencait le
-   --  systeme. Des que deux sources alimentent le meme pistage (une
-   --  couronne a 10 Hz et une tourelle a 0,04 Hz), chacune appelle
-   --  Update : une piste vue par une seule des deux verrait son compteur
-   --  de tours manques grimper deux fois trop vite et mourrait
-   --  prematurement. Le temps, lui, ne depend d aucune cadence.
+   --  systeme. Des que deux sources de cadences differentes alimentent le
+   --  meme pistage, chacune appelle Update : un compteur de tours ferait
+   --  vieillir une piste plus vite selon le nombre de sources. Le temps,
+   --  lui, ne depend d aucune cadence.
    Max_Coast_Confirmed_Ms : constant Time_Ms := 2_500;
    Max_Coast_Tentative_Ms : constant Time_Ms :=   900;
 

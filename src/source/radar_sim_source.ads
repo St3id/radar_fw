@@ -31,6 +31,9 @@ package Radar_Sim_Source is
    overriding
    function Per_Turn (Self : Simulated_Source) return Positive;
 
+   overriding
+   function Per_Azimuth (Self : Simulated_Source) return Positive;
+
    --  Nombre de pas d'une grille de balayage (au moins 2 : les formules
    --  d'interpolation divisent par Steps - 1).
    subtype Grid_Steps is Positive range 2 .. 1_024;
@@ -61,9 +64,9 @@ private
 
    --  ----- Realisme des cibles (ARCHITECTURE.md, realisme point 1) -----
    --  Une cible reelle n'est pas un point : c'est un ensemble de
-   --  reflecteurs (torse, membres...) dont l'echo fluctue d'un tour a
-   --  l'autre selon l'orientation (modeles de Swerling), avec de vrais
-   --  trous de detection. Chaque objet est donc simule par
+   --  reflecteurs (torse, membres...) dont le niveau fluctue d'un tour a
+   --  l'autre. Le tirage uniforme s'inspire du fading Swerling, sans en
+   --  reprendre la loi statistique. Chaque objet est donc simule par
    --  Scatter_Count reflecteurs dont l'amplitude est retiree au sort a
    --  chaque tour (0 = eteint ce tour-ci).
    Scatter_Count : constant := 4;

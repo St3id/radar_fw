@@ -14,10 +14,9 @@ package Radar_Cloud is
 
    --  Taille maximale du nuage.
    --
-   --  8192 et pas plus : un tour fin de cartographie (180 azimuts x 24
-   --  elevations) rend environ 4350 points, donc cette borne laisse le
-   --  double de marge. Et pas moins non plus, sinon la carte se tronque
-   --  en silence.
+   --  8192 : la carte progressive cumule un passage grossier et un passage
+   --  fin, soit environ 4800 points dans la scene simulee actuelle. La
+   --  borne laisse une marge, et Dropped signale tout depassement.
    --
    --  Ce que ca coute : 8192 x 3 Float = 96 Ko. C est la raison pour
    --  laquelle ce paquet ne vit PAS dans src/processing et ne part pas
@@ -32,18 +31,20 @@ package Radar_Cloud is
    --  directement dans un record.
    type Point_Array is array (1 .. Max_Points) of Point_3D;
 
-   --  Le nuage : un tableau de points + combien sont reellement utilises.
+   --  Le nuage : les points conserves et le nombre de points rejetes
+   --  une fois la capacite atteinte. Un nuage tronque doit etre visible.
    type Point_Cloud is record
       Points : Point_Array;
       Count  : Point_Count;
+      Dropped : Natural := 0;
    end record;
 
    --  Un nuage vide, pret a etre rempli.
    function Empty_Cloud return Point_Cloud;
 
-   --  Ajoute un point au nuage. Le nuage plein, le point est ignore :
-   --  la borne protege la memoire, mais la perte n'est pas signalee, et
-   --  un nuage tronque ressemble alors a une piece plus petite.
+   --  Ajoute un point au nuage. Si la capacite est atteinte, le point
+   --  est ignore et Dropped augmente : la memoire reste bornee et la
+   --  perte devient detectable par l'appelant.
    procedure Append (C : in out Point_Cloud; P : Point_3D);
 
 end Radar_Cloud;

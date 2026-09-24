@@ -1,11 +1,12 @@
 with Radar_Sweep;  use Radar_Sweep;
 
---  Radar_Source : l'interface abstraite par laquelle toute source de
---  mesures entre dans le systeme, simulateur comme capteur reel.
+--  Radar_Source : interface des profils de distance.
+--  Elle n'est pas directement compatible avec tous les capteurs envisages :
+--  ceux qui livrent deja des detections utilisent Radar_Target_Source.
 --
---  Aucun mode d'exploitation ne parle a un materiel en direct : tous
---  passent par ce type, et c'est ce qui rend le remplacement de la source
---  possible sans toucher au reste du programme.
+--  Aucun mode ne parle au materiel en direct. Un adaptateur devra convertir
+--  ou exposer les donnees sans perdre leur plage, leur pas, leur repere ou
+--  leur horodatage. Le LD2450 necessitera un flux de detections distinct.
 
 package Radar_Source is
 
@@ -18,8 +19,9 @@ package Radar_Source is
    --  TIMESTAMP du protocole de telemetrie.
    type Time_Ms is range 0 .. 2 ** 31 - 1;
 
-   --  Une mesure brute : un balayage capte dans une direction donnee.
-   --  (azimut + elevation = ou pointait le radar ; Data = les echos recus).
+   --  Une mesure du modele actuel : profil de 256 amplitudes simulees dans
+   --  une direction. Sweep fixe la plage a 20 m ; ce n'est pas le format
+   --  natif garanti d'un A121 ni des cibles serie du LD2450.
    type Measurement is record
       Azimuth   : Float;         --  direction horizontale, en degres
       Elevation : Float;         --  direction verticale, en degres
@@ -28,8 +30,9 @@ package Radar_Source is
    end record;
 
    --  ----- Le contrat -----
-   --  "Radar_Source" est une interface : un fournisseur de mesures radar.
-   --  Toute source concrete (simulee ou materielle) devra implementer Next.
+   --  "Radar_Source" est une interface de profils pour le pipeline simule.
+   --  Une source reelle ne l'implemente que si son format a ete adapte sans
+   --  inventer les donnees physiques absentes.
    type Source is interface;
 
    --  Fournit la prochaine mesure. Available = False si plus rien a lire.
@@ -49,5 +52,11 @@ package Radar_Source is
    --  ils sont obliges de nommer le type concret - et l'interface ne
    --  sert plus a rien.
    function Per_Turn (Self : Source) return Positive is abstract;
+
+   --  Nombre de mesures d'elevation traitees avant de passer a l'azimut
+   --  suivant. Le mode de cartographie cadence une colonne complete a la
+   --  fois sans connaitre la grille concrete de la source ; c'est ce qui
+   --  permet d'utiliser plusieurs resolutions avec le meme pipeline.
+   function Per_Azimuth (Self : Source) return Positive is abstract;
 
 end Radar_Source;

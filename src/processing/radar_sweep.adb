@@ -111,8 +111,8 @@ is
          end if;
 
          pragma Loop_Invariant (Result.Count <= Max_Targets);
-         --  Si on est dans un groupe, son sommet depasse le seuil : c'est
-         --  ce qui garantit qu'on n'enregistrera jamais une fausse alarme.
+         --  Si on est dans un groupe, son sommet depasse le seuil ; le
+         --  contrat porte sur cette valeur, pas sur une cible physique.
          pragma Loop_Invariant
            (if In_Group then S (Best_Pos) >= Detection_Threshold);
          pragma Loop_Invariant
@@ -204,7 +204,7 @@ is
    begin
       --  Meme regroupement que Detect_Clustered, mais chaque case est
       --  comparee a son seuil CFAR au lieu d'un seuil global fixe.
-      --  Les cases de la distance aveugle ne sont jamais des cibles.
+      --  Les cases ignorees par le modele ne sont jamais des detections.
       for I in Bin_Index loop
          if I > Blind_Bins
            and then Natural (S (I)) >= CFAR_Threshold (S, I)

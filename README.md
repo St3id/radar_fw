@@ -29,9 +29,12 @@ dans le navigateur.
 
 ## Ce que fait le programme
 
-Les quatre modes partagent la même source de données (`Radar_Source`) et
-la même chaîne de détection prouvée ; seul le traitement des balayages
-change.
+Les modes de cartographie et le mode `live` basé sur balayages utilisent
+`Radar_Source` et gardent le passage simulation → source réelle. Les capteurs
+qui livrent des positions 3D déjà calculées ont un contrat distinct,
+`Radar_Target_Source`. Aucun adaptateur matériel ne l'utilise encore. Un
+capteur qui ne donne que x/y, comme le LD2450 décrit ici, attend un type de
+piste planaire ; on ne lui invente pas une altitude.
 
     alr run                          # track : rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
@@ -52,11 +55,12 @@ change.
   premiers tours calibrent la carte de clutter ; ensuite le décor est
   soustrait et seuls les mobiles sont pistés. La page 3D se met à jour
   seule : cibles numérotées, distance, vitesse en m/s, traînées.
-- **`scan` — cartographie progressive.** Le balayage est cadencé une
-  colonne d'azimut à la fois — environ 11 s en simulation, des minutes
-  sur du matériel réel — et le nuage se construit au fil de l'eau, avec
-  sa progression et son compteur de points ; le scan terminé, il reste
-  explorable.
+- **`scan` — cartographie progressive.** Une passe globale rapide (60 × 8)
+  apparaît d'abord, puis une passe de détail (180 × 24) l'enrichit. Dans la
+  démonstration, la première passe prend environ 1,5 s et le détail 10,8 s ;
+  ce sont des cadences d'animation, pas des mesures du moteur ou du capteur.
+  Les nouveaux points sont transmis par lots, sans renvoyer tout le nuage à
+  chaque rafraîchissement.
 
 Les modes `live` et `scan` partagent le même serveur HTTP Ada
 (`Radar_Http`). Pour `track` et `map`, ouvrez le fichier HTML produit
@@ -73,17 +77,20 @@ le pipeline).
 
 Au-dessus vient la perception 3D :
 
-1. `Radar_Source` — l'interface abstraite : la source simulée
-   (`Radar_Sim_Source`) et, plus tard, le capteur réel sont
-   interchangeables ;
+1. `Radar_Source` — le contrat de profil de balayage, utilisé pour
+   développer sur simulation puis remplacer la source sans réécrire le
+   traitement. `Radar_Target_Source` est le contrat séparé pour les sources
+   qui livrent des positions 3D calculées. Le parseur matériel et l'adaptateur
+   LD2450 planaire restent à faire ;
 2. `Radar_Detect` — chaque mesure passe par la détection prouvée puis
    devient un point 3D ; deux objets alignés sur un même rayon donnent
    bien deux détections ;
 3. `Cluster` — fusion spatiale des détections d'un même tour ;
-4. `Radar_Clutter` — en surveillance, le décor appris est soustrait
-   (MTI) : ne restent que les objets mobiles ;
+4. `Radar_Clutter` — en surveillance par profils, le décor appris est
+   soustrait (MTI) : ne restent que les objets mobiles ;
 5. `Radar_Track` — association globale, identifiants stables, filtre
-   alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées.
+   alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées. Il reçoit
+   des frames horodatées, quel que soit le contrat d'entrée.
 
 ## État d'avancement
 
@@ -102,12 +109,13 @@ Acquis :
       fenêtre d'association et la durée de coasting se comptent en temps.
 - [x] Pistage robuste : prédiction et coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (ni les tentatives ni les fantômes ne sont
-      affichés), association globale, fusion anti-fragmentation, distance
-      aveugle prouvée (625 mm).
+      affichés), association globale, fusion anti-fragmentation, exclusion
+      logicielle des 8 premières cases simulées (625 mm).
 - [x] **MTI** par carte de clutter adaptative — apprentissage de fond et
       oubli lent — embarquable et cross-compilée pour ARM en CI.
-- [x] Cibles réalistes : cibles étendues à 4 réflecteurs, écho fluctuant
-      (Swerling), trous de détection, bruit de fond, fantômes multitrajet.
+- [x] Cibles simulées imparfaites : 4 réflecteurs, fading uniforme inspiré
+      des modèles de Swerling (sans en reprendre la loi statistique), trous de
+      détection, bruit de fond et fantômes multitrajet.
       Le pipeline est éprouvé contre des données imparfaites, voir
       `documentation/public/ARCHITECTURE.md` §1.
 - [x] Concurrence **Ravenscar** réelle : profil imposé à la compilation,
@@ -121,8 +129,11 @@ Acquis :
 
 Reste à faire :
 
-- [ ] Interface de niveau détection, pour les modules qui livrent des
-      cibles déjà pistées.
+- [ ] Type de rapport planaire, pistage 2D, puis adaptateur simulation et
+      matériel du LD2450. Garder le type 3D pour les mesures qui ont réellement
+      une altitude ; fusionner ensuite avec horloges et poses calibrées.
+- [ ] Raffinement sélectif des seuls secteurs utiles après la passe rapide ;
+      le mode `scan` actuel refait encore toute la grille en détail.
 - [ ] Driver capteur en Ada sur STM32 (matériel requis).
 - [ ] Balayage motorisé réel (matériel requis).
 
@@ -134,9 +145,9 @@ Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
 - l'absence d'erreur d'exécution : débordements, indices hors bornes ;
 - des contrats **fonctionnels**, et non des tautologies : `Peak_Bin`
   renvoie bien le maximum du balayage, `Peak_Distance` vaut exactement
-  `Bin_Distance (Peak_Bin (S))`, `Detect_All` et `Detect_Clustered` ne
-  rapportent aucune fausse alarme, et `Detect_Adaptive` (CFAR) ne
-  rapporte aucune cible sous le seuil de bruit local de sa propre case ;
+  `Bin_Distance (Peak_Bin (S))`, et les détecteurs ne rapportent que des
+  cases au-dessus de leur seuil logiciel. Cela ne prouve pas un taux de fausse
+  alarme réel ni qu'un écho provient d'une cible ;
 - la terminaison des sous-programmes (aspect implicite
   `Always_Terminates`) ;
 - l'objet protégé `Mailbox`, prouvé dans le contexte Ravenscar (projet
