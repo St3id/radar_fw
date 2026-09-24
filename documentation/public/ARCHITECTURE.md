@@ -389,6 +389,32 @@ transmission, câblage et mesure. Le rapport et le type d'entraînement ne peuve
 être choisis sérieusement qu'après avoir posé le temps de scan accepté, la
 masse/inertie du plateau et l'erreur angulaire tolérée.
 
+**Choix retenu : rotation continue dans un seul sens.** Le temps de scan est
+désormais posé : un plan à 360° en environ 2 s, un volume de six rangées en
+environ 12 s, sans arrêt ni inversion de la tête. Il en découle :
+
+- **un moteur pas-à-pas de type NEMA 17** avec un driver à micropas
+  interpolés (TMC2209), par **courroie crantée de rapport 3:1**. Le moteur
+  reste en périphérie et l'axe central libre. À 0,5 tr/s au plateau, le
+  moteur tourne à 1,5 tr/s, loin de ses limites ;
+- **un collecteur tournant** dans le passage central, à la place de la boucle
+  de câble. Il permet une rotation illimitée. Le module XM125 communique par
+  UART ou I²C, des liaisons lentes qui traversent un collecteur sans
+  difficulté ;
+- **un recalage à chaque tour** : l'index est franchi à chaque révolution, si
+  bien qu'un pas perdu ne se propage jamais au-delà d'un tour ;
+- **plus de jeu à l'inversion** : en tournant toujours dans le même sens, la
+  transmission reste appuyée du même côté ;
+- **une acquisition au vol** : chaque profil est horodaté, et l'angle est
+  interpolé à l'instant de la trame. Le faisceau défile alors de 180°/s :
+  une trame doit durer moins d'environ 12 ms pour que l'étalement reste sous
+  le quart d'un faisceau de 9°. C'est à vérifier sur le module réel.
+
+La cadence est bornée par le lien du capteur, pas par le moteur : un profil
+tous les 3° représente 60 profils/s, soit quelques dizaines de ko/s selon la
+plage et le pas configurés. Les mesures du montage (pas par tour, répétabilité
+de l'index, bruit du collecteur sur la liaison série) restent à faire.
+
 Le bloc ULN2003 de `30 x 22 mm` dans la maquette est lui aussi une enveloppe à
 mesurer avec les borniers et les câbles. La fiche du 28BYJ-48 donne `5 V` et
 `50 Ω` par phase : environ `100 mA` par phase par simple calcul résistif avant
@@ -450,7 +476,7 @@ des hypothèses tant que ces essais ne sont pas faits.
        +-------+--------+
                | GPIO (plus tard : drivers ULN2003)
                v
-       [azimut : tour borne, index et retour sans mesure + elevation]
+       [azimut : rotation continue, collecteur, index + elevation]
 
 Ce schéma décrit la **première phase** : un capteur unique, pour valider la
 chaîne. La cible est une **couronne** de capteurs fixes orientés dans des
@@ -472,10 +498,11 @@ démontré par `radar_demo`, transposé au matériel) :
                               profil Ravenscar
 
 Le moteur d'azimut n'a pas d'encodeur : un capteur d'index fixe donne l'origine,
-puis le contrôleur compte les pas sur un tour borné. Le retour à l'index vérifie
-la répétabilité, mais un pas perdu au milieu du balayage ne sera pas détecté
-immédiatement. Le jeu du réducteur se mesure sur le montage ; l'acquisition se
-fait toujours dans le même sens et le retour se fait sans mesure.
+puis le contrôleur compte les pas. La tête tourne en continu, toujours dans le
+même sens (voir le choix de transmission en §1.7). L'index, franchi à chaque
+révolution, recale donc le compte à chaque tour : un pas perdu n'est pas
+détecté sur-le-champ, mais il ne survit pas au tour suivant. Un collecteur
+tournant relie la tête au reste du montage.
 
 Phase matérielle suivante (XM125/A121) : un service configuré peut exposer des
 profils Sparse IQ via l'Exploration Server ; les registres I²C peuvent exposer
