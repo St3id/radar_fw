@@ -11,8 +11,8 @@ with Radar_World;   use Radar_World;
 --  autant de fois qu'il le faut, sans rebrancher quoi que ce soit.
 --
 --  Les imperfections qu'elle simule (bruit, echos fluctuants, trous de
---  detection, fantomes multitrajet) sont decrites dans
---  documentation/public/ARCHITECTURE.md, section 1.
+--  detection, fantomes multitrajet, murs speculaires et coins brillants)
+--  sont decrites dans documentation/public/ARCHITECTURE.md, section 1.
 
 package Radar_Sim_Source is
 

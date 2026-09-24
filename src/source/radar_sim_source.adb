@@ -1,4 +1,6 @@
-with Ada.Numerics.Float_Random;  use Ada.Numerics.Float_Random;
+with Ada.Numerics;                      use Ada.Numerics;
+with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
+with Ada.Numerics.Float_Random;         use Ada.Numerics.Float_Random;
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Sweep;     use Radar_Sweep;
 
@@ -112,6 +114,58 @@ package body Radar_Sim_Source is
       end if;
    end Distance_To_Bin;
 
+   --  ----- Murs speculaires (ARCHITECTURE.md, realisme point 9) -----
+   --  Modele de scenario, pas loi universelle des murs : echo fort pres de
+   --  la normale, echo diffus faible ailleurs. La reponse reelle depend du
+   --  materiau, des couches, de l'humidite, de la rugosite, de la polarisation
+   --  et de l'incidence. Rayleigh est un critere de rugosite, pas un verdict
+   --  mur peint = miroir. Ces constantes demandent une mesure sur le
+   --  montage final.
+
+   --  Echo du mur vu de face : la valeur unique de l'ancien modele.
+   Specular_Echo : constant Amplitude := 2_500;
+
+   --  Part diffuse en incidence normale : 20 dB sous le speculaire, soit
+   --  un facteur 10 en amplitude. HYPOTHESE de modelisation, a recaler
+   --  sur l'A121 reel en visant un mur sous des incidences connues. Face
+   --  au seuil CFAR typique (~160), elle s'eteint vers 50 degres.
+   Diffuse_Echo : constant Float := 250.0;
+
+   --  Coin vertical ideal entre deux murs (diedre) : le double rebond peut
+   --  renvoyer l'onde vers sa source dans le plan horizontal. Son niveau
+   --  depend de la geometrie et des materiaux ; ce n'est pas toujours le
+   --  point le plus brillant d'une piece reelle.
+   Corner_Echo : constant Amplitude := 3_500;
+
+   --  Azimut du coin du premier quadrant ; les trois autres s'en
+   --  deduisent par symetrie (180 - a, 180 + a, 360 - a).
+   Corner_Az : constant Float :=
+     Arctan (Room_Half_Y, Room_Half_X) * 180.0 / Pi;
+
+   --  Distance horizontale du radar aux quatre coins.
+   Corner_Distance : constant Float :=
+     Sqrt (Room_Half_X ** 2 + Room_Half_Y ** 2);
+
+   --  Echo d'un mur selon l'angle d'incidence (degres). Speculaire si la
+   --  normale du mur est dans le faisceau (meme tolerance que pour les
+   --  objets), diffus et decroissant sinon. Le Max protege la conversion
+   --  d'un cosinus qu'un arrondi rendrait a peine negatif pres de 90.
+   function Wall_Echo (Incidence : Float) return Amplitude is
+     (if Incidence < Beam_Width then Specular_Echo
+      else Amplitude
+             (Float'Max (0.0, Diffuse_Echo * Cos (Incidence * Pi / 180.0))));
+
+   --  Le faisceau vise-t-il un coin ? Un diedre VERTICAL ne renvoie
+   --  l'onde vers sa source que dans le plan horizontal : hors de la
+   --  tolerance d'elevation, le double rebond garde sa pente et manque le
+   --  radar (il faudrait un sol ou un plafond, donc un triedre).
+   function Sees_Corner (Az, El : Float) return Boolean is
+     (abs El < El_Width
+      and then (Angle_Diff (Az, Corner_Az) < Beam_Width
+                or else Angle_Diff (Az, 180.0 - Corner_Az) < Beam_Width
+                or else Angle_Diff (Az, 180.0 + Corner_Az) < Beam_Width
+                or else Angle_Diff (Az, 360.0 - Corner_Az) < Beam_Width));
+
    function Make
      (Sweeps   : Positive;
       See_Room : Boolean := False) return Simulated_Source
@@ -208,10 +262,28 @@ package body Radar_Sim_Source is
             S (J) := Amplitude (Random (Gen) * Noise_Level);
          end loop;
 
-         --  Les murs de la piece (mode cartographie) : un echo a la
-         --  distance du premier mur touche dans cette direction.
+         --  Les murs de la piece (mode cartographie) : a la distance du
+         --  premier mur touche, un echo qui depend de l'angle sous lequel
+         --  on le regarde, plus un echo fort si le faisceau vise un coin.
+         --  'Max et non une affectation : un echo diffus plus faible que
+         --  le bruit ne doit pas creuser un trou de silence dans la case.
          if Self.See_Room then
-            S (Distance_To_Bin (Wall_Distance (Az, El))) := 2_500;
+            declare
+               W : constant Bin_Index :=
+                 Distance_To_Bin (Wall_Distance (Az, El));
+            begin
+               S (W) := Amplitude'Max
+                          (S (W), Wall_Echo (Wall_Incidence (Az, El)));
+            end;
+
+            if Sees_Corner (Az, El) then
+               declare
+                  C : constant Bin_Index :=
+                    Distance_To_Bin (Corner_Distance / Cos (El * Pi / 180.0));
+               begin
+                  S (C) := Amplitude'Max (S (C), Corner_Echo);
+               end;
+            end if;
          end if;
 
          --  Les objets : chaque reflecteur visible ce tour-ci (Echoes

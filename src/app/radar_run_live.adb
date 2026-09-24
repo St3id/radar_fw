@@ -48,8 +48,12 @@ procedure Radar_Run_Live is
 
    --  Tours de calibration : le decor est appris a chaque tour jusqu'a
    --  atteindre le niveau de confirmation de la carte de clutter ; le
-   --  pistage ne demarre qu'apres.
-   Calibration_Turns : constant := 2;
+   --  pistage ne demarre qu'apres. 8 et non 2 depuis les murs
+   --  speculaires (realisme point 9) : un mur vu de biais renvoie un echo
+   --  proche du seuil CFAR, detecte un tour sur deux ou sur cinq. En
+   --  2 tours, ces cases n'etaient pas apprises et le pistage les
+   --  agregeait en 5 a 7 pistes fantomes des la mise en route (mesure).
+   Calibration_Turns : constant := 8;
 
    --  Apprentissage de fond (1 tour sur N) : le decor qui apparait
    --  (meuble deplace...) finit par etre appris, mais un mobile qui ne
@@ -58,8 +62,16 @@ procedure Radar_Run_Live is
    Learn_Period : constant := 4;
 
    --  Oubli lent (1 vieillissement tous les N tours) : le decor qui
-   --  disparait finit par etre oublie.
-   Age_Period : constant := 8;
+   --  disparait finit par etre oublie. L'equilibre se calcule : une case
+   --  detectee avec la probabilite p gagne en moyenne p x N / Learn_Period
+   --  crans par periode d'oubli et en perd 1. Elle n'est donc apprise que
+   --  si p > Learn_Period / N. A N = 8, seules les cases vues plus d'une
+   --  fois sur deux l'etaient : les echos intermittents des murs vus de
+   --  biais restaient hors carte, et le mode live affichait 8 a 11 pistes
+   --  fantomes. A N = 32, le seuil tombe a p > 12,5 % : 0 a 1 fantome
+   --  bref (mesure sur 120 s). Revers : un meuble retire met environ
+   --  30 s, au lieu de 7, a sortir de la carte.
+   Age_Period : constant := 32;
 
    --  Source'Class : les appels sont dispatchants (voir Radar_Source).
    Src  : Source'Class := Make (Sweeps => Positive'Last, See_Room => True);
@@ -69,7 +81,8 @@ procedure Radar_Run_Live is
    Turn : Natural := 0;
 
    State_Json : Unbounded_String :=
-     To_Unbounded_String ("{""turn"":0,""turn_ms"":840,""tracks"":[]}");
+     To_Unbounded_String
+       ("{""turn"":0,""turn_ms"":840,""calibrating"":true,""tracks"":[]}");
    Cloud_Json : Unbounded_String :=
      To_Unbounded_String ("{""points"":[]}");
 
@@ -143,7 +156,7 @@ procedure Radar_Run_Live is
       L ("  if(tp.length>1)dyn.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tp),new THREE.LineBasicMaterial({color:0x1f7a5a})));");
       L ("  list+='#'+tk.id+' &mdash; '+d+' mm &mdash; '+ms+' m/s<br>';");
       L (" }");
-      L (" status.innerHTML=(s.turn<2)?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
+      L (" status.innerHTML=s.calibrating?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
       L (" tgts.innerHTML=list;}");
       L ("async function tick(){");
       L (" try{const s=await(await fetch('/state.json')).json();TURN_MS=s.turn_ms;");
@@ -188,8 +201,14 @@ procedure Radar_Run_Live is
       R     : Unbounded_String;
       First : Boolean := True;
    begin
+      --  "calibrating" : c'est le serveur qui sait si la calibration dure
+      --  encore, pas la page. Elle testait autrefois turn < 2 elle-meme :
+      --  une regle metier dans le JavaScript (R1), fausse des que
+      --  Calibration_Turns a change.
       Append (R, "{""turn"":" & Img (Turn) & ",""turn_ms"":"
-                 & Img (Turn_Ms) & ",""tracks"":[");
+                 & Img (Turn_Ms) & ",""calibrating"":"
+                 & (if Turn < Calibration_Turns then "true" else "false")
+                 & ",""tracks"":[");
       --  Seules les pistes confirmees (M-sur-N) sont publiees : les
       --  tentatives et les fantomes de multitrajet restent invisibles.
       --  "coast" = 1 : piste non revue ce tour, position extrapolee.
@@ -336,7 +355,8 @@ begin
 
    Put_Line ("Mode LIVE : ouvre http://localhost:" & Img (Port)
              & "  (Ctrl+C pour arreter)");
-   Put_Line ("Tour 1 = calibration du decor, les cibles apparaissent au tour 2.");
+   Put_Line ("Tours 1 a " & Img (Calibration_Turns)
+             & " = calibration du decor, les cibles apparaissent ensuite.");
 
    Next_Turn := Clock;
    loop

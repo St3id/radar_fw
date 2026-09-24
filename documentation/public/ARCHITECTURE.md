@@ -211,13 +211,27 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    miroir derrière le mur ; c'est la règle M-sur-N qui les étouffe, ce que
    vérifie un test.
 6. **Clutter adaptatif** — **mis en œuvre.** Compteurs de confiance sur
-   2 bits, confirmation à 2 observations, apprentissage de fond (1 tour sur
-   4) et oubli lent (`Age` tous les 8 tours) : le décor qui apparaît est
-   appris, celui qui disparaît est oublié, et un mobile qui ne fait que
-   passer n'empoisonne pas la carte — tandis qu'un mobile qui se gare y fond,
-   réalisme assumé. Limite connue du mécanisme : la fragmentation d'une cible
-   étendue peut confirmer une piste « ombre » ; ce sont l'association globale
-   et la fusion de pistes, dans `Radar_Track`, qui l'écartent.
+   2 bits, confirmation à 2 observations, calibration sur 8 tours,
+   apprentissage de fond (1 tour sur 4) et oubli lent (`Age` tous les
+   32 tours) : le décor qui apparaît est appris, celui qui disparaît est
+   oublié, et un mobile qui ne fait que passer n'empoisonne pas la carte —
+   tandis qu'un mobile qui se gare y fond, réalisme assumé. Limite connue du
+   mécanisme : la fragmentation d'une cible étendue peut confirmer une piste
+   « ombre » ; ce sont l'association globale et la fusion de pistes, dans
+   `Radar_Track`, qui l'écartent.
+
+   *Le réglage de l'oubli se calcule.* Une case détectée avec la
+   probabilité p gagne en moyenne `p × N / 4` crans par période d'oubli de
+   N tours, et en perd un : elle n'est apprise que si `p > 4 / N`. Les murs
+   vus de biais (point 9) renvoient un écho proche du seuil, détecté par
+   intermittence. Avec N = 8, seules les cases vues plus d'une fois sur deux
+   étaient apprises, et le mode `live` affichait 8 à 11 pistes fantômes sur
+   les murs. Avec N = 32, le seuil tombe à 12,5 % : il reste 0 à 1 fantôme
+   bref (mesuré sur 120 s). En contrepartie, un meuble retiré met environ
+   30 s à sortir de la carte. Une carte qui apprendrait le **niveau** d'écho
+   plutôt que le nombre de détections (carte de clutter de type MTD)
+   supprimerait la cause, mais au prix d'une mémoire que la cible embarquée
+   ne peut pas offrir sans réduire la plage utile.
 7. **Émulateur LD2450** — **non implémenté.** Il s'agirait d'une source de
    niveau détection (x, y, vitesse, cadence et nombre de cibles à confirmer sur
    la version de trame utilisée, jitter, dropouts, fantômes), afin que le
@@ -233,14 +247,13 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    règlent l'animation de la simulation et ne prédisent pas le moteur ni le
    temps d'intégration RF. Le détail couvre encore tout le champ ; le
    raffinement sélectif par secteur reste à faire.
-9. **Murs spéculaires** — **non implémenté.** Le simulateur rend
-   aujourd'hui le même écho pour un mur, quel que soit l'angle sous lequel le
-   faisceau le frappe. En réalité (§1.6), l'écho d'un mur lisse chute dès que
-   l'incidence s'écarte de la normale, tandis que les coins restent
-   brillants. À simuler : une amplitude fonction de l'angle d'incidence, un
-   écho renforcé dans les coins, et les images miroirs sous le sol. Enjeu :
-   le CFAR et le regroupement sont aujourd'hui réglés sur des murs plus
-   faciles que les vrais.
+9. **Murs et coins** — **modèle simplifié ajouté au simulateur.** L'écho d'un
+   mur dépend maintenant de l'angle d'incidence et les coins verticaux peuvent
+   produire un écho fort. Les niveaux diffus/spéculaire et la géométrie des
+   coins restent des hypothèses, pas une loi de rétrodiffusion validée. Les
+   réflexions sur sol/plafond, les trajets cohérents et l'interférence entre
+   radars ne sont pas simulés ; le CFAR ne représente donc pas encore un
+   comportement matériel mesuré.
 
 ### 1.5 Ce qui est déjà réaliste (à conserver)
 
@@ -279,7 +292,7 @@ indirects peuvent produire des images derrière les parois ; un point estimé
 sous le plancher est suspect, mais pas une preuve universelle de fantôme sans
 connaître le repère et la géométrie.
 
-Le simulateur rend encore un écho de mur indépendant de l'incidence.
+Le simulateur emploie désormais une loi angulaire simple et des échos de coin.
 Son bruit uniforme, ses amplitudes de cible indépendantes de la portée, la
 combinaison par maximum, le mur rectangulaire idéal et l'absence de phase, de
 Doppler RF et de trajets multiples cohérents en font un scénario de

@@ -42,6 +42,20 @@ package body Radar_World is
               Count   => 0);
    end Empty_World;
 
+   ------------------
+   -- X_Wall_First --
+   ------------------
+
+   --  Le rayon de direction horizontale (Cos_A, Sin_A) touche-t-il
+   --  d'abord un mur X (x = +/- Room_Half_X, normale selon X) plutot
+   --  qu'un mur Y ? On compare Room_Half_X / |cos| a Room_Half_Y / |sin|
+   --  en multipliant en croix : jamais de division par zero. Partagee par
+   --  Wall_Distance et Wall_Incidence, qui doivent designer le MEME mur ;
+   --  sinon l'echo serait calcule pour un mur et place a la distance de
+   --  l'autre.
+   function X_Wall_First (Cos_A, Sin_A : Float) return Boolean is
+     (Room_Half_X * abs Sin_A <= Room_Half_Y * abs Cos_A);
+
    -------------------
    -- Wall_Distance --
    -------------------
@@ -53,22 +67,49 @@ package body Radar_World is
       Cos_A : constant Float := Cos (Az_Rad);
       Sin_A : constant Float := Sin (Az_Rad);
 
-      Dist_X : Float := Float'Last;
-      Dist_Y : Float := Float'Last;
+      Horizontal : Float;
    begin
-      --  Distance (vue de dessus) pour toucher un mur vertical
-      --  (gauche/droite), puis un mur horizontal (avant/arriere).
-      if abs Cos_A > 0.0001 then
-         Dist_X := Room_Half_X / abs Cos_A;
-      end if;
-      if abs Sin_A > 0.0001 then
-         Dist_Y := Room_Half_Y / abs Sin_A;
+      --  Distance (vue de dessus) jusqu'au mur touche. Les divisions sont
+      --  sures : X_Wall_First n'est vrai que si |cos| > 0 (sinon son
+      --  membre droit serait nul), et faux que si |sin| > 0.
+      if X_Wall_First (Cos_A, Sin_A) then
+         Horizontal := Room_Half_X / abs Cos_A;
+      else
+         Horizontal := Room_Half_Y / abs Sin_A;
       end if;
 
-      --  On touche le mur le plus proche ; viser haut ou bas allonge le
-      --  trajet (elevation supposee < 90 degres : cos > 0).
-      return Float'Min (Dist_X, Dist_Y) / Cos (El_Rad);
+      --  Viser haut ou bas allonge le trajet (elevation supposee < 90
+      --  degres : cos > 0).
+      return Horizontal / Cos (El_Rad);
    end Wall_Distance;
+
+   --------------------
+   -- Wall_Incidence --
+   --------------------
+
+   function Wall_Incidence
+     (Azimuth_Deg, Elevation_Deg : Float) return Float
+   is
+      Az_Rad : constant Float := Azimuth_Deg   * Pi / 180.0;
+      El_Rad : constant Float := Elevation_Deg * Pi / 180.0;
+
+      Cos_A : constant Float := Cos (Az_Rad);
+      Sin_A : constant Float := Sin (Az_Rad);
+
+      --  Cosinus de l'incidence : produit scalaire du rayon
+      --  (cos El cos A, cos El sin A, sin El) et de la normale du mur
+      --  touche, (1, 0, 0) pour un mur X ou (0, 1, 0) pour un mur Y.
+      Cos_H : constant Float :=
+        (if X_Wall_First (Cos_A, Sin_A) then abs Cos_A else abs Sin_A);
+
+      --  Borne a 1 : un arrondi flottant juste au-dessus ferait lever
+      --  Argument_Error a Arccos.
+      Cos_I : constant Float := Float'Min (1.0, abs Cos (El_Rad) * Cos_H);
+   begin
+      --  Cos_I est dans 0 .. 1, donc Arccos dans 0 .. Pi/2 ; le Min
+      --  absorbe l'arrondi de la conversion en degres (Post).
+      return Float'Min (90.0, Arccos (Cos_I) * 180.0 / Pi);
+   end Wall_Incidence;
 
    ----------
    -- Step --
