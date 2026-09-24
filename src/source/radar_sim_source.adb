@@ -30,7 +30,8 @@ package body Radar_Sim_Source is
       (40.0, -120.0, 90.0),
       (-70.0, -60.0, -100.0));
 
-   --  Fluctuation type Swerling : amplitude re-tiree a chaque tour.
+   --  Fading simplifie : le niveau est retire uniformement a chaque tour,
+   --  sans appliquer la loi statistique d'un modele Swerling.
    --  Min_Echo reste au-dessus du seuil CFAR typique (4 x bruit moyen
    --  ~40 = 160) : un echo present est detectable, sauf malchance.
    Min_Echo : constant Amplitude := 250;
@@ -142,6 +143,16 @@ package body Radar_Sim_Source is
    begin
       return Self.Az_Steps * Self.El_Steps;
    end Per_Turn;
+
+   -----------------
+   -- Per_Azimuth --
+   -----------------
+
+   overriding
+   function Per_Azimuth (Self : Simulated_Source) return Positive is
+   begin
+      return Self.El_Steps;
+   end Per_Azimuth;
 
    --------------------
    -- Make_Room_Scan --
@@ -278,7 +289,7 @@ package body Radar_Sim_Source is
          Self.Az_Step := Self.Az_Step + 1;
 
          --  Fin du tour complet (tous azimuts x toutes elevations) :
-         --  le monde avance, et les echos fluctuent (Swerling).
+         --  le monde avance et les niveaux d'echo sont retires au sort.
          if Self.Az_Step >= Self.Az_Steps then
             Self.Az_Step      := 0;
             Self.Current_Turn := Self.Current_Turn + 1;

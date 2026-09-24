@@ -67,9 +67,11 @@ package Radar_Track is
    --  fenetre d association reste non negligeable. A 2, des fantomes
    --  passaient. A 3, ils ne passent plus.
    --
-   --  3 et pas 5 : chaque tour de confirmation retarde l affichage d une
-   --  cible REELLE. A 840 ms par tour, 3 detections font deja 2,5 s
-   --  d attente avant qu une personne apparaisse a l ecran.
+   --  3 et pas 5 : chaque observation de confirmation retarde l affichage
+   --  d une cible REELLE. Cela ajoute deux intervalles apres la premiere
+   --  detection : 1,68 s a 840 ms entre frames, ou 200 ms a 10 Hz. Le
+   --  premier delai vient du balayage simule ; le second est la cadence
+   --  nominale annoncee pour le LD2450, encore a mesurer sur notre montage.
    Confirm_Hits : constant := 3;
 
    --  Met a jour les pistes avec les cibles d'un nouveau tour (frame

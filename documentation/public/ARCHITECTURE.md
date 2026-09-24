@@ -83,46 +83,79 @@ parade retenue :
 | Seuil fixe (100) | bruit variable selon distance/scène | fausses alarmes en avalanche OU cibles faibles ratées (parade : **CFAR**) |
 | Clutter appris une fois pour toutes | rideaux, ventilateurs, meubles déplacés | carte de clutter à **oubli lent** (moyenne exponentielle) |
 
-### 1.2 Le capteur réel ne balaie pas comme le simulateur
+### 1.2 Les faisceaux et les données ne sont pas interchangeables
 
-Le simulateur modélise un faisceau crayon de 3° balayé mécaniquement. **Aucun
-capteur envisagé ne fait ça nativement** :
+Le simulateur ne reproduit pas encore un diagramme d'antenne : son test accepte
+une cible à moins de 3° en azimut et 5° en élévation. Cela représente une fenêtre
+rectangulaire à seuil dur de 6° × 10° au total, sans lobes ni pondération de
+gain. La différence est importante : une largeur de faisceau constructeur est
+habituellement mesurée à un niveau donné, elle ne définit pas une frontière
+angulaire nette.
 
-- **HLK-LD2450** : pas de balayage du tout — champ large ± 60°, angle estimé
-  par différence de phase entre antennes RX, **10 Hz**, 3 cibles max, en
-  **2D** (pas d'élévation), et il sort des cibles **déjà pistées**, avec ses
-  propres artefacts (fantômes, accrochages, latence de décrochage) que les
-  intégrations domotique compensent par zones et temporisations.
-- **Acconeer A121** : le profil d'écho par cases de distance correspond bien à
-  notre type `Sweep` (bonne nouvelle), mais le faisceau natif est **large
-  (~50–65° selon le plan)** : sur tourelle **sans lentille, le mode
-  cartographie serait une bouillie angulaire**. La lentille (kit Acconeer
-  HBL/FZP, ou imprimée) ramène à **9–14°** selon sa distance à la puce, pour
-  un gain aller-retour de **+10 à +17 dB** (mesures publiées par Acconeer) :
-  elle fait partie du design, pas des accessoires. S'ajoutent fuite
-  d'antenne en champ proche, lobes secondaires, bruit.
-- **Résolution n'est pas précision.** Un faisceau de 9° couvre 47 cm de
-  large à 3 m : deux objets plus proches fusionnent, c'est la
-  **résolution**. Mais la **position** d'un réflecteur isolé s'estime bien
-  plus finement, en pondérant par l'amplitude les échos de plusieurs pas de
-  balayage successifs — de l'ordre du dixième de faisceau avec un bon
-  rapport signal sur bruit. Deux conséquences : un pas de balayage de la
-  moitié du faisceau suffit (plus fin n'ajoute pas de résolution), et c'est
-  alors le **jeu mécanique** de la tourelle (§2.1) qui limite la précision.
-- **BGT60TR13C** : IQ brut, angle par 3 RX — précision de quelques degrés, pas
-  3.
-- **Cadence** : le scan mécanique réel (servo + temps d'intégration) prendra
-  des **minutes** pour une pièce, pas 800 ms. Acceptable pour le mode
-  cartographie, mais l'affichage doit être **progressif** (le nuage se remplit
-  au fil de l'eau), pas « tout à la fin ».
+- **HLK-LD2450** : ce n'est pas un scanner d'angle. Hi-Link décrit un radar FMCW
+  24 GHz à une antenne TX et deux RX, avec un traitement intégré qui envoie des
+  données de détection par liaison série. La fiche annonce une portée maximale
+  de 6 m, des angles de ±60° en azimut et ±35° en inclinaison, et annonce
+  10 trames/s. Les coordonnées exposées sont x/y et la vitesse : le champ de
+  vision vertical n'est donc pas une mesure d'altitude. Cette cadence nominale
+  doit être chronométrée avec le firmware et le transport choisis.
+  Les sorties sont des cibles déjà calculées ; le module ne fournit pas au
+  programme Ada le profil brut de 256 cases attendu par `Radar_Source`.
+  [Fiche officielle Hi-Link du LD2450](https://www.hlktech.com/en/Goods-352.html).
+- **Acconeer A121** : c'est un radar à impulsions cohérentes (PCR) à 60,5 GHz,
+  pas un FMCW. Son unique canal TX/RX mesure une distance et une phase, pas un
+  angle ; obtenir la direction demande une mécanique d'azimut/élévation ou un
+  autre capteur angulaire. Le service Sparse IQ fournit des trames de balayages
+  et des échantillons de distance complexes. La plage, le profil d'impulsion,
+  l'espacement des échantillons, le nombre de balayages par trame et le réglage
+  HWAAS font partie de la configuration. Une frame peut regrouper plusieurs
+  balayages ; Acconeer indique des cadences typiques de 1 à 100 frames/s selon
+  les réglages, limitées par le nombre et la cadence des balayages. Cela ne
+  garantit pas cette fréquence dans le montage visé. [Frames, sweeps et
+  cadence A121](https://docs.acconeer.com/en/latest/radar_data_and_control/a121/sweeps_and_frames.html).
+  La capacité générale annoncée jusqu'à
+  20 m ne signifie pas qu'une configuration XM125 donnée couvre cette plage :
+  le PRF fixe aussi la distance maximale mesurable et non ambiguë. Le guide de
+  configuration recommande de limiter la plage au besoin et de choisir le pas
+  selon la trueness, le profil et les angles morts. Un pas d'échantillonnage
+  réglable jusqu'à environ 2,5 mm ne signifie pas que deux cibles séparées de
+  2,5 mm sont résolues : la résolution radiale dépend du profil et se mesure
+  séparément. [A121](https://developer.acconeer.com/a121/),
+  [principe PCR et mesure sans angle](https://docs.acconeer.com/en/latest/pcr_tech/overview.html),
+  [plage, pas et limites PRF](https://docs.acconeer.com/en/latest/radar_data_and_control/a121/measurement_range.html),
+  [résolution radiale](https://docs.acconeer.com/en/latest/figure_of_merits/a121.html),
+  [configuration A121](https://docs.acconeer.com/en/latest/radar_data_and_control/a121/how_to_configure.html).
+- **XM125** : c'est un module avec son propre microcontrôleur ; il peut exécuter
+  une application embarquée ou communiquer avec un hôte par un protocole de
+  registres. La forme des données reçues dépend donc du logiciel chargé. Ne pas
+  supposer qu'un XM125 sous son application I²C livre automatiquement les
+  profils IQ nécessaires à la cartographie. [Documentation XM125](https://developer.acconeer.com/home/a121-docs-software/xm125-xe125/).
+- **La géométrie angulaire limite la carte.** Pour une largeur mesurée β,
+  l'empreinte transversale vaut environ `2 R tan(β/2)`. Dans une configuration
+  Acconeer XE121 + LH120 + lentille hyperbolique à D1, le guide donne 16,8° à
+  mi-puissance dans le plan H ; à 3 m, cela correspond à environ 0,89 m
+  d'empreinte. Ce chiffre illustre une configuration précise, il ne caractérise
+  pas le XM125 prévu. Une cible isolée peut être localisée plus finement que
+  cette empreinte ; deux objets proches ne sont pas pour autant séparables.
+  Un couvercle placé devant le capteur peut aussi modifier fortement le
+  diagramme. Pour l'A121, Acconeer recommande d'optimiser l'épaisseur du
+  radome diélectrique selon sa permittivité (cas idéal : multiple de λ/2 dans
+  le matériau) et sa distance au capteur ; une lentille peut remplacer un
+  radome séparé. Mesurer l'empilement complet. [Radome et mécanique A121](https://docs.acconeer.com/en/latest/hw_integration/a121/radome_and_mechanical_design.html).
+- **Pas angulaire et durée.** Le pas de balayage se choisit après mesure du
+  diagramme et de la précision mécanique, selon la résolution spatiale utile.
+  Un pas beaucoup plus fin augmente les données et le temps sans créer
+  automatiquement une résolution équivalente. Pour un balayage mécanique,
+  ajouter temps d'acquisition, déplacement, stabilisation et retour sans
+  mesure ; ne déduire aucune cadence du simulateur.
 
 ### 1.3 Ce que montrent les projets existants
 
 - **LD2450 + ESPHome / Home Assistant** (composants communautaires, zones
-  polygonales, `off_delay`) : la communauté documente précisément les
-  artefacts réels — ventilateurs, instabilités d'alimentation en 3,3 V,
-  rafraîchissement 10 Hz — et les parades logicielles simples. C'est un aperçu
-  fidèle de ce que notre pipeline recevra.
+  polygonales, `off_delay`) : les intégrations rapportent des artefacts réels
+  — ventilateurs et instabilités d'alimentation — à vérifier sur l'assemblage.
+  La fiche Hi-Link annonce 10 trames/s ; c'est une cadence nominale, pas une
+  mesure de latence de bout en bout.
 - **Henrik Forstén (hforsten.com)** : la référence du radar FMCW amateur —
   6 GHz, PCB maison (~350 composants), détection d'un humain à 100 m, puis
   **SAR embarqué sur drone** avec autofocus. Deux leçons : le sommet du
@@ -138,18 +171,24 @@ capteur envisagé ne fait ça nativement** :
 Numérotation **stable** : plusieurs commentaires du code source y renvoient
 (« realisme point N »). Ne pas renuméroter.
 
-1. **Cibles étendues et Swerling** — **mis en œuvre.** Chaque objet est
-   simulé par 4 réflecteurs (± 150 mm), dont l'amplitude est tirée au sort à
-   chaque tour (graine fixe, donc reproductible), avec 15 % d'extinction par
-   réflecteur et 10 % d'évanouissement profond par objet. `Cluster_Radius`
-   est porté à 600 mm en conséquence : une cible étendue vue à travers une
+1. **Cibles étendues et fading** — **modèle simplifié dans le simulateur.**
+   Chaque objet est simulé par 4 réflecteurs (± 150 mm), dont le niveau est
+   tiré uniformément à chaque tour (graine fixe, donc reproductible), avec 15 %
+   d'extinction par réflecteur et 10 % d'évanouissement profond par objet.
+   Cela imite des variations d'écho, mais ce n'est pas une loi statistique
+   Swerling calibrée : les niveaux sont combinés par maximum, sans somme
+   cohérente de phase. `Cluster_Radius` est porté à 600 mm en conséquence :
+   une cible étendue vue à travers une
    quantification d'élévation peut écarter deux échos du même objet
    d'environ 520 mm à 3 m. Revers assumé : deux objets réels à moins de
-   600 mm fusionnent — c'est la résolution réelle du capteur simulé.
+   600 mm fusionnent ; ce rayon est un réglage de regroupement simulé, pas une
+   résolution physique mesurée.
 2. **Bruit de fond et CFAR** — **mis en œuvre.** Bruit aléatoire dans chaque
-   case et seuil CA-CFAR (fenêtre 8, garde 2, facteur 4) **prouvé SPARK**
-   (`Detect_Adaptive` : « aucune cible sous son seuil local »). C'est cette
-   détection qu'utilise tout le pipeline.
+   case et seuil CA-CFAR (fenêtre 8, garde 2, facteur 4). SPARK prouve ici que
+   toute case rapportée dépasse le seuil calculé par le code ; cela ne prouve
+   ni un taux de fausse alarme physique, ni qu'une case au-dessus du seuil
+   correspond à une cible réelle. Le bruit simulé et les amplitudes doivent
+   être recalés sur les données du profil choisi.
 3. **Cycle de vie M-sur-N** — **mis en œuvre.** Une piste tentative reste
    invisible avant 3 détections, et une tentative non revue meurt en
    2 tours ; l'affichage, en veille comme en rejeu, ne montre que les pistes
@@ -180,15 +219,20 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    étendue peut confirmer une piste « ombre » ; ce sont l'association globale
    et la fusion de pistes, dans `Radar_Track`, qui l'écartent.
 7. **Émulateur LD2450** — **non implémenté.** Il s'agirait d'une source de
-   niveau détection (x, y, vitesse, 10 Hz, 3 cibles au plus, jitter
-   réaliste, dropouts, fantômes), afin que le pipeline PC soit prêt **avant**
-   l'arrivée du module, qui remplacerait alors l'émulateur trame pour trame.
-8. **Cartographie progressive** — **mise en œuvre.** Le mode `scan` : le
-   serveur HTTP (paquet partagé `Radar_Http`) cadence le balayage une colonne
-   d'azimut à la fois et la page se remplit au fil de l'eau, avec sa
-   progression et son compteur de points ; le scan terminé, le nuage reste
-   servi et explorable. Sur du matériel réel, seules la cadence et la source
-   changeront.
+   niveau détection (x, y, vitesse, cadence et nombre de cibles à confirmer sur
+   la version de trame utilisée, jitter, dropouts, fantômes), afin que le
+   pipeline PC soit prêt avant l'arrivée du module. Il remplacerait
+   l'émulateur trame pour trame, sous réserve de la géométrie par capteur.
+8. **Cartographie progressive** — **mise en œuvre en deux résolutions.** Le
+   mode `scan` commence par une couverture globale de 60 × 8 directions, puis
+   ajoute une passe détaillée de 180 × 24. Dans la démo, une colonne prend
+   respectivement 25 ms et 60 ms : environ 1,5 s avant la première carte
+   grossière, puis 10,8 s pour compléter le détail. Les points sont envoyés
+   par lots et ajoutés à une géométrie GPU persistante ; le navigateur ne
+   retélécharge ni ne reconstruit le nuage complet à chaque sondage. Ces durées
+   règlent l'animation de la simulation et ne prédisent pas le moteur ni le
+   temps d'intégration RF. Le détail couvre encore tout le champ ; le
+   raffinement sélectif par secteur reste à faire.
 9. **Murs spéculaires** — **non implémenté.** Le simulateur rend
    aujourd'hui le même écho pour un mur, quel que soit l'angle sous lequel le
    faisceau le frappe. En réalité (§1.6), l'écho d'un mur lisse chute dès que
@@ -204,49 +248,171 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
   sol — et l'épisode « cible collée au mur invisible » rencontré pendant le
   développement est un comportement authentique, documenté dans l'historique
   Git.
-- La **quantification en distance** (cases de 78 mm) est honnête : le nuage
-  « en bandes » du mode cartographie est ce qu'un vrai capteur donne.
-- L'architecture à **deux niveaux d'entrée** (balayage brut / détections
-  toutes faites) correspond exactement au matériel visé (A121 et BGT60 au
-  niveau balayage, LD2450 au niveau détection).
+- La **quantification en distance** de la simulation vaut 78,125 mm par case
+  sur une plage théorique de 20 m. Ce pas logiciel n'est ni la résolution
+  physique, ni l'espacement d'échantillons garanti par l'A121.
+- Les deux familles d'entrée sont séparées : `Radar_Source` transporte les
+  profils ; `Radar_Target_Source` transporte des frames déjà calculées en
+  3D. Le LD2450 ne fournit qu'une position planaire dans le contrat étudié :
+  il lui manque encore un rapport 2D et un pistage 2D explicites.
 - « Pas de FFT lourde sur le MCU, le PC fait le rendu » : c'est aussi le
   partage des rôles des projets amateurs aboutis (Forstén).
 
-### 1.6 Propagation en intérieur : les murs sont des miroirs
+### 1.6 Propagation en intérieur : réflexion et diffusion dépendent des surfaces
 
-Une surface renvoie l'onde **dans toutes les directions** (diffusion) si ses
-aspérités sont grandes devant la longueur d'onde, et **comme un miroir**
-(réflexion spéculaire) si elles sont petites. Le critère de Rayleigh fixe la
-frontière : une surface est lisse si ses aspérités restent sous
-`λ / (8 cos θ)`, θ étant l'angle d'incidence compté depuis la normale — soit
-**0,6 mm à 60 GHz** et 1,6 mm à 24 GHz en incidence normale, et davantage en
-incidence rasante, où les surfaces paraissent plus lisses encore.
+La réflexion d'une onde millimétrique dépend de la permittivité et de la
+conductivité du matériau, de son épaisseur, de la polarisation et de l'angle
+d'incidence. La rugosité par rapport à la longueur d'onde partage
+approximativement les surfaces lisses (composante spéculaire dominante) et
+rugueuses (diffusion plus importante) ; le critère de Rayleigh est un repère,
+pas une séparation binaire entre « miroir » et « diffuseur ». À 24 GHz,
+λ ≈ 12,5 mm ; à 60,5 GHz, λ ≈ 5 mm. Les propriétés électriques des matériaux
+de construction et leurs coefficients de réflexion/transmission sont traités
+par la [recommandation ITU-R P.2040](https://www.itu.int/rec/R-REC-P.2040/en).
 
-Un mur peint, une porte, une vitre sont donc des **miroirs** aux fréquences
-visées. Conséquences pour la cartographie :
+Un mur, une porte ou une vitre ne peut donc pas être qualifié de miroir sur le
+seul fait qu'il est peint ou lisse à l'œil. Les mesures publiées à 60 GHz
+montrent que la rugosité change la part spéculaire et diffusée. Les coins
+peuvent donner des retours forts par réflexions multiples, mais leur amplitude
+dépend de leur matériau, de leur forme et de leur orientation. Des trajets
+indirects peuvent produire des images derrière les parois ; un point estimé
+sous le plancher est suspect, mais pas une preuve universelle de fantôme sans
+connaître le repère et la géométrie.
 
-- **Écho fort seulement en incidence quasi normale.** Quand le faisceau
-  frappe un mur de biais, l'énergie repart de l'autre côté de la normale,
-  loin du radar ; seule une faible part diffuse revient (les modèles de
-  propagation millimétrique en intérieur retiennent, pour une plaque de
-  plâtre, un coefficient de diffusion de l'ordre de 0,3 en amplitude).
-- **Les coins sont brillants.** Un dièdre (deux murs) ou un trièdre (deux
-  murs et le sol ou le plafond) renvoie l'onde vers sa source sur une large
-  plage d'angles : ce sont les points les plus visibles d'une pièce, bien
-  plus que les murs eux-mêmes.
-- **Images miroirs.** Une cible vue par rebond sur un mur apparaît derrière
-  ce mur (§1.4 point 5) ; vue par rebond sur le sol, elle apparaît **sous le
-  plancher**. Un point sous le niveau du sol est donc, à coup sûr, un
-  fantôme — un filtre gratuit.
-- **Placement du capteur de cartographie.** Près du centre de la pièce,
-  chaque mur présente une zone vue en incidence normale. Dans un coin, les
-  deux murs adjacents ne sont vus qu'en incidence rasante et disparaissent
-  presque de la carte.
+Le simulateur rend encore un écho de mur indépendant de l'incidence.
+Son bruit uniforme, ses amplitudes de cible indépendantes de la portée, la
+combinaison par maximum, le mur rectangulaire idéal et l'absence de phase, de
+Doppler RF et de trajets multiples cohérents en font un scénario de
+développement, pas une validation de propagation. Il faut relever la réponse
+de l'A121 face à des matériaux connus et à plusieurs angles avant d'en tirer
+une carte attendue.
 
-La carte réelle attendue : des **taches** là où le faisceau frappe les murs
-de face, des coins très marqués, et des pans de mur faibles ou absents entre
-les deux. Ces vides relèvent de la physique de la réflexion, pas d'un défaut
-du traitement.
+### 1.7 Vérification physique et compatibilité des interfaces
+
+La revue des fiches, des contrats et du code établit un écart bloquant avant
+tout branchement direct :
+
+| Élément | Ce que le système fournit ou suppose | Ce qu'il faut pour le capteur réel |
+| ------- | ------------------------------------ | ---------------------------------- |
+| `Radar_Sweep.Sweep` | 256 valeurs d'amplitude 0..4095, plage linéaire fixe de 20 m | A121 : profil et plage sélectionnés, pas de distance, points IQ complexes ; conversion et calibration explicites |
+| `Radar_Source.Measurement` | azimut, élévation, heure, un seul `Sweep` ; pas d'identifiant ni de pose capteur | capteur, horodatage de capture et extrinsèques par module ; angle mesuré par index/encodeur pour le scanner |
+| LD2450 | aucun adaptateur dans le dépôt ; sortie série déjà traitée en cibles planaires | décodage série + rapport 2D horodaté ; ne pas fabriquer un `Sweep` ni une altitude |
+| A121/XM125 | aucun pilote matériel dans le dépôt | choisir le firmware XM125 ou le chemin A121 qui expose les données requises, puis mapper plage/étape/IQ/calibration |
+
+Le principe de `Radar_Source` reste central : développer et éprouver le
+traitement de profils sur simulation, puis remplacer le producteur A121 sans
+réécrire le pipeline. `Radar_Target_Source` est la frontière séparée pour
+les rapports déjà calculés, à condition qu'ils soient honnêtement
+représentables en 3D. Le LD2450 reste une source planaire : avant de l'utiliser
+pour le suivi rapide, le code doit introduire un type d'observation 2D et un
+filtre de piste 2D. Poser `z = 0` dans `Frame` ferait passer une convention
+de dessin pour une mesure d'altitude. Chaque flux matériel devra avoir un
+équivalent simulé avec le même sens physique ; la fusion se fera ensuite dans
+un repère commun, après calibration des poses et des horloges.
+
+La transformation 3D actuelle suppose le radar à l'origine. Une couronne de
+LD2450 exige, pour chaque module, une rotation et une translation vers le repère
+global ; la fusion demande aussi des horloges comparables. Le timestamp unique
+d'une `Frame` ne suffit pas à corriger le déplacement d'une cible pendant un
+scan mécanique long. Ces éléments doivent entrer dans les contrats Ada, sans
+logique de décision dans la page HTML.
+
+La base de temps actuelle est un entier de 31 bits en millisecondes
+(`0 .. 2**31 - 1`), soit environ 24,9 jours. La source simulée l'incrémente
+sans retour circulaire ; le pistage suppose des timestamps strictement
+croissants et calcule zéro durée quand un timestamp régresse. Avant un usage
+continu, il faut définir le calcul wrap-safe des écarts ou étendre l'époque,
+ainsi que le traitement d'un redémarrage et de trames hors ordre. Pour plusieurs
+capteurs, leurs horloges doivent d'abord être ramenées sur une base commune.
+
+**Contrat de temps recommandé avant le multi-capteur :** séparer le temps
+interne du champ `TIMESTAMP` v1. Le pipeline et `Radar_Track` devraient porter
+un temps monotone interne sur 64 bits ; le champ 32 bits du protocole reste une
+représentation de transport, avec son origine et son comportement au rebouclage
+définis séparément. La source simulée garde son horloge virtuelle déterministe,
+ce qui préserve le rejeu identique. Chaque adaptateur réel étend son compteur de
+capture et le ramène à une époque commune. Une trame ancienne ou issue d'un
+redémarrage doit être rejetée ou provoquer une remise à zéro explicite du
+pistage ; la convertir silencieusement en `dt = 0` masque la rupture temporelle.
+Cette recommandation n'est pas encore implémentée.
+
+**Cadence de la tourelle à vérifier avant de figer le rapport.** Le croquis
+actuel place le rayon moyen de couronne à `80/2 + 4/2 = 42 mm`, le rayon dessiné
+du pignon à `4 mm` et l'axe moteur à `46 mm` : ces trois valeurs décrivent un
+engrènement géométrique cohérent dans le modèle, mais pas une denture fabriquée.
+Le rapport extérieur représenté est `42/4 = 10,5:1`. Combiné au réducteur
+nominal `64:1` et aux `4096` demi-pas/tour annoncés pour le 28BYJ-48 5 V, cela
+donne `672:1` et environ `43 008` demi-pas par tour de tourelle. À une cadence
+commandée de 100 demi-pas/s, un tour prendrait environ **430 s** ; le retour
+complet à l'index à la même vitesse porterait le mouvement seul à environ
+**14 min 20 s**, avant les acquisitions et les accélérations. Sans l'étage
+extérieur, l'estimation serait 41 s par tour, mais avec moins de couple et une
+granularité angulaire différente. C'est un compromis à trancher à partir du
+temps de cycle acceptable, de l'inertie, du frottement et du couple requis ; le
+nombre de 48 dents visibles dans les maquettes est un motif graphique, pas un
+nombre de dents choisi. Les valeurs du 28BYJ-48 sont celles d'une fiche 5 V
+particulière, pas une garantie pour tout moteur vendu sous ce nom. [Fiche
+28BYJ-48 5 V](https://www.mouser.com/datasheet/2/758/stepd-01-data-sheet-1143075.pdf).
+
+Le moteur reste en boucle ouverte : l'index corrige l'origine après le retour,
+mais ne révèle pas un pas perdu au milieu du balayage. Garder un seul sens de
+mesure puis revenir sans mesurer limite l'effet du jeu, déjà présent dans la
+conception. Avant d'augmenter la réduction, mesurer sur le moteur réel les
+demi-pas par tour, le jeu, les pas perdus et le temps d'un cycle complet. Le
+rapport de couple idéal ne doit pas être déduit du seul chiffre de couple de la
+fiche sans savoir à quel arbre il se rapporte ni tenir compte des pertes.
+
+Le choix de transmission reste ouvert. Une couronne dentée donne un entraînement
+positif et compact sans tendre de courroie, mais demande de fixer le module, le
+nombre de dents, le jeu et la précision d'impression. Une courroie crantée rend
+le rapport plus facile à changer et pardonne un léger défaut d'entraxe ; elle
+ajoute tension, support de galet et élasticité. Entraîner directement le plateau
+retire la réduction extérieure et accélère le balayage, mais demande davantage
+de couple au moteur et augmente l'angle par pas. Un moteur plus rapide avec
+encodeur détecterait les pas perdus pendant le scan, au prix du volume, du
+driver et du logiciel de retour. Le palier indépendant, l'axe central ouvert,
+le moteur fixe et l'index restent de bons invariants : ils séparent charge,
+transmission, câblage et mesure. Le rapport et le type d'entraînement ne peuvent
+être choisis sérieusement qu'après avoir posé le temps de scan accepté, la
+masse/inertie du plateau et l'erreur angulaire tolérée.
+
+Le bloc ULN2003 de `30 x 22 mm` dans la maquette est lui aussi une enveloppe à
+mesurer avec les borniers et les câbles. La fiche du 28BYJ-48 donne `5 V` et
+`50 Ω` par phase : environ `100 mA` par phase par simple calcul résistif avant
+la chute du driver, avec deux phases parfois alimentées ensemble. Prévoir la
+branche moteur et son retour de masse selon la mesure réelle ; le calibre
+`500 mA` d'une sortie ULN2003 ne dimensionne pas à lui seul la puissance
+thermique lorsque plusieurs voies commutent. [Fiche ULN2003A de TI](https://www.ti.com/lit/ds/symlink/uln2003a.pdf).
+
+La maquette actuelle représente cinq LD2450 fonctionnant en FMCW dans la même
+bande 24 GHz ; quatre reste l'option plus légère à caractériser avant de figer
+le nombre. La documentation de recherche sur les radars FMCW montre que les
+paramètres de chirp influent sur l'interférence entre radars ; le comportement
+des LD2450 côte à côte reste à mesurer, car Hi-Link ne publie pas ces
+paramètres sur sa fiche. Quatre modules espacés de 90° donneraient 30° de
+recouvrement géométrique théorique avec des secteurs annoncés de ±60° ; cinq à
+72° en donnent 48°. Quatre réduisent la consommation, les câbles et le nombre
+d'émetteurs, mais offrent moins de marge angulaire. Ce calcul ne décrit pas la
+sensibilité réelle aux bords du faisceau. [Étude d'interférence FMCW](https://doi.org/10.1049/joe.2019.0167).
+
+Le nombre de capteurs a aussi une borne électronique : le STM32G474 dispose de
+USART1 à USART3, UART4 et UART5, plus LPUART1. Dans le routage candidat, LPUART1
+sert au pont ESP32 et les cinq autres voies peuvent recevoir chacune un LD2450.
+Quatre radars laissent donc une voie UART pour l'A121 si son firmware utilise
+ce transport ; cinq consomment les cinq voies capteur. Une sixième entrée radar
+exigerait un concentrateur ou une autre architecture. Ce décompte porte sur les
+périphériques du microcontrôleur, pas sur les broches effectivement exposées :
+leur multiplexage et leur présence sur la carte WeAct restent à vérifier.
+[Fiche STM32G474](https://www.st.com/resource/en/datasheet/stm32g474qb.pdf).
+
+Le diagnostic physique reste donc **analytique**, faute de modules montés et
+de mesures RF. Les essais de validation sont : cartographier portée/angle d'un
+LD2450 seul puis en groupe ; comparer détections manquées et fausses avec un,
+quatre puis cinq émetteurs actifs ; mesurer le motif A121 avec la lentille,
+coque et support finaux ; refaire les acquisitions moteur arrêté et en
+mouvement ; puis calibrer les poses et le biais d'angle sur des cibles aux
+positions mesurées. La transmission mécanique et le routage moteur restent
+des hypothèses tant que ces essais ne sont pas faits.
 
 ---
 
@@ -271,7 +437,7 @@ du traitement.
        +-------+--------+
                | GPIO (plus tard : drivers ULN2003)
                v
-       [2 moteurs : tourelle azimut (rotation CONTINUE) + elevation]
+       [azimut : tour borne, index et retour sans mesure + elevation]
 
 Ce schéma décrit la **première phase** : un capteur unique, pour valider la
 chaîne. La cible est une **couronne** de capteurs fixes orientés dans des
@@ -282,8 +448,9 @@ La décomposition en tâches visée sur la carte (le motif Ravenscar déjà
 démontré par `radar_demo`, transposé au matériel) :
 
                        +-------------------------+
-    [Capteur] --SPI--> |  tache acquisition      |
-                       |                         |
+    [Capteur] <-bus--> |  tache acquisition      |
+      (UART, I2C       |                         |
+       ou SPI)         |                         |
     [Moteurs]  <-GPIO- |  tache moteur / scan    | --> objet protege
                        |                         |     (tampon, prouve)
     [PC] <-UART/WiFi-- |  tache telemetrie       |
@@ -291,55 +458,71 @@ démontré par `radar_demo`, transposé au matériel) :
                           STM32G474 - Ada bare-metal
                               profil Ravenscar
 
-Les moteurs n'ont **pas d'encodeur** : la position angulaire vient du
-comptage de pas depuis une prise d'origine sur butée. C'est ce qui rend la
-dérive possible, et ce qui impose de refaire l'origine régulièrement.
-S'y ajoute le **jeu du réducteur**, de l'ordre du degré sur les petits
-moteurs à engrenages : si le balayage alterne les sens, l'aller et le retour
-sont décalés de ce jeu et chaque mur apparaît **en double**. D'où une
-acquisition dans un seul sens, ou une compensation mesurée du jeu — par
-exemple sur un coin réflecteur placé à position connue.
+Le moteur d'azimut n'a pas d'encodeur : un capteur d'index fixe donne l'origine,
+puis le contrôleur compte les pas sur un tour borné. Le retour à l'index vérifie
+la répétabilité, mais un pas perdu au milieu du balayage ne sera pas détecté
+immédiatement. Le jeu du réducteur se mesure sur le montage ; l'acquisition se
+fait toujours dans le même sens et le retour se fait sans mesure.
 
-Phase matérielle suivante (A121) : même schéma, mais le capteur parle **SPI**
-et livre un profil d'écho par cases de distance (notre type `Sweep`) — c'est
-là que `Detect_Adaptive` (CFAR), `Radar_Clutter` et le pistage, déjà
-cross-compilés pour le Cortex-M4F, tournent **sur la carte**.
+Phase matérielle suivante (XM125/A121) : un service configuré peut exposer des
+profils Sparse IQ via l'Exploration Server ; les registres I²C peuvent exposer
+des résultats de détection selon le micrologiciel. Aucun de ces chemins ne doit
+être assimilé d'avance au `Sweep` fixe du simulateur. Choisir d'abord le
+micrologiciel, la plage, le pas, le format complexe et le transport ; le SPI
+concerne le pilotage direct de la puce A121 ou d'autres capteurs comme le
+BGT60. CFAR, clutter et pistage ne peuvent rester côté carte qu'après avoir
+défini et calibré la conversion des données reçues.
 
 Répartition des rôles :
 
 - Le **STM32 fait le temps réel et le formatage des données, en Ada** — c'est
   la part embarquée du traitement. Pas de FFT lourde sur le MCU.
 - Le **PC** fait le traitement lourd et le rendu 3D.
-- Le **driver capteur est écrit en Ada**. Nuance : pour l'A121, la
-  bibliothèque RSS d'Acconeer étant fermée, ce sera en pratique un
-  **binding Ada → C** (`pragma Import`) plutôt qu'un driver SPI intégralement
-  écrit à la main.
+- Le **driver XM125 est écrit en Ada** pour le lien configuré (UART ou I²C).
+  La bibliothèque RSS fermée ne s'intègre au STM32 que si l'on abandonne le
+  module et pilote directement la puce A121 ; ce choix demanderait alors un
+  binding Ada → C (`pragma Import`).
 
-### 2.2 Comment les ondes sont émises et captées
+### 2.2 Ce que mesurent les capteurs visés
 
-On ne « touche » jamais l'onde : la puce radar fait tout le RF.
+Le chemin RF et la sortie logicielle dépendent du capteur ; il n'existe pas un
+format de mesure commun implicite :
 
-1. La puce génère un signal 24/60 GHz (FMCW : fréquence qui glisse, ou
-   impulsions cohérentes pour l'A121) et l'envoie sur son **antenne TX gravée
-   sur le circuit** (quelques mm : intégrée, pas remplaçable) ;
-2. l'onde part en cône (le « faisceau », large de 40–120° selon le module),
-   rebondit sur ce qu'elle rencontre — un corps humain réfléchit bien, le
-   plâtre absorbe/traverse partiellement à 24 GHz, bloque à 60 GHz ;
-3. l'écho revient sur les **antennes RX** ; la puce mesure le retard
-   (→ distance), le glissement de fréquence (→ vitesse Doppler) et la
-   différence de phase entre RX (→ angle) ;
-4. le module livre le résultat **en numérique** (UART ou SPI). Le travail de ce
-   dépôt commence là.
+1. Le **LD2450** émet en FMCW autour de 24 GHz et possède deux voies de
+   réception. Son traitement embarqué produit des détections de cible et les
+   transmet en série. Le programme hôte ne reçoit pas son profil RF brut.
+2. L'**A121** fonctionne en radar à impulsions cohérentes (PCR) autour de
+   60,5 GHz. Le service Sparse IQ peut fournir des échantillons complexes par
+   distance, selon le profil et la configuration. Une voie TX/RX ne donne pas
+   à elle seule un angle d'arrivée ; la tourelle ou un autre instrument doit
+   fournir la direction.
+3. La scène renvoie une combinaison de réflexions, transmissions et diffusion.
+   Leur importance dépend du matériau, de l'épaisseur, de l'humidité, de la
+   rugosité à l'échelle de la longueur d'onde, de la polarisation et de
+   l'incidence. Une cloison ne peut pas être déclarée opaque ou transparente
+   sur la seule fréquence ; voir §1.6 et [ITU-R P.2040](https://www.itu.int/rec/R-REC-P.2040/en).
+4. Chaque module transforme le signal selon son propre traitement puis expose
+   ses données par une interface définie par le fabricant. Le firmware doit
+   respecter cette représentation au lieu de fabriquer un profil commun qui
+   n'est pas fourni par le capteur.
 
-### 2.3 Sur les « plusieurs faisceaux »
+### 2.3 Balayage mécanique et résolution angulaire
 
-Le vrai multi-faisceaux (phased array type **AESA**) n'est pas réalisable au
-budget hobby. La version abordable est le **beamforming par balayage
-mécanique** (on pointe → on synthétise l'angle), éventuellement complété par du
-beamforming numérique : c'est de cela qu'il s'agit ici, et non d'une antenne
-AESA. Attente réaliste sur le rendu : un nuage de points 3D **épars** — bonne
-résolution en distance, résolution angulaire grossière — et non une maquette
-CAO.
+La tourelle prévue **déplace physiquement un capteur** et associe chaque
+mesure à une direction et une heure. Elle ne synthétise pas une antenne à
+réseau phasé (AESA) et ne crée pas de faisceau plus étroit. Un véritable
+beamforming demanderait plusieurs voies cohérentes, une géométrie d'antennes
+connue et des données de phase calibrées ; les interfaces des modules retenus
+ne fournissent pas aujourd'hui un tel flux commun.
+
+Le balayage mécanique est le choix le plus direct pour donner une direction à
+l'A121, qui possède un seul canal TX/RX. Il évite de concevoir un réseau RF,
+mais échange cette simplicité contre un scan lent, du jeu mécanique, des
+erreurs de pointage et une scène non instantanée. Le LD2450 estime ses cibles
+avec ses deux voies RX, puis ne livre que des détections traitées. Attente
+réaliste : un nuage 3D **épars** — résolution en distance dépendant du profil,
+résolution angulaire limitée par le diagramme mesuré et la mécanique — et non
+une maquette CAO.
 
 ### 2.4 Télémétrie : comment les résultats remontent jusqu'au PC
 
@@ -354,36 +537,34 @@ Le point d'architecture qui compte : l'ESP32 reste un **pont transparent**
 dans le STM32 en Ada, et le pont reste un composant standard de l'industrie
 (« gateway »).
 
-Débits, pour fixer les idées : des pistes (id, x, y, z, vitesse) à 10 Hz =
-**~1 Ko/s** (rien du tout : UART 115200 suffit) ; des profils bruts A121
-≈ 10–20 Ko/s (UART 921600 ou WiFi, confortable) ; de l'IQ brut BGT60 = des
-Mo/s — là il faudra décimer **à bord**, et c'est un argument de plus pour faire
-le traitement sur le STM32.
+Le débit doit être calculé à partir de la sortie réellement configurée. Pour
+Sparse IQ, une estimation de charge utile est
+`échantillons complexes par trame × octets par échantillon × trames par seconde`,
+à laquelle s'ajoutent en-têtes et transport. Profil, plage, nombre de balayages
+et cadence changent ce résultat ; une estimation générique en Ko/s ne doit pas
+servir à choisir le lien ou le processeur.
 
-### 2.5 « Le WiFi perturbe-t-il le radar ? » — Non, et voici pourquoi
+### 2.5 Compatibilité radio et intégration électrique
 
-- Le WiFi émet à **2,4 / 5 / 6 GHz**. Les radars visés écoutent à **24 GHz**
-  (LD2450) ou **60 GHz** (A121, BGT60). Aucun recouvrement : pour le radar, le
-  WiFi n'existe pas (ses filtres d'entrée rejettent tout ce qui n'est pas sa
-  bande). L'ESP32 peut être collé au module.
-- Les **vraies** interférences à connaître :
-  - **deux radars 24 GHz face à face** (deux LD2450 dans la même pièce)
-    peuvent se polluer mutuellement ;
-  - le **ventilateur / rideau** : pas une interférence radio, mais une cible
-    mobile bien réelle pour le Doppler (documenté par les utilisateurs
-    domotique — c'est la carte de clutter et le M-sur-N qui la gèrent) ;
-  - le cas particulier du **coffee-can 2,4 GHz** (projet DIY ultérieur) : lui
-    partage la bande WiFi — interférences dans les deux sens, à faire loin des
-    points d'accès.
-- Sens inverse (le radar perturbe-t-il le WiFi, ou les personnes présentes ?) :
-  puissance émise de l'ordre du **milliwatt**, en bande libre réglementée —
-  sans enjeu.
-
-Conséquence utile : à 60 GHz les ondes **ne traversent pas les cloisons**. Le
-radar ne verra jamais la pièce d'à côté (à 24 GHz, une cloison légère est
-partiellement transparente — les capteurs domotique sont parfois cachés
-derrière un panneau). Le WiFi, lui, traverse : on peut donc être ailleurs dans
-la maison pendant que le radar scanne.
+- Les porteuses Wi-Fi usuelles (2,4, 5 et 6 GHz) sont distinctes des porteuses
+  nominales des LD2450 (24 GHz) et A121 (60,5 GHz). Cela écarte un
+  recouvrement direct des porteuses fondamentales, mais ne démontre pas à lui
+  seul l'immunité du récepteur à proximité d'un ESP32 ou d'un convertisseur.
+  Les émissions hors bande, le couplage proche, les retours d'alimentation et
+  les perturbations conduites doivent être évalués sur l'assemblage final.
+- Le risque de brouillage RF le plus évident à mesurer est celui de plusieurs
+  LD2450 actifs dans la même bande FMCW. Le résultat dépend des signaux et des
+  réglages internes, qui ne sont pas entièrement publiés par la fiche. Les
+  moteurs et ventilateurs peuvent aussi devenir des cibles physiques mobiles
+  ou créer du bruit électrique ; ce sont deux phénomènes différents.
+- Pour choisir l'emplacement de l'ESP32, du convertisseur et des moteurs,
+  comparer les données brutes et les erreurs de transport avec radio Wi-Fi
+  inactive/active, moteur arrêté/en mouvement, puis tous les modules actifs.
+  Séparer les alimentations ou les retours uniquement si la mesure révèle un
+  couplage utile à corriger ; vérifier chutes de tension et réinitialisations.
+- Ne pas déduire puissance d'émission, conformité réglementaire ou innocuité
+  du seul numéro de fréquence. Vérifier les déclarations du module exact et
+  les règles applicables à son pays et à son antenne.
 
 ### 2.6 Décoder les trames du capteur — trois pièges
 
@@ -550,3 +731,71 @@ Ces compteurs (trames reçues, CRC faux, trames perdues) doivent être
 C'est la différence entre un démonstrateur et un instrument : quand la qualité
 du lien se dégrade, il faut le voir **avant** que les pistes deviennent
 farfelues.
+
+### 2.8 Priorités d'exploitation : aperçu, détail, suivi
+
+Les trois résultats demandés n'ont pas la même contrainte temporelle. Le
+logiciel doit conserver trois chemins, puis les réunir dans l'affichage avec
+des horodatages et des niveaux de confiance :
+
+1. **Vue globale rapidement** — le mode `scan` commence par 60 × 8 directions
+   pour donner une carte grossière, puis garde ces points visibles pendant
+   qu'il ajoute le balayage 180 × 24. Dans la simulation, cela donne un aperçu
+   en environ 1,5 s et le détail complet en environ 12,3 s au total. Le second
+   passage couvre encore toute la pièce ; le prochain raffinement utile est de
+   revisiter seulement les secteurs intéressants, mais uniquement quand le
+   scanner sait atteindre un angle demandé et mesurer cet angle.
+2. **Suivre une cible avec peu de délai** — `Radar_Track.Update` travaille
+   déjà sur des frames datées : sa confirmation M-sur-N de trois observations
+   ajoute environ deux intervalles de rapport après la première observation.
+   La fiche officielle LD2450 annonce 10 trames/s, soit environ 200 ms pour ces
+   deux intervalles avant le transport ; cette latence reste à mesurer sur le
+   montage complet. Avec les frames de 840 ms du balayage simulé actuel, la
+   confirmation ajoute environ 1,68 s. Les pertes de détection allongent ce
+   délai. Réduire globalement le seuil de confirmation
+   rendrait les fantômes plus visibles ; il vaut mieux garder ce filtre pour
+   les profils incertains et régler le compromis selon la source et sa qualité.
+3. **Faire les deux en parallèle** — le flux de cibles doit être traité dès
+   son arrivée, avec priorité et horodatage de capture. Le scan A121 peut
+   continuer en tâche de fond pour affiner la géométrie. Il ne faut pas attendre
+   la fin d'un tour mécanique pour publier une cible issue d'un autre capteur.
+
+Le choix matériel suit ces contraintes : un module qui livre des cibles
+directement convient au suivi, mais ne fournit pas les profils nécessaires à
+une carte dense des murs ; le profil A121 donne la matière pour cartographier,
+mais son axe mécanique ne peut pas suivre une personne avec une cadence
+comparable. Les réunir dans un faux format `Sweep` ferait perdre les
+différences de dimension, de vitesse et de confiance. Les positions LD2450
+sont planaires dans le contrat actuel : leur suivi rapide demande encore un
+type 2D, sans altitude inventée. Une couronne de modules peut couvrir plus
+large, mais le chevauchement en 24 GHz et la fusion des repères restent à
+mesurer avant de figer leur nombre.
+
+La boîte protégée `Radar_Buffer.Mailbox` a une politique différente de celle
+de la carte : elle remplace volontairement une mesure non consommée par la
+plus fraîche. C'est cohérent avec le suivi, où une vieille observation ajoute
+de la latence ; ce serait mauvais pour la cartographie. `Radar_Cloud` conserve
+les points jusqu'à sa capacité fixe et compte ceux qu'il rejette ; `map` et
+`scan` signalent alors explicitement que le résultat est incomplet. Cette
+borne protège la mémoire, mais ne garantit pas une collecte sans perte : une
+configuration réelle devra dimensionner la capacité et traiter tout rejet
+comme une carte incomplète. Garder une voie « dernière mesure » pour le
+pistage et un accumulateur distinct pour la carte évite de sacrifier l'un des
+deux usages en partageant un même tampon.
+
+`Radar_Track.Update` reçoit une frame logique et mémorise un seul
+`Last_Stamp`. Une intégration multi-capteurs devra donc convertir les positions
+dans le même repère, regrouper les observations d'un même instant avant
+l'appel au pistage, et retarder ou rejeter une frame arrivée en retard. Des
+appels successifs pour deux capteurs au même instant compteraient deux fois la
+confirmation M-sur-N ; une frame plus ancienne ferait reculer l'horloge du
+tracker. La synchronisation et la fusion sont une étape d'orchestration, pas
+une propriété déjà fournie par les deux contrats de source.
+
+**Limite actuelle :** le mode `scan` et le mode `live` restent deux
+démonstrations séparées, sans capteurs réels ni ordonnanceur commun. Le mode
+`live`, fondé sur des profils, simule un tour toutes les 840 ms et met à jour
+les pistes à la fin du tour ; il ne démontre donc pas un suivi rapide matériel. La
+prochaine intégration doit raccorder le flux planaire à un filtre 2D, garder
+`Radar_Target_Source` pour les rapports réellement 3D, puis faire tourner le
+suivi prioritaire et le scan de détail en parallèle.

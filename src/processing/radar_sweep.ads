@@ -5,24 +5,26 @@
 --  microcontrolleur : ni entrees-sorties, ni horloge, ni exception
 --  propagee, afin de rester cross-compilable (voir radar_core.gpr).
 --
---  Un balayage est un tableau d'amplitudes indexe par case de distance ;
---  toutes les distances sont exprimees en millimetres.
+--  Le modele de balayage est un tableau de niveaux simules par case de
+--  distance ; toutes les distances logicielles sont en millimetres. Ce
+--  format n'est pas le flux natif d'un capteur particulier.
 
 package Radar_Sweep
   with SPARK_Mode => On
 is
 
-   --  Portee maximale du capteur, en millimetres (20 m).
+   --  Plage maximale du modele, en millimetres (20 m), pas une config capteur.
    Max_Range_Mm : constant := 20_000;
 
-   --  Distance physique : type borne, impossible de sortir de 0..20 m.
+   --  Distance du modele, bornee a 0..20 m.
    type Millimeters is range 0 .. Max_Range_Mm;
 
    --  Un balayage est decoupe en cases de distance ("range bins").
    Sweep_Length : constant := 256;
    type Bin_Index is range 1 .. Sweep_Length;
 
-   --  Amplitude de l'echo dans une case : valeur d'un ADC 12 bits.
+   --  Niveau d'echo abstrait sur 12 bits dans le simulateur ; il ne decrit
+   --  ni l'ADC ni l'echelle de sortie d'un capteur reel.
    type Amplitude is range 0 .. 4_095;
 
    --  Le balayage complet : une amplitude par case.
@@ -39,15 +41,16 @@ is
    --  Presence d'une cible : le pic depasse-t-il le seuil ?
    function Has_Target (S : Sweep) return Boolean;
 
-   --  Distance physique du debut de la tranche couverte par une case.
+   --  Distance simulee du debut de la tranche couverte par une case.
    --  On multiplie avant de diviser : 20_000/256 = 78,125 mm par case,
    --  tronquer d'abord (78) fausserait la distance de 110 mm en bout de
-   --  portee. Ecrite en "expression function" : sa definition sert de
-   --  contrat, le prouveur et les clients la voient.
+   --  portee. Ce pas de quantification ne definit pas la resolution de
+   --  distance d'un radar physique. Ecrite en "expression function" : sa
+   --  definition sert de contrat, le prouveur et les clients la voient.
    function Bin_Distance (B : Bin_Index) return Millimeters is
      (Millimeters ((Integer (B) - 1) * Max_Range_Mm / Sweep_Length));
 
-   --  Conversion du pic en distance physique.
+   --  Conversion du pic en distance du modele.
    --  Precondition : il doit y avoir une cible, sinon la distance n'a pas
    --  de sens. Postcondition fonctionnelle : le resultat est exactement
    --  la distance de la case du pic (pas juste "dans les bornes", ce que
@@ -73,8 +76,9 @@ is
    end record;
 
    --  Cherche toutes les cases dont l'amplitude atteint le seuil.
-   --  Contrat fonctionnel prouve : aucune fausse alarme, c'est-a-dire que
-   --  toute cible rapportee depasse reellement le seuil. Une
+   --  Contrat fonctionnel prouve : toute case rapportee depasse le seuil
+   --  calcule par le code. Cela ne garantit ni un taux de fausse alarme
+   --  physique, ni qu'une case au-dessus du seuil est une cible reelle. Une
    --  postcondition du genre "Count <= Max_Targets" ne prouverait rien :
    --  le sous-type Target_Count la garantit deja.
    function Detect_All (S : Sweep) return Detection
@@ -85,7 +89,7 @@ is
    --  Comme Detect_All, mais regroupe les cases consecutives au-dessus du
    --  seuil en une seule cible (le sommet du groupe). Plus realiste : un
    --  objet etale sur plusieurs cases voisines = une cible, pas plusieurs.
-   --  Meme contrat fonctionnel : pas de fausse alarme.
+   --  Meme contrat fonctionnel : chaque case rapportee depasse le seuil.
    function Detect_Clustered (S : Sweep) return Detection
      with Post =>
        (for all K in 1 .. Detect_Clustered'Result.Count =>
@@ -94,8 +98,8 @@ is
    --  ----- Seuil adaptatif CFAR (ARCHITECTURE.md, realisme point 2) -----
    --  Un seuil fixe ne survit pas au monde reel : trop bas, il noie le
    --  pistage de fausses alarmes ; trop haut, il rate les cibles
-   --  faibles. CA-CFAR (Cell-Averaging Constant False Alarm Rate) : le
-   --  seuil de chaque case = bruit moyen de ses voisines x un facteur.
+   --  faibles. Le modele CA-CFAR (Cell-Averaging Constant False Alarm Rate)
+   --  estime ici le bruit local ; son taux de fausse alarme n'est pas calibre.
 
    CFAR_Window : constant := 8;  --  cases moyennees de chaque cote
    CFAR_Guard  : constant := 2;  --  cases ignorees autour de la testee
@@ -114,10 +118,11 @@ is
      (Natural'Max (CFAR_Floor,
                    CFAR_Factor * Natural (Noise_Estimate (S, B))));
 
-   --  Distance aveugle (8 cases = 625 mm, l'ordre de grandeur de la
-   --  portee minimale d'un vrai module 24 GHz) : les premieres cases ne
-   --  sont jamais declarees cibles. Sur un vrai radar, la fuite directe
-   --  TX -> RX les sature ; ici, leurs fausses alarmes CFAR ont en plus
+   --  Zone ignoree par le modele (8 cases, soit 625 mm) : les premieres
+   --  cases ne sont jamais declarees cibles. Cette valeur ne represente
+   --  pas une distance aveugle mesuree d'un module 24 GHz ou A121. Sur un
+   --  vrai radar, les limites proches dependent du capteur et du profil ;
+   --  ici, les fausses alarmes CFAR ont en plus
    --  un vice geometrique : a courte distance, tous les azimuts se
    --  retrouvent proches de l'origine, donc les fausses alarmes s'y
    --  regroupent tour apres tour et fabriquent une piste fantome
@@ -129,9 +134,8 @@ is
 
    --  Detection a seuil adaptatif + regroupement des cases voisines.
    --  C'est elle que le pipeline utilise. Contrats prouves : toute
-   --  cible rapportee depasse le seuil CFAR de sa case (pas de fausse
-   --  alarme par rapport au bruit local) et se trouve au-dela de la
-   --  distance aveugle.
+   --  case rapportee depasse le seuil CFAR calcule pour cette case et se
+   --  trouve au-dela de la zone ignoree par le modele.
    function Detect_Adaptive (S : Sweep) return Detection
      with Post =>
        (for all K in 1 .. Detect_Adaptive'Result.Count =>
