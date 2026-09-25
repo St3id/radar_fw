@@ -82,7 +82,7 @@ jobs:
         run: alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
 
       # ===== Cross-compilation pour la cible embarquee =====
-      # Verifie SANS la carte que le coeur algorithmique (src/processing,
+      # Verifie SANS la carte que le coeur algorithmique (src/core,
       # prouve SPARK) compile pour Cortex-M4F avec le runtime reduit
       # "light" - le processeur du STM32G474 vise. Tout ajout au coeur
       # qui dependrait du PC (Text_IO, Calendar...) casse cette etape.

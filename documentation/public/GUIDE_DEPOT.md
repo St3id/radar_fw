@@ -54,10 +54,12 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 Les sous-dossiers ne sont pas décoratifs : ils correspondent à ce que chaque
 projet de compilation embarque (§4).
 
-### `src/processing/` — le cœur embarquable
+### `src/core/` — le cœur embarquable
 
 Le seul code qui part sur le microcontrôleur. Interdit d'y mettre du
 `Ada.Text_IO` ou du `Ada.Calendar` (règle R7).
+C'est exactement le contenu que compile `radar_core.gpr` pour la cible ARM
+(§4) : le dossier porte le nom du projet qui le vérifie.
 
 | Fichier | Paquet | Rôle | SPARK |
 | ------- | ------ | ---- | ----- |
@@ -68,7 +70,11 @@ Les deux seules unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep` et
 `Radar_Buffer` (`src/tasking/`). Vérifiable d'une commande :
 `grep -rn "SPARK_Mode" src/`
 
-### `src/source/` — d'où viennent les données, et la perception
+### `src/perception/` — voir et suivre : des données brutes aux pistes
+
+Deux étages successifs : d'abord d'où viennent les mesures (les contrats de
+source et le simulateur qui les remplit), ensuite ce qu'on en tire (détections
+3D, regroupement, pistage).
 
 | Fichier | Paquet | Rôle |
 | ------- | ------ | ---- |
