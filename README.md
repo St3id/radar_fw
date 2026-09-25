@@ -250,11 +250,12 @@ fusion LiDAR + radar mmWave sur ESP32
 [Tactical-Radar-System-ESP32-P4](https://github.com/Stevee87/Tactical-Radar-System-ESP32-P4-elcrow-Display),
 MIT). Leur lecture a fait gagner du temps sur trois points précis :
 
-- l'encodage des coordonnées du protocole Hi-Link, en **binaire décalé** et
-  non en complément à deux — de quoi inverser tous les signes sans que rien
-  ne plante ;
-- la **configuration du module, qu'il faut réaffirmer** périodiquement parce
-  qu'il y retombe tout seul ;
+- le **codage des coordonnées** du protocole Hi-Link, qui n'est pas du
+  complément à deux : leurs projets en montrent deux lectures différentes, et
+  leur comparaison avec l'exemple du constructeur a permis de retenir la
+  bonne (un bit de signe) ;
+- la **séquence de configuration multi-cible**, et le prix d'une séquence
+  bloquante ;
 - la **cécité au mouvement tangentiel** d'un capteur Doppler, une limite
   physique qu'une couronne de capteurs ne lève pas et que le pistage doit
   absorber.
