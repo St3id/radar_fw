@@ -207,6 +207,24 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    mécanique, `dt` varie d'une fraction de seconde à des dizaines de
    secondes selon la direction : un rayon figé serait aussitôt trop large,
    puis très vite trop étroit.
+
+   Le délai de survie dépend de ce que l'absence d'écho **prouve**. Dans le
+   champ du capteur, une piste confirmée survit 2,5 s : au-delà, le silence
+   signifie probablement que l'objet est parti. Dans la **zone aveugle**, le
+   silence ne prouve rien : le capteur ne pouvait pas voir. Chaque frame
+   porte donc la portée minimale de son capteur (`Frame.Min_Range`, 625 mm
+   pour la chaîne à profils, dérivée de `Blind_Bins` dans le cœur prouvé),
+   et une piste dont la position prédite s'y trouve survit 10 s. La zone est
+   élargie de la demi-taille d'une cible (200 mm) : l'écho d'une cible
+   étendue s'effondre dès que son **bord** y entre, avant son centre. Mesure
+   en veille simulée sur 254 tours : les deux traversées de la zone aveugle
+   changeaient l'identifiant de l'objet, elles le conservent désormais
+   (6 changements d'identifiant → 4). La portée minimale voyage avec la
+   frame, et non comme une constante du pistage, parce qu'elle est propre à
+   chaque capteur. Les quatre changements restants ont d'autres causes : deux
+   croisements d'objets à moins de 600 mm (`Cluster_Radius`, point 1), un
+   objet au-dessus du faisceau près du radar, dont l'élévation mesurée
+   dérive, et une perte encore inexpliquée.
 5. **Fantômes multitrajet** — **mis en œuvre.** 5 % de probabilité d'écho
    miroir derrière le mur ; c'est la règle M-sur-N qui les étouffe, ce que
    vérifie un test.

@@ -234,6 +234,82 @@ package body Radar_Pipeline_Tests is
               "Passe le delai de coasting, la piste doit mourir");
    end Test_Coast_Is_Time_Based;
 
+   --  Test 5bis : zone aveugle. Une cible qui passe au pied du radar
+   --  devient invisible (Frame.Min_Range) ; ne rien voir y est normal,
+   --  la piste doit donc survivre et garder son identifiant.
+   --
+   --  Scenario calcule a la main (Alpha 0,5, Beta 0,3, dt 1 s) : la
+   --  cible avance de 200 mm/s vers le radar, detectee a 1300, 1100,
+   --  900 puis 700 mm. Position filtree finale 794 mm, vitesse
+   --  -188 mm/s : la prediction est sous 625 + 200 mm, donc "aveugle".
+   --  Apres 6 s sans echo, la cible ressort de l autre cote a -700 mm ;
+   --  la prediction dit -525 mm : 175 mm d ecart, dans la fenetre.
+   --
+   --  La contre-epreuve (Min_Range = 0) rejoue le meme scenario et doit
+   --  tuer la piste : c est elle qui prouve que le champ fait la
+   --  difference, et non un delai de survie trop genereux.
+   procedure Test_Blind_Zone_Coast
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      --  Joue les deux premieres phases avec une portee minimale donnee
+      --  et rend le pistage obtenu.
+      function Run (Min_Range : Float) return Tracker is
+         Trk   : Tracker;
+         Now   : Time_Ms := 0;
+         F     : Frame;
+         Empty : Frame;
+      begin
+         Reset (F);
+         Reset (Empty);
+         F.Min_Range     := Min_Range;
+         Empty.Min_Range := Min_Range;
+         F.Count := 1;
+
+         for N in 0 .. 3 loop
+            F.Items (1) := (Pos      => (1300.0 - Float (N) * 200.0,
+                                         0.0, 0.0),
+                            Distance => 1300.0 - Float (N) * 200.0);
+            Tick (Trk, F, Now);
+         end loop;
+
+         for N in 1 .. 6 loop
+            Tick (Trk, Empty, Now);
+         end loop;
+         return Trk;
+      end Run;
+
+      Blind   : Tracker := Run (Profile_Min_Range);
+      Sighted : constant Tracker := Run (0.0);
+      Id      : constant Natural := First_Active (Blind).Id;
+      Back    : Frame;
+      Now     : Time_Ms := 10 * Turn_Ms;
+      Active  : Natural := 0;
+   begin
+      Assert (First_Active (Blind).Confirmed,
+              "Apres 6 s dans la zone aveugle, la piste doit survivre");
+      Assert (not First_Active (Sighted).Active,
+              "Sans zone aveugle, 6 s sans echo doivent tuer la piste");
+
+      --  La cible ressort de la zone : meme identifiant, pas de piste
+      --  neuve.
+      Reset (Back);
+      Back.Min_Range := Profile_Min_Range;
+      Back.Count     := 1;
+      Back.Items (1) := (Pos => (-700.0, 0.0, 0.0), Distance => 700.0);
+      Tick (Blind, Back, Now);
+
+      for Tk of Blind.Tracks loop
+         if Tk.Active then
+            Active := Active + 1;
+         end if;
+      end loop;
+      Assert (First_Active (Blind).Id = Id and then Active = 1,
+              "La cible ressortie doit garder son identifiant, obtenu"
+              & First_Active (Blind).Id'Image & " pour" & Id'Image);
+   end Test_Blind_Zone_Coast;
+
    --  Test 5ter : association globale. Deux pistes etablies en x=0 et
    --  x=500 ; nouvelles detections en 480 et 950. En glouton (ordre des
    --  pistes), la piste 1 volerait la detection 480 (distance 480 < 600)
@@ -625,6 +701,9 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Coast_Is_Time_Based'Access,
          "Cycle de vie compte en temps, pas en mises a jour");
+      Register_Routine
+        (T, Test_Blind_Zone_Coast'Access,
+         "Pistage : une cible qui traverse la zone aveugle garde son ID");
       Register_Routine
         (T, Test_Speed_Rate_Independent'Access,
          "Vitesse en mm/s independante de la cadence");

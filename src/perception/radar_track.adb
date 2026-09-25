@@ -56,6 +56,19 @@ package body Radar_Track is
    Max_Coast_Confirmed_Ms : constant Time_Ms := 2_500;
    Max_Coast_Tentative_Ms : constant Time_Ms :=   900;
 
+   --  Survie d une piste confirmee dont la position predite est dans la
+   --  zone aveugle du capteur (Frame.Min_Range). La, ne rien voir est
+   --  NORMAL : ce n est pas un indice de disparition.
+   --
+   --  10 s, mesure et non devine : en mode live, un objet lent
+   --  (~130 mm/s) traverse la zone aveugle de 625 mm en 4 a 10 s ; a
+   --  2,5 s, il ressortait avec un nouvel identifiant (3 changements sur
+   --  6 en 254 tours). Pas infini pour autant : c est une piste
+   --  fantome qui reste affichee, et si un AUTRE objet ressort de la
+   --  zone avant l echeance, il herite de l identifiant. 10 s borne ce
+   --  risque a la duree reellement observee.
+   Max_Coast_Blind_Ms : constant Time_Ms := 10_000;
+
    --  Deux pistes actives a moins de cette distance (mm) sont le meme
    --  objet fragmente : elles fusionnent (inferieur au rayon de
    --  regroupement pour ne pas coller deux objets vraiment distincts).
@@ -67,6 +80,26 @@ package body Radar_Track is
    --  Temps ecoule depuis la derniere association de cette piste.
    function Since_Seen (Tk : Track; Now : Time_Ms) return Time_Ms is
      (if Now > Tk.Last_Seen then Now - Tk.Last_Seen else 0);
+
+   --  Demi-taille d une cible, en mm. Une cible n est pas un point : ses
+   --  reflecteurs s etalent autour de son centre (+/-150 mm dans le
+   --  simulateur, epaules d une personne ~ +/-200 mm). Son echo
+   --  s effondre donc des que son BORD entre dans la zone aveugle, bien
+   --  avant son centre. Mesure : un objet perdu a 595 mm reapparaissait
+   --  a 731 mm, alors que sa position predite etait deja ressortie
+   --  (664 mm) - sans cette marge, la piste mourait au bout de 2,5 s.
+   --  C est une propriete de la CIBLE, d ou sa place ici ; la portee
+   --  minimale, propriete du CAPTEUR, voyage dans la frame.
+   Target_Half_Extent : constant Float := 200.0;
+
+   --  La piste est-elle la ou le capteur ne la voit pas en entier ? Les
+   --  positions sont exprimees dans le repere du capteur : la distance
+   --  a l origine est la distance au radar. Un capteur qui voit tout
+   --  (Min_Range = 0) n a pas de zone aveugle, meme avec la marge.
+   function In_Blind_Zone (Tk : Track; F : Frame) return Boolean is
+     (F.Min_Range > 0.0
+      and then Sqrt (Tk.Pos.X ** 2 + Tk.Pos.Y ** 2 + Tk.Pos.Z ** 2)
+               < F.Min_Range + Target_Half_Extent);
 
    function Speed_Of (Tk : Track) return Float is
      (Sqrt (Tk.Velocity.X ** 2 + Tk.Velocity.Y ** 2 + Tk.Velocity.Z ** 2));
@@ -169,19 +202,25 @@ package body Radar_Track is
          end loop;
 
          --  ----- 4a. Pistes non revues ce tour-ci -----
+         --  Le delai de survie depend de ce que l absence d echo PROUVE.
+         --  Une tentative non revue est probablement une fausse alarme :
+         --  delai court. Une piste confirmee dans le champ du capteur a
+         --  pu subir un fading : delai moyen. Une piste confirmee dans
+         --  la zone aveugle n a simplement pas pu etre vue : delai long.
          for I in T.Tracks'Range loop
             if T.Tracks (I).Active and then not Track_Done (I) then
-               T.Tracks (I).Missing := T.Tracks (I).Missing + 1;
-               if (T.Tracks (I).Confirmed
-                   and then Since_Seen (T.Tracks (I), F.Stamp)
-                            > Max_Coast_Confirmed_Ms)
-                 or else
-                  (not T.Tracks (I).Confirmed
-                   and then Since_Seen (T.Tracks (I), F.Stamp)
-                            > Max_Coast_Tentative_Ms)
-               then
-                  T.Tracks (I).Active := False;
-               end if;
+               declare
+                  Tk    : Track renames T.Tracks (I);
+                  Limit : constant Time_Ms :=
+                    (if not Tk.Confirmed then Max_Coast_Tentative_Ms
+                     elsif In_Blind_Zone (Tk, F) then Max_Coast_Blind_Ms
+                     else Max_Coast_Confirmed_Ms);
+               begin
+                  Tk.Missing := Tk.Missing + 1;
+                  if Since_Seen (Tk, F.Stamp) > Limit then
+                     Tk.Active := False;
+                  end if;
+               end;
             end if;
          end loop;
       end;
