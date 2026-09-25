@@ -14,8 +14,9 @@ package body Radar_Detect is
 
    procedure Reset (F : in out Frame) is
    begin
-      F.Count := 0;
-      F.Stamp := 0;
+      F.Count     := 0;
+      F.Stamp     := 0;
+      F.Min_Range := 0.0;
    end Reset;
 
    ---------
@@ -32,6 +33,11 @@ package body Radar_Detect is
       --  appele pour chaque direction du tour, c est l instant ou le
       --  tour s acheve.
       F.Stamp := M.Stamp;
+
+      --  Detect_Adaptive vient de s interdire les premieres cases : la
+      --  frame doit le dire, sinon le pistage croirait vide une zone
+      --  qu il n a simplement pas pu voir.
+      F.Min_Range := Profile_Min_Range;
 
       for K in 1 .. D.Count loop
          exit when F.Count = Max_Detections;
@@ -66,7 +72,10 @@ package body Radar_Detect is
 
    begin
       Reset (Result);
-      Result.Stamp := F.Stamp;   --  le regroupement ne change pas l heure
+      --  Le regroupement ne change ni l heure ni ce que le capteur
+      --  voyait : les oublier ici les perdrait avant le pistage.
+      Result.Stamp     := F.Stamp;
+      Result.Min_Range := F.Min_Range;
 
       --  Pour chaque detection pas encore regroupee...
       for I in 1 .. F.Count loop

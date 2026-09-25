@@ -259,8 +259,11 @@ procedure Radar_Run_Live is
          --  clutter entre la detection et la conversion 3D) et court-
          --  circuite donc Radar_Detect.Add : c est a lui de dater la
          --  frame. Sans cette ligne, le dt vaut son plancher et les
-         --  vitesses sortent mille fois trop grandes.
-         F.Stamp := M.Stamp;
+         --  vitesses sortent mille fois trop grandes. Meme raison pour
+         --  Min_Range : sans lui, une piste qui passe au pied du radar
+         --  serait tenue pour perdue au bout du delai ordinaire.
+         F.Stamp     := M.Stamp;
+         F.Min_Range := Profile_Min_Range;
 
          declare
             D : constant Detection := Detect_Adaptive (M.Data);

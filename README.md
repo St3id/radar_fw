@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada 2022 ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **22 tests AUnit**, rejoués à chaque commit |
+| Tests | **23 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 4 : `track`, `map`, `live`, `scan` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -195,12 +195,13 @@ soit branchée.
 
 ## Tests
 
-**22 tests AUnit** répartis en deux suites :
+**23 tests AUnit** répartis en deux suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
   zénith, regroupement spatial, cycle de vie du pistage (filtre,
-  M-sur-N, coasting, mort des tentatives), deux échos sur un même rayon,
+  M-sur-N, coasting, mort des tentatives, traversée de la zone aveugle),
+  deux échos sur un même rayon,
   murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif,
   pilotage de la source par l'interface,
   format de sérialisation, vitesse en mm/s indépendante de la cadence de

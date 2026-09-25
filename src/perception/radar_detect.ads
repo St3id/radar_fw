@@ -1,5 +1,10 @@
 with Radar_Geometry;  use Radar_Geometry;
 with Radar_Source;    use Radar_Source;
+with Radar_Sweep;
+--  "use type" et non "use" : on veut seulement le "+" de Bin_Index pour
+--  calculer Blind_Bins + 1, pas importer tout Radar_Sweep dans la
+--  visibilite des clients (son type Detection y cotoierait Detection_3D).
+use type Radar_Sweep.Bin_Index;
 
 --  Radar_Detect : le passage des cibles d'un balayage aux detections 3D
 --  d'un tour complet, puis leur regroupement spatial.
@@ -35,16 +40,31 @@ package Radar_Detect is
 
    type Detection_List is array (1 .. Max_Detections) of Detection_3D;
 
-   --  Le resultat d'un tour : les objets vus + leur nombre.
    --  Le resultat d un tour : les objets vus, leur nombre, et QUAND le
    --  tour s est acheve. L horodatage voyage avec la frame jusqu au
    --  pistage : c est lui qui donne le dt entre deux regards, et donc
    --  des vitesses en mm/s au lieu de mm/tour.
+   --
+   --  Min_Range dit jusqu ou le capteur etait AVEUGLE pendant ce tour :
+   --  en deca de cette distance (mm), une absence d echo ne prouve pas
+   --  qu il n y a rien. Le pistage en a besoin pour ne pas enterrer une
+   --  piste qui traverse la zone aveugle. C est un champ de la frame et
+   --  non une constante du pistage, parce que chaque capteur a la sienne.
+   --  0.0 = le capteur voit tout (valeur sure : sans elle, le pistage
+   --  se comporte exactement comme avant).
    type Frame is record
-      Items : Detection_List;
-      Count : Detection_Count;
-      Stamp : Time_Ms := 0;
+      Items     : Detection_List;
+      Count     : Detection_Count;
+      Stamp     : Time_Ms := 0;
+      Min_Range : Float   := 0.0;
    end record;
+
+   --  Zone aveugle de la chaine a profils : Detect_Adaptive ne rapporte
+   --  jamais les Blind_Bins premieres cases, la premiere case visible
+   --  commence donc a Bin_Distance (Blind_Bins + 1) = 625 mm. Derivee du
+   --  coeur prouve plutot que recopiee : changer Blind_Bins la suit.
+   Profile_Min_Range : constant Float :=
+     Float (Radar_Sweep.Bin_Distance (Radar_Sweep.Blind_Bins + 1));
 
    --  Ajoute une detection a la frame (si une mesure contient une cible).
    --  Calcule la position 3D a partir de la direction et de la distance.
