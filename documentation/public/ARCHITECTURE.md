@@ -628,39 +628,77 @@ servir à choisir le lien ou le processeur.
 
 À ne pas confondre avec le protocole de télémétrie de la section suivante :
 ici il s'agit de lire ce que le **module radar** envoie, un format imposé par
-son fabricant. Les points ci-dessous proviennent d'implémentations tierces du
-protocole Hi-Link (famille LD2450 / RD-03D) et restent à confirmer sur le
-manuel du module retenu, mais ils coûtent chacun plusieurs heures à
-redécouvrir.
+son fabricant. Le codage des champs et la cadence ci-dessous sont vérifiés sur
+l'exemple chiffré et la FAQ du manuel Hi-Link du LD2450, et recoupés avec
+l'implémentation LD2450 d'ESPHome ; le comportement de la configuration vient
+d'implémentations tierces (famille LD2450 / RD-03D) et reste à mesurer sur le
+module retenu.
 
 **Structure de trame** — en-tête `AA FF 03 00`, trois blocs cible de 8 octets,
-queue `55 CC`, soit **30 octets** au total. Trois cibles sont toujours
-transmises : les emplacements inutilisés sont simplement nuls.
+queue `55 CC`, soit **30 octets** au total. Chaque bloc porte, en
+petit-boutiste : X (2 octets), Y (2), vitesse (2), résolution de distance (2).
+Trois cibles sont toujours transmises : les emplacements inutilisés sont
+simplement nuls.
 
-**Piège 1 — l'encodage des coordonnées n'est pas du complément à deux.**
-Les coordonnées et les vitesses arrivent en **binaire décalé** : `0x8000`
-représente zéro, au-dessus c'est positif, en dessous négatif.
+**Cadence : 10 trames par seconde** selon le manuel. C'est la borne haute du
+rafraîchissement : rien en aval ne produira plus de dix positions nouvelles
+par seconde et par cible. La liaison n'est pas le goulot — à 256 000 bauds,
+une trame de 30 octets occupe 1,2 ms de ligne, et le module accepte jusqu'à
+460 800 bauds.
 
-    valeur = raw - 16#8000#
+**Piège 1 — ni complément à deux, ni binaire décalé : un bit de signe.**
+Le bit 15 porte le signe (1 = positif, 0 = négatif), les bits 0 à 14 la valeur
+absolue. L'exemple du manuel, à reprendre tel quel comme vecteur de test :
 
-Déclarer un entier signé 16 bits avec une clause de représentation donnerait
-donc **tous les signes faux**. Le symptôme est perfide : les cibles
-apparaissent en miroir par rapport à l'origine, ce qui reste assez plausible
-pour qu'on cherche longtemps ailleurs.
+    AA FF 03 00   0E 03 B1 86 10 00 40 01   8 x 00   8 x 00   55 CC
 
-**Piège 2 — le module oublie sa configuration.** Le mode multi-cible doit
-être demandé explicitement par une séquence de commandes (en-tête
-`FD FC FB FA`, longueur, mot de commande, queue `04 03 02 01`). Sans elle, le
-module démarre dans un état indéterminé et le pistage décroche par
-intermittence. Pire : il peut y **retomber tout seul**, ce qui impose de
-réaffirmer la configuration périodiquement — l'ordre de la minute.
+| Champ | Octets | Brut | Bit 15 | Valeur |
+| ----- | ------ | ---- | ------ | ------ |
+| X | `0E 03` | 782 | 0 | 0 − 782 = **−782 mm** |
+| Y | `B1 86` | 34 481 | 1 | 34 481 − 2¹⁵ = **1 713 mm** |
+| Vitesse | `10 00` | 16 | 0 | 0 − 16 = **−16 cm/s** |
+| Résolution de distance | `40 01` | 320 | — | **320 mm**, non signée |
 
-**Piège 3 — la configuration ne doit rien bloquer.** La séquence comporte des
-attentes entre commandes. Les implémenter par des pauses bloquantes affame la
-liaison série et le réseau, et provoque une perte de données par minute. En
-Ada sous profil Ravenscar, cela s'écrit naturellement comme une **tâche
-périodique** et le problème ne se pose pas ; c'est un des endroits où la
-concurrence déterministe paie comptant.
+    Magnitude : constant Natural := Natural (Raw and 16#7FFF#);
+    Value     : constant Integer :=
+      (if (Raw and 16#8000#) /= 0 then Magnitude else -Magnitude);
+
+Deux lectures fausses circulent, et chacune reste plausible sur la moitié du
+champ. L'entier signé 16 bits (complément à deux) rend les valeurs
+**positives** absurdes : `B1 86` donne −31 055. Le binaire décalé
+(`raw - 16#8000#`) rend les positives justes mais les **négatives**
+absurdes : `0E 03` donne −31 986 mm, qu'un filtre de portée efface sans
+bruit — toute la moitié gauche du champ disparaît. Une version antérieure de
+ce document recommandait le binaire décalé, recopié d'une implémentation
+tierce dont le code contredisait son propre commentaire ; elle est corrigée
+d'après l'exemple du constructeur. Corollaire pour les tests : un émulateur de
+trames et un décodeur écrits avec la même erreur se valident l'un l'autre. Le
+vecteur de test doit venir du manuel, jamais de l'émulateur.
+
+**La vitesse est en cm/s**, pas en mm/s : elle se multiplie par 10 avant
+d'entrer dans le pistage, qui travaille en mm/s. Une implémentation tierce la
+divise par 1000 comme des mm/s, et l'affiche dix fois trop petite.
+
+**Piège 2 — réaffirmer la configuration a un prix.** Le mode multi-cible se
+demande par une séquence de trames de commande (en-tête `FD FC FB FA`,
+longueur, mot de commande, queue `04 03 02 01`) : ouverture du mode
+configuration (`0x00FF`), commande multi-cible (`0x0090`), fermeture
+(`0x00FE`). Une implémentation tierce la **réaffirme chaque minute**, au cas
+où le module retomberait dans un autre mode. Ce retour spontané n'est pas
+documenté par le constructeur, et ESPHome ne le suppose pas : il lit le mode
+(`0x0091`) au démarrage. Or chaque séquence occupe la liaison et le module :
+environ 0,45 s avec des attentes fixes de 50, 200 et 200 ms, contre une
+cinquantaine de millisecondes chez ESPHome, qui ne marque une pause qu'après
+la commande elle-même. Qu'il retombe ou non, et qu'il continue ou non
+d'émettre des cibles pendant la séquence, se mesure sur le module retenu avant
+de payer ce prix toutes les minutes.
+
+**Piège 3 — la configuration ne doit rien bloquer.** Implémentées par des
+pauses bloquantes, ces attentes figeaient la boucle d'une implémentation
+tierce pendant environ 650 ms : liaison série et réseau affamés, un trou
+garanti par minute. En Ada sous profil Ravenscar, cela s'écrit naturellement
+comme une **tâche périodique** et le problème ne se pose pas ; c'est un des
+endroits où la concurrence déterministe paie comptant.
 
 ---
 
