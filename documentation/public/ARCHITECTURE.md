@@ -571,7 +571,10 @@ mesure à une direction et une heure. Elle ne synthétise pas une antenne à
 réseau phasé (AESA) et ne crée pas de faisceau plus étroit. Un véritable
 beamforming demanderait plusieurs voies cohérentes, une géométrie d'antennes
 connue et des données de phase calibrées ; les interfaces des modules retenus
-ne fournissent pas aujourd'hui un tel flux commun.
+ne fournissent pas aujourd'hui un tel flux commun. Une piste différente est
+étudiée au §2.9 : la synthèse d'ouverture en arc affine l'azimut avec un seul
+capteur cohérent décentré, sans réseau d'antennes ; elle n'existe pour
+l'instant qu'en simulation.
 
 Le balayage mécanique est le choix le plus direct pour donner une direction à
 l'A121, qui possède un seul canal TX/RX. Il évite de concevoir un réseau RF,
@@ -895,3 +898,76 @@ les pistes à la fin du tour ; il ne démontre donc pas un suivi rapide matérie
 prochaine intégration doit raccorder le flux planaire à un filtre 2D, garder
 `Radar_Target_Source` pour les rapports réellement 3D, puis faire tourner le
 suivi prioritaire et le scan de détail en parallèle.
+
+### 2.9 Synthèse d'ouverture en arc (simulée)
+
+Un capteur à un seul canal TX/RX, comme l'A121, mesure la distance mais pas
+l'angle. Sur une tourelle, l'angle vient de la direction visée, avec la
+finesse du faisceau : ~65° à mi-puissance pour l'A121 nu (plan H, datasheet
+v1.3), ~17° avec la lentille hyperbolique citée au §1.2. Mais l'A121 est
+**cohérent** : il mesure aussi la phase de l'écho. Monté **décentré**, à la
+distance `r` de l'axe, il décrit un arc ; d'un balayage à l'autre, la phase
+de l'écho d'un point fixe change selon `4π d / λ`. En compensant cette phase
+pour chaque position supposée du point, puis en sommant les balayages, les
+échos s'ajoutent en phase au bon endroit et s'annulent ailleurs : c'est une
+antenne synthétique de la taille de la corde de l'arc, `2 r sin(β/2)` pour
+une ouverture traitée `β`.
+
+    finesse en azimut (premier zero)   ~ lambda / (4 r sin(beta/2))
+    pas maximal le long de l'arc       ~ lambda / (4 sin(beta/2))
+    lambda = 4,96 mm a 60,5 GHz
+
+`Radar_Sar` forme l'image par **rétroprojection** (pour chaque pixel, somme
+cohérente des balayages qui le voient, sans approximation de champ lointain) ;
+`Radar_Sar_Sim` simule des échos complexes (faisceau gaussien, enveloppe du
+profil, phase `−4π d/λ`, amplitude en `1/d²`) et injecte des erreurs
+mécaniques balayage par balayage. Résultats du mode `sar`, **en simulation**
+(une mire ponctuelle à 3 m, profil 2, `r` = 60 mm, un balayage tous les
+1,5°). Les pertes dues aux erreurs aléatoires sont des moyennes sur 30
+tirages, le pire tirage entre parenthèses : un tirage isolé peut être
+chanceux.
+
+| Grandeur | Résultat simulé |
+| -------- | --------------- |
+| Largeur à −3 dB, ouverture traitée 60° | 2,25° (premier zéro théorique 2,37°) |
+| Largeur à −3 dB, ouverture traitée 90° | 1,70° (théorie 1,67°) |
+| Faisceau réel, sans synthèse | 43,6° : la synthèse affine ~19 fois |
+| `r` = 40 / 60 / 80 mm (60°, pas de 1°) | 3,36° / 2,23° / 1,66° |
+| Faux-rond de la tête, 0,10 / 0,14 / 0,20 / 0,50 mm RMS | −0,24 / −0,47 / −0,97 / −6,3 dB au pic (pire : −0,33 / −0,66 / −1,4 / −10) |
+| Erreur d'angle de la tourelle, 0,5° / 1° RMS | −0,48 / −1,8 dB (pire : −0,62 / −2,3) |
+| Gigue de phase résiduelle, 20° / 45° RMS | −0,53 / −2,7 dB (pire : −0,93 / −5,0) |
+| Pas de 1 à 2° par balayage | aucun lobe au-dessus de −20 dB sur ±90° |
+| Pas de 3° par balayage | image fantôme vers ±47°, à −10 dB |
+| Pas de 5° par balayage | image fantôme vers ±27,5°, à −3,6 dB |
+
+La ligne de la gigue de phase sert aussi de contrôle du simulateur : une
+erreur de phase gaussienne d'écart-type `σ` (en radians) réduit en théorie
+une somme cohérente d'un facteur `exp(−σ²/2)` en amplitude, soit
+`−4,34 σ²` dB : −0,53 dB pour 20°, −2,68 dB pour 45°. La simulation
+retrouve ces valeurs.
+
+Trois enseignements. Le **faux-rond du rayon** est la contrainte critique :
+un écart radial allonge directement le trajet aller-retour, et la phase
+tourne de 360° pour λ/2 ≈ 2,5 mm. L'**erreur d'angle** l'est beaucoup
+moins : à 60 mm, 0,5° déplace l'antenne de 0,52 mm de côté et ne coûte pas
+plus que 0,14 mm de faux-rond, car un décalage tangentiel change à peine la
+distance aux cibles proches de l'axe de visée. Et le **pas
+d'échantillonnage** suit la règle de Nyquist : au-delà de 2,37° par balayage
+(60 mm, 60° d'ouverture), une image fantôme (lobe de réseau) apparaît, plus
+proche du vrai point et plus forte à mesure que le pas grandit. La formule
+simple `sin ψ ≈ λ / (2 r Δφ)` en donne l'ordre de grandeur (52° pour un pas
+de 3°, 28° pour 5°) ; la simulation la place à 47° et 27,5°. L'écart à 3°
+vient du faisceau : le fantôme se forme surtout avec les balayages les plus
+tournés vers la cible, au bord de l'ouverture traitée. Un pas de 2°
+(180 balayages par tour) reste sous la limite.
+
+Ce sont des chiffres de **modèle**, pas des mesures : faisceau gaussien,
+phase idéalement plate le long de l'impulsion (option *phase enhancement* de
+l'A121), mire ponctuelle, aucune réflexion multiple. La gigue de phase réelle
+peut être estimée à chaque balayage par un sous-balayage de bouclage
+(*loopback* : l'impulsion est mesurée sur la puce, sans passer par l'air),
+comme le fait le détecteur de distance d'Acconeer pour ses mesures proches.
+Le bouclage n'est pas autorisé en profil 2 (`acc_config.h`) : ce
+sous-balayage devra utiliser un autre profil, et la corrélation de la gigue
+entre profils reste à vérifier. Le faux-rond réel d'une tourelle imprimée
+reste lui aussi à mesurer, sur un coin réflecteur.

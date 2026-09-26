@@ -74,7 +74,8 @@ Les deux seules unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep` et
 
 Deux étages successifs : d'abord d'où viennent les mesures (les contrats de
 source et le simulateur qui les remplit), ensuite ce qu'on en tire (détections
-3D, regroupement, pistage).
+3D, regroupement, pistage). À part, l'imagerie par synthèse d'ouverture, pour
+l'instant simulée (ARCHITECTURE §2.9).
 
 | Fichier | Paquet | Rôle |
 | ------- | ------ | ---- |
@@ -84,6 +85,8 @@ source et le simulateur qui les remplit), ensuite ce qu'on en tire (détections
 | `radar_world.ads/.adb` | `Radar_World` | la vérité terrain : objets mobiles, murs |
 | `radar_detect.ads/.adb` | `Radar_Detect` | détections 3D d'un tour + regroupement spatial |
 | `radar_track.ads/.adb` | `Radar_Track` | le pistage : association, alpha-beta, M-sur-N, fusion |
+| `radar_sar.ads/.adb` | `Radar_Sar` | synthèse d'ouverture en arc : rétroprojection, mesure du pic |
+| `radar_sar_sim.ads/.adb` | `Radar_Sar_Sim` | échos complexes d'un capteur décentré, erreurs mécaniques |
 
 ### `src/geometry/` — les maths
 
@@ -103,11 +106,12 @@ source et le simulateur qui les remplit), ensuite ce qu'on en tire (détections
 
 | Fichier | Rôle |
 | ------- | ---- |
-| `radar_fw.adb` | le point d'entrée : aiguille vers `track`, `map`, `live`, `scan` |
+| `radar_fw.adb` | le point d'entrée : aiguille vers `track`, `map`, `live`, `scan`, `sar` |
 | `radar_run_tracking.adb` | mode `track` — génère `out/radar_tracking_3d.html` |
 | `radar_run_mapping.adb` | mode `map` — génère `out/radar_3d.html` |
 | `radar_run_live.adb` | mode `live` — serveur temps réel |
 | `radar_run_scan.adb` | mode `scan` — serveur, cartographie progressive |
+| `radar_run_sar.adb` | mode `sar` — synthèse d'ouverture simulée, résultats en texte |
 | `radar_http.ads/.adb` | `Radar_Http` : le serveur HTTP en Ada, partagé par `live` et `scan` |
 | `radar_html.ads/.adb` | `Radar_Html` : helpers de sérialisation |
 
@@ -124,6 +128,7 @@ source et le simulateur qui les remplit), ensuite ce qu'on en tire (détections
 | `run_tests.adb` | le lanceur (produit `bin/run_tests`) |
 | `radar_sweep_tests.ads/.adb` | suite 1 : traitement du balayage |
 | `radar_pipeline_tests.ads/.adb` | suite 2 : géométrie, regroupement, pistage, clutter, CFAR |
+| `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
 
 ---
 
@@ -151,6 +156,7 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
     alr exec -- ./bin/radar_fw map     # mode map    -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live    # mode live   -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan    # mode scan   -> http://localhost:8080
+    alr exec -- ./bin/radar_fw sar     # mode sar    -> resultats dans la console
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr   # compiler les tests
     alr exec -- ./bin/run_tests                     # les lancer
@@ -162,7 +168,8 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
     alr exec -- gprbuild -p -P radar_core.gpr   # le garde-fou ARM
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
-`live` et `scan`, ouvrir l'URL pendant que le programme tourne.
+`live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`
+n'écrit rien : il affiche ses mesures dans la console.
 
 ---
 
