@@ -21,8 +21,8 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **23 tests AUnit**, rejoués à chaque commit |
-| Modes d'exploitation | 4 : `track`, `map`, `live`, `scan` |
+| Tests | **27 tests AUnit**, rejoués à chaque commit |
+| Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
 | Source de données | simulateur reproductible — aucun matériel à ce jour |
@@ -40,6 +40,7 @@ piste planaire ; on ne lui invente pas une altitude.
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
+    alr exec -- ./bin/radar_fw sar   # synthese d'ouverture simulee (texte)
 
 - **`track` — rejeu du pistage.** 60 tours d'un monde d'objets mobiles :
   détection, pistage, vitesses, puis un rejeu animé dans
@@ -64,6 +65,11 @@ piste planaire ; on ne lui invente pas une altitude.
   ce sont des cadences d'animation, pas des mesures du moteur ou du capteur.
   Les nouveaux points sont transmis par lots, sans renvoyer tout le nuage à
   chaque rafraîchissement.
+- **`sar` — synthèse d'ouverture simulée.** Un capteur cohérent décentré de
+  60 mm sur une tourelle voit une mire à 3 m ; la somme cohérente des échos
+  de tout l'arc affine l'azimut de ~44° (faisceau réel) à ~2,2°. Le mode
+  affiche aussi ce que coûtent le faux-rond de la tête, l'erreur d'angle, la
+  gigue de phase et un échantillonnage trop lâche (ARCHITECTURE §2.9).
 
 Les modes `live` et `scan` partagent le même serveur HTTP Ada
 (`Radar_Http`). Pour `track` et `map`, ouvrez le fichier HTML produit
@@ -195,7 +201,7 @@ soit branchée.
 
 ## Tests
 
-**23 tests AUnit** répartis en deux suites :
+**27 tests AUnit** répartis en trois suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -205,7 +211,10 @@ soit branchée.
   murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif,
   pilotage de la source par l'interface,
   format de sérialisation, vitesse en mm/s indépendante de la cadence de
-  balayage, cycle de vie des pistes compté en temps.
+  balayage, cycle de vie des pistes compté en temps ;
+- synthèse d'ouverture en arc : focalisation et finesse conformes à la
+  théorie, gain sur le faisceau réel, tolérances mécaniques, repliement
+  quand l'échantillonnage est trop lâche.
 
 Compiler puis lancer les suites :
 
@@ -219,6 +228,7 @@ Compiler puis lancer les suites :
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
+    alr exec -- ./bin/radar_fw sar   # synthese d'ouverture simulee (texte)
 
 ## Intégration continue
 

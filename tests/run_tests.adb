@@ -4,6 +4,7 @@ with AUnit.Test_Suites;  use AUnit.Test_Suites;
 
 with Radar_Sweep_Tests;
 with Radar_Pipeline_Tests;
+with Radar_Sar_Tests;
 
 --  Lanceur des tests : construit la suite complete et rend un code de
 --  sortie non nul si un seul cas echoue, ce qui suffit a faire echouer
@@ -17,6 +18,7 @@ procedure Run_Tests is
    begin
       S.Add_Test (new Radar_Sweep_Tests.Test_Case);
       S.Add_Test (new Radar_Pipeline_Tests.Test_Case);
+      S.Add_Test (new Radar_Sar_Tests.Test_Case);
       return S;
    end Suite;
 
