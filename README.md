@@ -2,7 +2,7 @@
 
 [![Build, Test & Prove](https://github.com/St3id/radar_fw/actions/workflows/ci.yml/badge.svg)](https://github.com/St3id/radar_fw/actions/workflows/ci.yml)
 
-Chaîne de traitement radar 3D écrite en **Ada 2022 / SPARK** : détection
+Chaîne de traitement radar 3D écrite en **Ada / SPARK** : détection
 prouvée formellement, pistage multi-cibles, restitution 3D dans le
 navigateur.
 
@@ -19,7 +19,7 @@ dans le navigateur.
 
 | | |
 | --- | --- |
-| Langage | Ada 2022 ; `SPARK_Mode` sur le cœur de traitement |
+| Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
 | Tests | **23 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 4 : `track`, `map`, `live`, `scan` |
@@ -239,8 +239,8 @@ cœur pour la cible ARM.
 
 ## Outils
 
-Ada 2022, SPARK, Alire, GNAT — natif et `gnat_arm_elf` pour la cible
-STM32.
+Ada (norme 2012), SPARK, Alire, GNAT — natif et `gnat_arm_elf` pour la
+cible STM32.
 
 ## Remerciements
 

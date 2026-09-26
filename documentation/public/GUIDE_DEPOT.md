@@ -134,9 +134,9 @@ sous-ensemble différent, pour une raison différente.
 
 | Projet | Compile | Pourquoi il existe |
 | ------ | ------- | ------------------ |
-| `radar_fw.gpr` | `app` + `geometry` + `processing` + `source` | l'application PC |
-| `radar_demo.gpr` | `demo` + `tasking` + `processing`, sous `ravenscar.adc` | imposer le profil Ravenscar (il n'importe **pas** la config AUnit, qui violerait `No_Calendar`) |
-| `radar_core.gpr` | `processing` seul, pour `arm-eabi` | le garde-fou embarqué : si le cœur cesse d'être portable, ça casse ici (R7) |
+| `radar_fw.gpr` | `app` + `geometry` + `core` + `perception` | l'application PC |
+| `radar_demo.gpr` | `demo` + `tasking` + `core`, sous `ravenscar.adc` | imposer le profil Ravenscar (il n'importe **pas** la config AUnit, qui violerait `No_Calendar`) |
+| `radar_core.gpr` | `core` seul, pour `arm-eabi` | le garde-fou embarqué : si le cœur cesse d'être portable, ça casse ici (R7) |
 | `radar_fw_tests.gpr` | `tests` + `radar_fw.gpr` | les tests AUnit |
 
 Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
