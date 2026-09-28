@@ -850,6 +850,15 @@ d'après l'exemple du constructeur. Corollaire pour les tests : un émulateur de
 trames et un décodeur écrits avec la même erreur se valident l'un l'autre. Le
 vecteur de test doit venir du manuel, jamais de l'émulateur.
 
+**Zéro garde le bit de signe à 0.** Une capture de la FAQ du manuel montre
+une vitesse nulle codée `00 00`, et non `00 80` : le bit 15 ne vaut 1 que
+pour une valeur strictement positive. Le décodage n'en dépend pas (les deux
+formes se lisent 0), l'encodage d'un émulateur si. Le format est codé dans
+`Radar_Ld2450`, dans le cœur embarquable : l'aller-retour entre codage et
+décodage y est prouvé pour toutes les valeurs, et ses tests reproduisent
+octet pour octet les quatre trames du manuel, l'exemple ci-dessus et les
+trois captures de la FAQ.
+
 **La vitesse est en cm/s**, pas en mm/s : elle se multiplie par 10 avant
 d'entrer dans le pistage, qui travaille en mm/s. Une implémentation tierce la
 divise par 1000 comme des mm/s, et l'affiche dix fois trop petite.
