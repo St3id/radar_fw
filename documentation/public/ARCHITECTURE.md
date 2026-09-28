@@ -620,7 +620,7 @@ signalés comme tels, que les essais du point 8 confirment ou corrigent.
 | Élément | Rôle | Ce qui compte pour la CEM |
 | ------- | ---- | ------------------------- |
 | LD2450 (couronne) | émetteur et victime | FMCW 24,00–24,25 GHz (250 MHz de balayage) ; 5 V, 120 mA en moyenne, source d'au moins 200 mA ; aucune exigence d'ondulation publiée |
-| LD6004 | émetteur et victime | FMCW 58–64 GHz, 12 dBm en sortie et 4 dBi d'antenne ; 3,1–3,5 V, 135 à 600 mA, source d'au moins 1 A, **ondulation ≤ 50 mV, découpage ≥ 2 MHz** si l'alimentation est à découpage |
+| LD6004 | émetteur et victime | FMCW 58–64 GHz, 12 dBm (en sortie selon le manuel, en PIRE selon la page produit : point 7) et 4 dBi d'antenne ; 3,1–3,5 V, 135 à 600 mA, source d'au moins 1 A, **ondulation ≤ 50 mV, découpage ≥ 2 MHz** si l'alimentation est à découpage |
 | A121 (XM125) | émetteur et victime | impulsions cohérentes 57–64 GHz, PIRE 11 dBm ; **ondulation ≤ 25 mV crête à crête de 10 kHz à 4 MHz** sur son 1,8 V numérique ; appel de ~3 à ~75 mA au passage en mesure |
 | TMC2209 + NEMA 17 | source | découpage à 23, 35 (défaut), 47 ou 59 kHz (2/1024 à 2/410 de son horloge de 12 MHz) ; ~1 A par phase, fronts rapides |
 | ULN2003 + 28BYJ-48 | source | commutation inductive au rythme des pas, ~100 mA par phase |
@@ -651,9 +651,10 @@ couronne, un noyau métallique au centre (tôle ou ruban de cuivre) applique
 cette dernière consigne.
 
 À 60 GHz, le LD6004 et l'A121 partagent la bande 57–64 GHz. Même calcul,
-LD6004 à 10 cm (5 dB de PIRE de plus), personne à 3 m : le brouilleur arrive
-entre −5 et +35 dB par rapport à l'écho pour des lobes de −30 à −10 dB de
-chaque côté. L'intégration cohérente de l'A121 rabat une partie de ce signal
+LD6004 à 10 cm (1 ou 5 dB de PIRE de plus que l'A121, selon la valeur du
+fabricant retenue : point 7), personne à 3 m : le brouilleur arrive entre
+−9 et +35 dB par rapport à l'écho pour des lobes de −30 à −10 dB de chaque
+côté. L'intégration cohérente de l'A121 rabat une partie de ce signal
 non corrélé, dans une proportion qu'on ne peut pas chiffrer sans mesure.
 D'où une règle de conception : **réserver la bande 60 GHz à l'A121**, avec
 une couronne tout en 24 GHz ; un LD6004 près de la tête de cartographie ne
@@ -769,8 +770,11 @@ injectera ces défauts, pour que le décodeur soit éprouvé avant le matériel.
   de conformité.
 - 57–64 GHz, annexe 1 bande n1 : 100 mW PIRE et 10 mW en sortie
   d'émetteur. L'A121 (11 dBm PIRE) est déclaré conforme à la directive
-  2014/53/UE. Le manuel du LD6004 annonce 12 dBm en sortie (16 mW), plus que
-  10 mW : écart à clarifier (valeur crête ou moyenne, déclaration du module).
+  2014/53/UE. Pour le LD6004, les deux documents du fabricant se
+  contredisent : 12 dBm en sortie selon le manuel (16 mW, plus que les
+  10 mW), 12 dBm de PIRE selon la page produit, soit 8 dBm en sortie avec
+  l'antenne de 4 dBi (6,3 mW, conforme). Aucune déclaration de conformité
+  n'est publiée : c'est elle qui tranchera.
 - Une lentille augmente la PIRE : ramener le plan E de l'A121 de 53 à 12°
   ajoute ~6,5 dB (~17,5 dBm crête, sous 20 dBm) ; une lentille ronde à 17°
   ajouterait ~11 dB (~22 dBm crête, au-dessus). L'agrément FCC de l'A121 ne
