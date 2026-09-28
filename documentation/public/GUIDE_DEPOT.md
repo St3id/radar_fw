@@ -65,9 +65,11 @@ C'est exactement le contenu que compile `radar_core.gpr` pour la cible ARM
 | ------- | ------ | ---- | ----- |
 | `radar_sweep.ads/.adb` | `Radar_Sweep` | types bornés, seuil, pic, distance, multi-cibles, CFAR | oui |
 | `radar_clutter.ads/.adb` | `Radar_Clutter` | carte de clutter MTI adaptative | pas encore |
+| `radar_ld2450.ads/.adb` | `Radar_Ld2450` | format des trames du LD2450 : codage à bit de signe, encodeur | oui |
 
-Les deux seules unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep` et
-`Radar_Buffer` (`src/tasking/`). Vérifiable d'une commande :
+Les unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep`,
+`Radar_Ld2450` et `Radar_Buffer` (`src/tasking/`). Vérifiable d'une
+commande :
 `grep -rn "SPARK_Mode" src/`
 
 ### `src/perception/` — voir et suivre : des données brutes aux pistes
@@ -129,6 +131,7 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_sweep_tests.ads/.adb` | suite 1 : traitement du balayage |
 | `radar_pipeline_tests.ads/.adb` | suite 2 : géométrie, regroupement, pistage, clutter, CFAR |
 | `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
+| `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage) |
 
 ---
 

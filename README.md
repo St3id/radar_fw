@@ -20,8 +20,8 @@ dans le navigateur.
 | | |
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
-| Vérification formelle | **85 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **27 tests AUnit**, rejoués à chaque commit |
+| Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
+| Tests | **30 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -89,8 +89,9 @@ Au-dessus vient la perception 3D :
 1. `Radar_Source` — le contrat de profil de balayage, utilisé pour
    développer sur simulation puis remplacer la source sans réécrire le
    traitement. `Radar_Target_Source` est le contrat séparé pour les sources
-   qui livrent des positions 3D calculées. Le parseur matériel et l'adaptateur
-   LD2450 planaire restent à faire ;
+   qui livrent des positions 3D calculées. Le format de trame du LD2450 est
+   codé et prouvé (`Radar_Ld2450`, dans le cœur embarquable) ; le parseur
+   matériel et l'adaptateur planaire restent à faire ;
 2. `Radar_Detect` — chaque mesure passe par la détection prouvée puis
    devient un point 3D ; deux objets alignés sur un même rayon donnent
    bien deux détections ;
@@ -130,6 +131,8 @@ Acquis :
 - [x] Concurrence **Ravenscar** réelle : profil imposé à la compilation,
       tâche cyclique, objet protégé prouvé, tâche sporadique.
 - [x] Cross-compilation du cœur prouvé pour Cortex-M4F, sans la carte.
+- [x] **Format de trame du LD2450** prouvé et embarquable : les quatre
+      trames du manuel du fabricant sont reproduites octet pour octet.
 - [x] Serveur HTTP écrit en Ada (`GNAT.Sockets`), partagé par `live` et
       `scan`.
 - [x] Intégration continue sur toutes les branches : build, tests, démo
@@ -149,7 +152,7 @@ Reste à faire :
 ## Vérification formelle
 
 Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
-**85 checks, 0 non prouvé**. Ce qui est établi :
+**112 checks, 0 non prouvé**. Ce qui est établi :
 
 - l'absence d'erreur d'exécution : débordements, indices hors bornes ;
 - des contrats **fonctionnels**, et non des tautologies : `Peak_Bin`
@@ -157,6 +160,9 @@ Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
   `Bin_Distance (Peak_Bin (S))`, et les détecteurs ne rapportent que des
   cases au-dessus de leur seuil logiciel. Cela ne prouve pas un taux de fausse
   alarme réel ni qu'un écho provient d'une cible ;
+- le codage des trames LD2450 (`Radar_Ld2450`) : décoder une valeur codée
+  rend toujours cette valeur, pour les 65 535 possibles, et chaque trame
+  construite porte son en-tête et sa fin ;
 - la terminaison des sous-programmes (aspect implicite
   `Always_Terminates`) ;
 - l'objet protégé `Mailbox`, prouvé dans le contexte Ravenscar (projet
@@ -201,7 +207,7 @@ soit branchée.
 
 ## Tests
 
-**27 tests AUnit** répartis en trois suites :
+**30 tests AUnit** répartis en quatre suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -214,7 +220,9 @@ soit branchée.
   balayage, cycle de vie des pistes compté en temps ;
 - synthèse d'ouverture en arc : focalisation et finesse conformes à la
   théorie, gain sur le faisceau réel, tolérances mécaniques, repliement
-  quand l'échantillonnage est trop lâche.
+  quand l'échantillonnage est trop lâche ;
+- module LD2450 : les quatre trames du manuel reproduites octet pour octet,
+  bit de signe aux limites, emplacements vides.
 
 Compiler puis lancer les suites :
 
