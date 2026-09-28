@@ -605,27 +605,195 @@ Sparse IQ, une estimation de charge utile est
 et cadence changent ce résultat ; une estimation générique en Ko/s ne doit pas
 servir à choisir le lien ou le processeur.
 
-### 2.5 Compatibilité radio et intégration électrique
+### 2.5 Compatibilité électromagnétique (CEM)
 
-- Les porteuses Wi-Fi usuelles (2,4, 5 et 6 GHz) sont distinctes des porteuses
-  nominales des LD2450 (24 GHz) et A121 (60,5 GHz). Cela écarte un
-  recouvrement direct des porteuses fondamentales, mais ne démontre pas à lui
-  seul l'immunité du récepteur à proximité d'un ESP32 ou d'un convertisseur.
-  Les émissions hors bande, le couplage proche, les retours d'alimentation et
-  les perturbations conduites doivent être évalués sur l'assemblage final.
-- Le risque de brouillage RF le plus évident à mesurer est celui de plusieurs
-  LD2450 actifs dans la même bande FMCW. Le résultat dépend des signaux et des
-  réglages internes, qui ne sont pas entièrement publiés par la fiche. Les
-  moteurs et ventilateurs peuvent aussi devenir des cibles physiques mobiles
-  ou créer du bruit électrique ; ce sont deux phénomènes différents.
-- Pour choisir l'emplacement de l'ESP32, du convertisseur et des moteurs,
-  comparer les données brutes et les erreurs de transport avec radio Wi-Fi
-  inactive/active, moteur arrêté/en mouvement, puis tous les modules actifs.
-  Séparer les alimentations ou les retours uniquement si la mesure révèle un
-  couplage utile à corriger ; vérifier chutes de tension et réinitialisations.
-- Ne pas déduire puissance d'émission, conformité réglementaire ou innocuité
-  du seul numéro de fréquence. Vérifier les déclarations du module exact et
-  les règles applicables à son pays et à son antenne.
+La CEM pose trois questions : les éléments du système se gênent-ils entre
+eux, le système gêne-t-il son environnement, supporte-t-il son
+environnement. Ici la première domine : trois familles de radars, deux
+moteurs, des convertisseurs et un émetteur Wi-Fi tiennent dans une tour
+d'une vingtaine de centimètres. Les chiffres viennent des fiches
+constructeur quand elles existent ; les autres sont des ordres de grandeur,
+signalés comme tels, que les essais du point 8 confirment ou corrigent.
+
+**Inventaire : qui émet, qui subit.**
+
+| Élément | Rôle | Ce qui compte pour la CEM |
+| ------- | ---- | ------------------------- |
+| LD2450 (couronne) | émetteur et victime | FMCW 24,00–24,25 GHz (250 MHz de balayage) ; 5 V, 120 mA en moyenne, source d'au moins 200 mA ; aucune exigence d'ondulation publiée |
+| LD6004 | émetteur et victime | FMCW 58–64 GHz, 12 dBm en sortie et 4 dBi d'antenne ; 3,1–3,5 V, 135 à 600 mA, source d'au moins 1 A, **ondulation ≤ 50 mV, découpage ≥ 2 MHz** si l'alimentation est à découpage |
+| A121 (XM125) | émetteur et victime | impulsions cohérentes 57–64 GHz, PIRE 11 dBm ; **ondulation ≤ 25 mV crête à crête de 10 kHz à 4 MHz** sur son 1,8 V numérique ; appel de ~3 à ~75 mA au passage en mesure |
+| TMC2209 + NEMA 17 | source | découpage à 23, 35 (défaut), 47 ou 59 kHz (2/1024 à 2/410 de son horloge de 12 MHz) ; ~1 A par phase, fronts rapides |
+| ULN2003 + 28BYJ-48 | source | commutation inductive au rythme des pas, ~100 mA par phase |
+| Convertisseurs | source | de 150 kHz (LM2596) à 1,5 MHz au plus (MP1584) pour les modules courants |
+| ESP32 | source et victime | 2,4 GHz jusqu'à ~20 dBm ; appels de ~240 mA à l'émission |
+| Liaisons série | victimes | LD2450 à 256 000 bauds **sans somme de contrôle** ; LD6004 avec deux sommes de contrôle ; XM125 par USB (CRC) |
+
+**1. Les radars entre eux.** Un voisin arrive par un seul trajet, en `1/d²`,
+alors que l'écho d'une cible fait l'aller-retour, en `1/R⁴`. Pour deux
+modules identiques distants de `d`, face à une cible de surface équivalente
+`σ` à la distance `R` :
+
+    I/S = (Gl_e x Gl_r) x 4 pi R^4 / (sigma d^2)
+
+où `Gl_e` et `Gl_r` sont les gains d'émission et de réception dans la
+direction de l'autre module, rapportés aux gains dans l'axe (lobes
+latéraux). Couronne de LD2450 : `d` = 5 cm, personne de 1 m² à 5 m, le terme
+`4π R⁴ / (σ d²)` vaut 65 dB ; avec des lobes latéraux de −20, −25 ou
+−30 dB de chaque côté, le voisin arrive **25, 15 ou 5 dB au-dessus de
+l'écho**. Son effet dépend des chirps : deux rampes qui se croisent laissent
+une salve brève (du bruit) ; deux rampes presque parallèles laissent un
+battement stable, donc une cible fantôme à distance fixe qui dérive avec les
+horloges. Hi-Link ne publie pas ses chirps : seule la mesure tranche. Ses
+consignes vont dans le même sens : ne jamais orienter deux radars 24 GHz
+l'un vers l'autre, les éloigner autant que possible, et une plaque
+métallique à l'arrière du module coupe ce qui vient de derrière. Dans la
+couronne, un noyau métallique au centre (tôle ou ruban de cuivre) applique
+cette dernière consigne.
+
+À 60 GHz, le LD6004 et l'A121 partagent la bande 57–64 GHz. Même calcul,
+LD6004 à 10 cm (5 dB de PIRE de plus), personne à 3 m : le brouilleur arrive
+entre −5 et +35 dB par rapport à l'écho pour des lobes de −30 à −10 dB de
+chaque côté. L'intégration cohérente de l'A121 rabat une partie de ce signal
+non corrélé, dans une proportion qu'on ne peut pas chiffrer sans mesure.
+D'où une règle de conception : **réserver la bande 60 GHz à l'A121**, avec
+une couronne tout en 24 GHz ; un LD6004 près de la tête de cartographie ne
+s'envisage qu'après l'essai A121 seul / A121 + LD6004. Entre les deux
+bandes, pas de chemin direct : les harmoniques du 24 GHz tombent à 48 et
+72 GHz, hors de 57–64 GHz.
+
+**2. L'alimentation vers les radars (perturbations conduites).** Un radar
+FMCW traduit une fréquence de battement `f` en distance, `R = c f / (2 S)`,
+où `S` est la pente du chirp. Une ondulation qui atteint sa chaîne de
+réception dans cette bande devient une raie : une fausse cible à distance
+fixe, ou un plancher de bruit relevé. Pour un chirp hypothétique de 250 MHz
+en 100 µs (`S` = 2,5 MHz/µs), 0 à 6 m correspondent à 0–100 kHz : le
+découpage du TMC2209 à 35 kHz tomberait à 2,1 m, son harmonique 2 à 4,2 m.
+C'est l'interprétation la plus simple de l'exigence du LD6004 : au-dessus de
+2 MHz, le découpage sort de la bande utile. Les modules abaisseurs courants
+(LM2596 à 150 kHz, Mini-360 à 340 kHz, MP1584 à 1,5 MHz au plus) restent en
+dessous. Conséquences :
+
+- **LD6004 : régulateur linéaire** (3,3 V, au moins 1 A) depuis un 5 V
+  propre. Il dissipe `(5 − 3,3) × I` : 0,23 W à 135 mA, 1,0 W aux pointes de
+  600 mA ; c'est le courant moyen mesuré qui fixe le refroidissement.
+- **A121** : la carte SparkFun XM125 enchaîne deux régulateurs linéaires
+  (5 V → 3,3 V → 1,8 V, Richtek RT9080). Alimentée par un port USB ordinaire,
+  elle tient a priori les 25 mV ; le risque apparaît sur un 5 V partagé avec
+  les moteurs.
+- **Tour** : distribution en étoile depuis l'entrée, en trois branches :
+  moteur (12 V, au moins 100 µF au plus près du TMC2209), radars (5 V
+  filtré), logique (STM32, ESP32). Le filtre des radars est un LC amorti
+  dont la coupure tombe sous les fréquences de découpage : 10 µH et 100 µF
+  donnent `f0` = 5 kHz, soit en théorie −34 dB à 35 kHz et −59 dB à
+  150 kHz ; les éléments parasites limitent l'atténuation réelle au-delà de
+  quelques centaines de kHz. La résistance série d'un condensateur
+  électrolytique amortit la résonance ; Acconeer décrit la même méthode pour
+  l'A121 (LC à 30 kHz, résistance de 250 mΩ).
+- **28BYJ-48** : bobines sur la branche moteur, pas sur le 5 V des radars
+  (sa version 12 V s'y prête directement), et coupées pendant les balayages
+  de l'A121.
+
+**3. Les moteurs vers les câbles (couplage proche).** Les phases du NEMA 17
+basculent de 12 V en un temps de l'ordre de 100 ns (ordre de grandeur, à
+mesurer), soit ~120 V/µs. Par couplage capacitif, 10 pF entre un fil de
+phase et une ligne série injectent `C dV/dt` ≈ 1,2 mA pendant le front :
+60 mV sur une ligne tenue par une sortie de 50 Ω, plus d'un volt sur une
+entrée à haute impédance. Parades : fils de phase torsadés deux à deux et
+courts ; lignes série torsadées avec leur masse, éloignées des fils moteur ;
+filtre RC à l'entrée de réception (1 kΩ et 100 pF, soit 100 ns, l'échelle
+des fronts à filtrer, encore invisible devant les 3,9 µs d'un bit à
+256 000 bauds) ; vote à trois échantillons de l'USART du STM32 et comptage
+de ses erreurs de bruit et de trame. La broche COM du ULN2003 doit être
+reliée à l'alimentation des bobines : ce sont ses diodes internes qui
+écrêtent les surtensions de coupure.
+
+**4. Le Wi-Fi vers les radars.** 2,4 GHz est loin de 24 et 60 GHz, et les
+antennes des radars le filtrent. Restent deux chemins : le champ proche d'un
+émetteur à ~20 dBm, redressé par les amplificateurs basse fréquence des
+radars (l'enveloppe des paquets devient une perturbation impulsionnelle), et
+les appels de courant d'environ 240 mA sur une alimentation partagée. La
+dixième harmonique du canal 1 (10 × 2,412 = 24,12 GHz) tombe en outre dans
+la bande du LD2450, à un niveau non spécifié et sans doute très faible.
+Parades : antenne de l'ESP32 tournée à l'opposé des radars et aussi loin que
+la tour le permet, puissance d'émission réduite (une pièce ne demande pas
+20 dBm), ESP32 sur la branche logique.
+
+**5. L'intégrité des trames : l'immunité passe aussi par le logiciel.** Une
+trame LD2450 n'a pas de somme de contrôle : en-tête `AA FF 03 00`,
+24 octets de cibles, fin `55 CC`. Un octet corrompu entre les deux passe
+inaperçu et peut déplacer une cible de plusieurs mètres. Le décodeur Ada
+devra donc vérifier la plausibilité de chaque cible : `y` positif (devant le
+capteur), distance dans la portée, vitesse bornée, champ de résolution
+constant (le manuel le dit fixe ; il vaut 360 dans les trois exemples de sa
+FAQ, 320 dans celui du §2.6 : la valeur se relève sur le module réel). Le
+fenêtrage d'association du pistage rejette ensuite les sauts restants.
+Trames rejetées et erreurs d'USART seront comptées et publiées. Un module
+qui se tait ou redémarre (baisse de tension, décharge électrostatique)
+devra être détecté et reconfiguré si besoin : le mode multi-cible est une
+commande de l'hôte, dont la persistance après redémarrage reste à vérifier.
+Le LD6004 (deux sommes de contrôle), le XM125 (USB) et la télémétrie vers
+le PC (§2.7, CRC) sont protégés par leur transport. L'émulateur de capteur
+injectera ces défauts, pour que le décodeur soit éprouvé avant le matériel.
+
+**6. Masses, décharges électrostatiques et collecteur.**
+
+- Dans la configuration visée, la tête (XM125 sur l'USB du PC) et le
+  boîtier (sur sa batterie, données par Wi-Fi) n'ont aucune liaison
+  galvanique : pas de boucle de masse. Pendant les essais câblés au PC,
+  l'adaptateur USB-série et une alimentation 5 V séparée relient les
+  masses ; un chargeur secteur de classe II y injecte alors un courant de
+  fuite à 50 Hz et son bruit de découpage. Une batterie USB évite la question
+  et sert de référence.
+- L'A121 tient 2 kV (modèle du corps humain) et 1 kV (modèle CDM) ; la carte
+  SparkFun protège son USB par un réseau de diodes. Les LD2450 et LD6004 ne
+  publient pas de tenue. Un corps humain atteint couramment plusieurs kV par
+  temps sec : boîtier imprimé isolant, aucune pièce métallique touchable
+  reliée à l'électronique, connecteurs en retrait.
+- Si un collecteur tournant est ajouté, il ne porte que l'alimentation ; les
+  données de la tête passent par radio. Chaque variation de résistance de
+  contact devient un creux de tension : condensateur de réserve et diode de
+  protection (TVS) côté tournant.
+
+**7. Émissions et réglementation (France).**
+
+- Convertisseurs et driver pas-à-pas sont ceux d'une imprimante 3D, avec des
+  câbles courts : une gêne pour la radio domestique est peu probable.
+- 24 GHz, ERC 70-03 (édition de 2024) : 100 mW PIRE en annexe 1 bande m
+  (appareils non spécifiques, 24,00–24,25 GHz) comme en annexe 6 bande m
+  (radiorepérage, 24,05–24,25 GHz). Restrictions françaises : en annexe 6,
+  aucune pour une installation fixe, sinon 0,1 mW PIRE entre 24,10 et
+  24,15 GHz et, en FMCW, 20 mW moyens et 50 mW crête avec un balayage d'au
+  moins 5 MHz/ms ; en annexe 1, 0,1 mW PIRE entre 24,10 et 24,15 GHz. Le
+  LD2450 balaie dès 24,00 GHz, sous le bas de la bande de l'annexe 6, et sa
+  PIRE n'est pas publiée : le cadre qui le couvre se lit dans sa déclaration
+  de conformité.
+- 57–64 GHz, annexe 1 bande n1 : 100 mW PIRE et 10 mW en sortie
+  d'émetteur. L'A121 (11 dBm PIRE) est déclaré conforme à la directive
+  2014/53/UE. Le manuel du LD6004 annonce 12 dBm en sortie (16 mW), plus que
+  10 mW : écart à clarifier (valeur crête ou moyenne, déclaration du module).
+- Une lentille augmente la PIRE : ramener le plan E de l'A121 de 53 à 12°
+  ajoute ~6,5 dB (~17,5 dBm crête, sous 20 dBm) ; une lentille ronde à 17°
+  ajouterait ~11 dB (~22 dBm crête, au-dessus). L'agrément FCC de l'A121 ne
+  couvre d'ailleurs que les lentilles qui n'augmentent pas la PIRE.
+
+**8. Essais sans instrument : les radars se mesurent eux-mêmes.** Chaque
+couplage se teste en A/B, pièce vide, quelques minutes par configuration, en
+comptant ce que les capteurs produisent déjà : détections et fantômes des
+LD2450 et du LD6004, plancher de bruit de l'A121 sur des cases vides,
+erreurs d'USART et trames rejetées.
+
+| Bascule | Couplage visé |
+| ------- | ------------- |
+| moteur arrêté / en rotation | points 2 et 3 (les vibrations, qui ne sont pas de la CEM, se voient aussi) |
+| Wi-Fi au repos / en émission continue | point 4 |
+| batterie USB / chargeur secteur / convertisseur | points 2 et 6 |
+| 1, puis 2, 3 et 4 LD2450 actifs | point 1, 24 GHz |
+| A121 seul / A121 + LD6004 | point 1, 60 GHz |
+
+Seuils proposés : une configuration est acceptée si les fantômes augmentent
+de moins de 5 % et si le plancher de l'A121 monte de moins de 1 dB. Un
+oscilloscope, s'il est disponible, vérifie directement les 25 et 50 mV
+d'ondulation sur les rails.
 
 ### 2.6 Décoder les trames du capteur — trois pièges
 
