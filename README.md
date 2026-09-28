@@ -33,8 +33,9 @@ Les modes de cartographie et le mode `live` basé sur balayages utilisent
 `Radar_Source` et gardent le passage simulation → source réelle. Les capteurs
 qui livrent des positions 3D déjà calculées ont un contrat distinct,
 `Radar_Target_Source`. Aucun adaptateur matériel ne l'utilise encore. Un
-capteur qui ne donne que x/y, comme le LD2450 décrit ici, attend un type de
-piste planaire ; on ne lui invente pas une altitude.
+capteur qui ne donne que x/y, comme le LD2450 décrit ici, entre par un
+troisième contrat, `Radar_Planar_Source`, et attend un pistage planaire ;
+on ne lui invente pas une altitude.
 
     alr run                          # track : rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
@@ -89,9 +90,10 @@ Au-dessus vient la perception 3D :
 1. `Radar_Source` — le contrat de profil de balayage, utilisé pour
    développer sur simulation puis remplacer la source sans réécrire le
    traitement. `Radar_Target_Source` est le contrat séparé pour les sources
-   qui livrent des positions 3D calculées. Le format de trame du LD2450 est
-   codé et prouvé (`Radar_Ld2450`, dans le cœur embarquable) ; le parseur
-   matériel et l'adaptateur planaire restent à faire ;
+   qui livrent des positions 3D calculées, et `Radar_Planar_Source` celui
+   des capteurs planaires comme le LD2450, dont le format de trame est codé
+   et prouvé (`Radar_Ld2450`, dans le cœur embarquable). Le parseur
+   matériel et le pistage planaire restent à faire ;
 2. `Radar_Detect` — chaque mesure passe par la détection prouvée puis
    devient un point 3D ; deux objets alignés sur un même rayon donnent
    bien deux détections ;
@@ -141,9 +143,10 @@ Acquis :
 
 Reste à faire :
 
-- [ ] Type de rapport planaire, pistage 2D, puis adaptateur simulation et
-      matériel du LD2450. Garder le type 3D pour les mesures qui ont réellement
-      une altitude ; fusionner ensuite avec horloges et poses calibrées.
+- [ ] Pistage 2D, puis adaptateurs simulation et matériel du LD2450 (le
+      type de rapport planaire existe). Garder le type 3D pour les mesures
+      qui ont réellement une altitude ; fusionner ensuite avec horloges et
+      poses calibrées.
 - [ ] Raffinement sélectif des seuls secteurs utiles après la passe rapide ;
       le mode `scan` actuel refait encore toute la grille en détail.
 - [ ] Driver capteur en Ada sur STM32 (matériel requis).

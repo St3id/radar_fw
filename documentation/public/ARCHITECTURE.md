@@ -327,16 +327,17 @@ tout branchement direct :
 | ------- | ------------------------------------ | ---------------------------------- |
 | `Radar_Sweep.Sweep` | 256 valeurs d'amplitude 0..4095, plage linéaire fixe de 20 m | A121 : profil et plage sélectionnés, pas de distance, points IQ complexes ; conversion et calibration explicites |
 | `Radar_Source.Measurement` | azimut, élévation, heure, un seul `Sweep` ; pas d'identifiant ni de pose capteur | capteur, horodatage de capture et extrinsèques par module ; angle mesuré par index/encodeur pour le scanner |
-| LD2450 | aucun adaptateur dans le dépôt ; sortie série déjà traitée en cibles planaires | décodage série + rapport 2D horodaté ; ne pas fabriquer un `Sweep` ni une altitude |
+| LD2450 | format de trame codé (`Radar_Ld2450`) et contrat 2D (`Radar_Planar_Source`) ; pas encore de décodeur série | décodage série vers des rapports 2D horodatés ; ne pas fabriquer un `Sweep` ni une altitude |
 | A121/XM125 | aucun pilote matériel dans le dépôt | choisir le firmware XM125 ou le chemin A121 qui expose les données requises, puis mapper plage/étape/IQ/calibration |
 
 Le principe de `Radar_Source` reste central : développer et éprouver le
 traitement de profils sur simulation, puis remplacer le producteur A121 sans
 réécrire le pipeline. `Radar_Target_Source` est la frontière séparée pour
 les rapports déjà calculés, à condition qu'ils soient honnêtement
-représentables en 3D. Le LD2450 reste une source planaire : avant de l'utiliser
-pour le suivi rapide, le code doit introduire un type d'observation 2D et un
-filtre de piste 2D. Poser `z = 0` dans `Frame` ferait passer une convention
+représentables en 3D. Le LD2450 reste une source planaire : son type
+d'observation 2D existe (`Radar_Planar_Source`), mais avant de l'utiliser pour
+le suivi rapide, il faut encore un filtre de piste 2D. Poser `z = 0` dans
+`Frame` ferait passer une convention
 de dessin pour une mesure d'altitude. Chaque flux matériel devra avoir un
 équivalent simulé avec le même sens physique ; la fusion se fera ensuite dans
 un repère commun, après calibration des poses et des horloges.
@@ -1046,8 +1047,9 @@ une carte dense des murs ; le profil A121 donne la matière pour cartographier,
 mais son axe mécanique ne peut pas suivre une personne avec une cadence
 comparable. Les réunir dans un faux format `Sweep` ferait perdre les
 différences de dimension, de vitesse et de confiance. Les positions LD2450
-sont planaires dans le contrat actuel : leur suivi rapide demande encore un
-type 2D, sans altitude inventée. Une couronne de modules peut couvrir plus
+sont planaires et ont leur propre contrat (`Radar_Planar_Source`) : leur
+suivi rapide demande encore un filtre de piste 2D, sans altitude inventée.
+Une couronne de modules peut couvrir plus
 large, mais le chevauchement en 24 GHz et la fusion des repères restent à
 mesurer avant de figer leur nombre.
 

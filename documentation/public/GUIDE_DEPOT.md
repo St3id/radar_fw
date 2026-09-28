@@ -83,6 +83,7 @@ l'instant simulée (ARCHITECTURE §2.9).
 | ------- | ------ | ---- |
 | `radar_source.ads` | `Radar_Source` | le contrat des profils de distance (simulation puis source matérielle) |
 | `radar_target_source.ads` | `Radar_Target_Source` | le contrat pour les frames de détections déjà calculées en 3D |
+| `radar_planar_source.ads` | `Radar_Planar_Source` | le contrat pour les rapports planaires (x, y sans altitude) d'un capteur comme le LD2450 |
 | `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes) |
 | `radar_world.ads/.adb` | `Radar_World` | la vérité terrain : objets mobiles, murs |
 | `radar_detect.ads/.adb` | `Radar_Detect` | détections 3D d'un tour + regroupement spatial |
