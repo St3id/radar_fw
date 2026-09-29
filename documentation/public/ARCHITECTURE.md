@@ -434,6 +434,65 @@ tous les 3° représente 60 profils/s, soit quelques dizaines de ko/s selon la
 plage et le pas configurés. Les mesures du montage (pas par tour, répétabilité
 de l'index, bruit du collecteur sur la liaison série) restent à faire.
 
+**L'angle et l'heure se prennent à la source.** Un point est rangé à l'angle
+attribué à sa mesure : si cet angle est lu avec un retard `Δt` pendant que la
+tête tourne à `ω`, l'erreur vaut `ω × Δt`. À 0,5 tr/s (180°/s), 10 ms de
+retard décalent l'angle de 1,8°, soit 16 cm à 5 m ; à 0,9 tr/s, de 3,2°,
+une cellule entière de la résolution visée. Ce retard vient vite si l'angle
+est lu à la réception des données : un profil d'environ 500 octets met 5,6 ms
+à traverser une liaison série à 921 600 bauds, et un adaptateur USB-série peut
+retenir les octets plusieurs millisecondes de plus. D'où la règle : l'angle et
+l'heure d'une mesure se prennent au début de la mesure, à la source, jamais à
+la réception. Le contrôleur, qui génère les pas, connaît l'angle à chaque
+instant : soit il déclenche lui-même chaque mesure et note l'angle à cet
+instant, soit l'horloge du capteur (ses trames portent une heure à la
+milliseconde) est recalée sur la sienne, ce qui borne l'erreur à environ 0,3°
+à 0,9 tr/s. Un retard constant mais inconnu fait tourner toute la carte d'un
+bloc, d'un angle proportionnel à la vitesse : faire tourner la tête à deux
+vitesses (ou dans les deux sens) et chercher le décalage qui superpose les
+deux cartes mesure ce retard sans instrument ; un coin réflecteur rend la
+mesure nette. Un retard variable, lui, rend la carte floue et ne se corrige
+pas après coup.
+
+**Un blocage ne doit produire aucun point faux.** Un pas-à-pas bloqué ne se
+casse pas : il décroche. C'est la donnée qui devient fausse, puisque le
+logiciel croit la tête en mouvement et range chaque mesure au mauvais angle.
+Trois moyens de détection, du plus grossier au plus fin :
+
+- **l'index** : le temps entre deux passages et le nombre de pas comptés par
+  tour. Un tour de retard au plus, et tout le tour devient suspect ;
+- **la mesure de charge du driver** (StallGuard du TMC2209, broche DIAG) : un
+  rotor bloqué est signalé en quelques millisecondes, mais une courroie qui
+  saute côté plateau lui échappe, et la mesure est peu fiable à très basse
+  vitesse ;
+- **une roue codeuse solidaire du plateau**, 90 fentes lues par deux fourches
+  optiques décalées d'un quart de fente : 360 repères par tour, donc l'angle
+  réel du plateau au degré près, compatible avec l'axe creux et le
+  collecteur. Les pas moteur interpolent entre deux repères, et un pas perdu
+  est révélé au repère suivant.
+
+Le contrôleur suit une machine à états. **Nominal** : l'angle mesuré suit la
+consigne. **Ralenti** : l'écart de poursuite dépasse environ 1° ; la consigne
+de vitesse baisse, car le couple d'un pas-à-pas remonte quand il ralentit.
+**Bloqué** : aucun repère depuis quelques centaines de millisecondes ; le
+courant est coupé, les mesures sont invalidées, une alerte part. **Reprise** :
+petit recul, nouvel essai, puis passage de l'index avant de refaire confiance
+aux angles. **Défaut** : après plusieurs échecs, arrêt jusqu'à une relance
+explicite.
+
+Chaque mesure porte son angle mesuré et un indicateur de validité : une mesure
+douteuse n'entre pas dans la carte, qui garde ses valeurs précédentes avec
+leur âge. Un trou daté vaut mieux qu'un mur mal placé. La synthèse
+d'ouverture vérifie en plus l'écart angulaire entre deux mesures successives :
+au-delà de 2°, le secteur est marqué sous-échantillonné, car un pas de 3° fait
+déjà naître un lobe fantôme (§2.9). La veille ne dépend pas de la tête : la
+couronne continue de suivre pendant un blocage, seules la hauteur des pistes
+et la carte cessent d'être rafraîchies. La charge mesurée par le driver monte
+avant un blocage (frottement, roulement fatigué) : c'est un indicateur d'usure
+à surveiller. Critère d'acceptation : un blocage de 10 s ne produit aucun
+point faux, la couronne continue de suivre, et la tête repart seule après
+recalage par l'index.
+
 Le bloc ULN2003 de `30 x 22 mm` dans la maquette est lui aussi une enveloppe à
 mesurer avec les borniers et les câbles. La fiche du 28BYJ-48 donne `5 V` et
 `50 Ω` par phase : environ `100 mA` par phase par simple calcul résistif avant
@@ -516,12 +575,14 @@ démontré par `radar_demo`, transposé au matériel) :
                           STM32G474 - Ada bare-metal
                               profil Ravenscar
 
-Le moteur d'azimut n'a pas d'encodeur : un capteur d'index fixe donne l'origine,
-puis le contrôleur compte les pas. La tête tourne en continu, toujours dans le
-même sens (voir le choix de transmission en §1.7). L'index, franchi à chaque
-révolution, recale donc le compte à chaque tour : un pas perdu n'est pas
-détecté sur-le-champ, mais il ne survit pas au tour suivant. Un collecteur
-tournant relie la tête au reste du montage.
+Le moteur d'azimut n'a pas d'encodeur : c'est le plateau qui porte la mesure
+d'angle, une roue codeuse de 90 fentes lue par deux fourches optiques, et un
+capteur d'index fixe donne l'origine. Le contrôleur compte les pas entre deux
+repères. La tête tourne en continu, toujours dans le même sens (voir le choix
+de transmission en §1.7) : un pas perdu est révélé au repère suivant, et
+l'index recale le compte à chaque tour. La conduite à tenir en cas de
+ralentissement ou de blocage est décrite au §1.7. Un collecteur tournant
+relie la tête au reste du montage.
 
 Phase matérielle suivante (XM125/A121) : un service configuré peut exposer des
 profils Sparse IQ via l'Exploration Server ; les registres I²C peuvent exposer
