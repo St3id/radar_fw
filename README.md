@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **30 tests AUnit**, rejoués à chaque commit |
+| Tests | **35 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -92,8 +92,9 @@ Au-dessus vient la perception 3D :
    traitement. `Radar_Target_Source` est le contrat séparé pour les sources
    qui livrent des positions 3D calculées, et `Radar_Planar_Source` celui
    des capteurs planaires comme le LD2450, dont le format de trame est codé
-   et prouvé (`Radar_Ld2450`, dans le cœur embarquable). Le parseur
-   matériel et le pistage planaire restent à faire ;
+   et prouvé (`Radar_Ld2450`, dans le cœur embarquable) et que simule un
+   émulateur de liaison série (`Radar_Ld2450_Sim`). Le parseur des trames
+   et le pistage planaire restent à faire ;
 2. `Radar_Detect` — chaque mesure passe par la détection prouvée puis
    devient un point 3D ; deux objets alignés sur un même rayon donnent
    bien deux détections ;
@@ -135,6 +136,11 @@ Acquis :
 - [x] Cross-compilation du cœur prouvé pour Cortex-M4F, sans la carte.
 - [x] **Format de trame du LD2450** prouvé et embarquable : les quatre
       trames du manuel du fabricant sont reproduites octet pour octet.
+- [x] **Émulateur du LD2450** : les octets qu'enverrait le module, dix
+      fois par seconde, pour la scène simulée (distance oblique, champ et
+      portée selon l'angle, trois cibles au plus, bruit, pertes, fantômes),
+      avec les défauts de liaison à la demande (octet abîmé, module muet,
+      redémarrage) ; reproductible à la graine près.
 - [x] Serveur HTTP écrit en Ada (`GNAT.Sockets`), partagé par `live` et
       `scan`.
 - [x] Intégration continue sur toutes les branches : build, tests, démo
@@ -143,10 +149,10 @@ Acquis :
 
 Reste à faire :
 
-- [ ] Pistage 2D, puis adaptateurs simulation et matériel du LD2450 (le
-      type de rapport planaire existe). Garder le type 3D pour les mesures
-      qui ont réellement une altitude ; fusionner ensuite avec horloges et
-      poses calibrées.
+- [ ] Parseur des trames LD2450 et pistage 2D (le format, le type de
+      rapport planaire et l'émulateur existent). Garder le type 3D pour les
+      mesures qui ont réellement une altitude ; fusionner ensuite avec
+      horloges et poses calibrées.
 - [ ] Raffinement sélectif des seuls secteurs utiles après la passe rapide ;
       le mode `scan` actuel refait encore toute la grille en détail.
 - [ ] Driver capteur en Ada sur STM32 (matériel requis).
@@ -210,7 +216,7 @@ soit branchée.
 
 ## Tests
 
-**30 tests AUnit** répartis en quatre suites :
+**35 tests AUnit** répartis en quatre suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -225,7 +231,9 @@ soit branchée.
   théorie, gain sur le faisceau réel, tolérances mécaniques, repliement
   quand l'échantillonnage est trop lâche ;
 - module LD2450 : les quatre trames du manuel reproduites octet pour octet,
-  bit de signe aux limites, emplacements vides.
+  bit de signe aux limites, emplacements vides ; émulateur : cadence,
+  champ et portée, distance oblique et vitesse radiale, défauts de liaison,
+  reproductibilité.
 
 Compiler puis lancer les suites :
 
