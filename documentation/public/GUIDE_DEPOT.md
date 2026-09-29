@@ -84,6 +84,7 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_source.ads` | `Radar_Source` | le contrat des profils de distance (simulation puis source matérielle) |
 | `radar_target_source.ads` | `Radar_Target_Source` | le contrat pour les frames de détections déjà calculées en 3D |
 | `radar_planar_source.ads` | `Radar_Planar_Source` | le contrat pour les rapports planaires (x, y sans altitude) d'un capteur comme le LD2450 |
+| `radar_ld2450_sim.ads/.adb` | `Radar_Ld2450_Sim` | l'émulateur du LD2450 vu de sa liaison série : octets, imperfections, défauts de liaison |
 | `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes) |
 | `radar_world.ads/.adb` | `Radar_World` | la vérité terrain : objets mobiles, murs |
 | `radar_detect.ads/.adb` | `Radar_Detect` | détections 3D d'un tour + regroupement spatial |
@@ -132,7 +133,7 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_sweep_tests.ads/.adb` | suite 1 : traitement du balayage |
 | `radar_pipeline_tests.ads/.adb` | suite 2 : géométrie, regroupement, pistage, clutter, CFAR |
 | `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
-| `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage) |
+| `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage, émulateur) |
 
 ---
 

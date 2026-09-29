@@ -734,8 +734,9 @@ qui se tait ou redémarre (baisse de tension, décharge électrostatique)
 devra être détecté et reconfiguré si besoin : le mode multi-cible est une
 commande de l'hôte, dont la persistance après redémarrage reste à vérifier.
 Le LD6004 (deux sommes de contrôle), le XM125 (USB) et la télémétrie vers
-le PC (§2.7, CRC) sont protégés par leur transport. L'émulateur de capteur
-injectera ces défauts, pour que le décodeur soit éprouvé avant le matériel.
+le PC (§2.7, CRC) sont protégés par leur transport. L'émulateur du capteur
+(`Radar_Ld2450_Sim`, §2.6) injecte déjà ces défauts, pour que le décodeur
+soit éprouvé avant le matériel.
 
 **6. Masses, décharges électrostatiques et collecteur.**
 
@@ -859,6 +860,26 @@ formes se lisent 0), l'encodage d'un émulateur si. Le format est codé dans
 décodage y est prouvé pour toutes les valeurs, et ses tests reproduisent
 octet pour octet les quatre trames du manuel, l'exemple ci-dessus et les
 trois captures de la FAQ.
+
+**L'émulateur remplace le port série, pas le décodeur.** `Radar_Ld2450_Sim`
+produit, dix fois par seconde, les octets qu'un module enverrait pour la
+scène simulée ; le décodeur les lira comme ceux d'un vrai port, puis livrera
+des rapports planaires (`Radar_Planar_Source`). Son modèle de mesure est
+celui d'un capteur à deux antennes de réception horizontales : une distance
+oblique et un angle, d'où `x = R sin θ` et `y = R cos θ`. Une cible plus
+haute ou plus basse que le module paraît donc plus loin : à 1 m devant et
+0,6 m de dénivelé, `y` vaut 1 166 mm. Le champ couvre ±60° sur ±35°, la
+portée suit des relevés d'utilisateurs (8 m dans l'axe, 6 m à 30°, 5 m à
+45°, 1 m à 60°), et seules les trois cibles les plus proches sont
+rapportées. Bruit, pertes, fantômes et défauts de liaison (octet abîmé,
+module muet, redémarrage qui retombe en mono-cible) sont réglables ou
+déclenchés à la demande. Chaque trame porte aussi ce que le module voulait
+envoyer : c'est la vérité à laquelle le décodeur sera comparé. Le hasard
+vient d'un générateur congruentiel écrit dans le paquet, et non de
+`Ada.Numerics.Float_Random`, dont la suite peut changer avec le
+compilateur : la même graine donne les mêmes octets partout. Le côté du `x`
+positif (droite ou gauche), le sens de la vitesse et le comportement après
+un redémarrage restent à vérifier sur un module réel.
 
 **La vitesse est en cm/s**, pas en mm/s : elle se multiplie par 10 avant
 d'entrer dans le pistage, qui travaille en mm/s. Une implémentation tierce la
