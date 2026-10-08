@@ -65,10 +65,14 @@ is
             Result.Targets (Result.Count) := I;
          end if;
 
-         --  Invariants : le compte reste borne, et tout ce qui a ete
-         --  enregistre jusqu'ici depasse reellement le seuil (c'est ce
-         --  second invariant qui porte la postcondition fonctionnelle).
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Invariants : chaque case parcourue ajoute au plus une cible,
+         --  et tout ce qui a ete enregistre jusqu'ici depasse reellement
+         --  le seuil (c'est ce second invariant qui porte la
+         --  postcondition fonctionnelle). "Count <= Max_Targets" ne
+         --  dirait rien : le sous-type Target_Count le garantit deja, et
+         --  le compilateur le signale ("always True") des que les
+         --  contrats s'executent (-gnata).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
          pragma Loop_Invariant
            (for all K in 1 .. Result.Count =>
               S (Result.Targets (K)) >= Detection_Threshold);
@@ -110,7 +114,9 @@ is
             In_Group := False;
          end if;
 
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Au plus une cible enregistree par case parcourue (voir
+         --  Detect_All : la borne Max_Targets, elle, vient du type).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
          --  Si on est dans un groupe, son sommet depasse le seuil ; le
          --  contrat porte sur cette valeur, pas sur une cible physique.
          pragma Loop_Invariant
@@ -225,7 +231,9 @@ is
             In_Group := False;
          end if;
 
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Au plus une cible enregistree par case parcourue (voir
+         --  Detect_All).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
          pragma Loop_Invariant
            (if In_Group
             then Natural (S (Best_Pos)) >= CFAR_Threshold (S, Best_Pos)

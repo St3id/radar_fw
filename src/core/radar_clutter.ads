@@ -40,6 +40,12 @@ package Radar_Clutter is
    --  Nombre d'observations pour qu'une case devienne du clutter.
    Confirm_Level : constant := 2;
 
+   --  Directions : tout azimut fini est accepte (ramene modulo 360), toute
+   --  elevation finie est bornee a la grille. Un angle NON FINI (NaN,
+   --  infini) ne designe aucune case : Learn ignore la mesure et Filter
+   --  ne rend aucune cible, car une detection sans direction connue ne
+   --  peut pas etre placee dans l'espace.
+
    type Clutter_Map is private;
 
    --  Carte vierge (aucune direction apprise).

@@ -35,6 +35,11 @@ package body Radar_Http is
       end loop;
       while First <= Data'Last loop
          Send_Socket (Sock, Data (First .. Data'Last), Last);
+         --  Aucun octet accepte : sans cette sortie, la boucle repartirait
+         --  du meme endroit indefiniment, et le serveur avec elle.
+         if Last < First then
+            raise Socket_Error with "envoi impossible : aucun octet accepte";
+         end if;
          exit when Last >= Data'Last;
          First := Last + 1;
       end loop;
@@ -167,6 +172,14 @@ package body Radar_Http is
       Keep : Boolean := False;
    begin
       Receive_Socket (Sock, Buf, Last);
+
+      --  Connexion fermee sans rien envoyer (une preconnexion abandonnee) :
+      --  il n'y a personne a qui repondre.
+      if Last < Buf'First then
+         Close_Socket (Sock);
+         return;
+      end if;
+
       for I in Buf'First .. Last loop
          Req (Natural (I)) := Character'Val (Buf (I));
       end loop;
@@ -252,6 +265,14 @@ package body Radar_Http is
                --  des qu'elle a ecoute un flux /events (mesure).
                Set_Socket_Option
                  (Conn, Socket_Level, (Receive_Timeout, Timeout => 0.2));
+               --  Meme defaut cote emission : un client qui ne lit plus
+               --  (onglet gele) remplit le tampon d'emission, et un envoi
+               --  bloquant l'attendrait sans fin - /cloud.json du mode scan
+               --  pese assez pour le remplir. 1 s : un client local lit des
+               --  Mo par seconde, seul un client bloque atteint ce delai.
+               --  Les abonnes /events passent ensuite en non bloquant.
+               Set_Socket_Option
+                 (Conn, Socket_Level, (Send_Timeout, Timeout => 1.0));
                Handle (S, Conn, Handler);
             end;
          end;

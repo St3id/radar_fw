@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **37 tests AUnit**, rejoués à chaque commit |
+| Tests | **38 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -101,7 +101,8 @@ Au-dessus vient la perception 3D :
 3. `Cluster` — fusion spatiale des détections d'un même tour ;
 4. `Radar_Clutter` — en surveillance par profils, le décor appris est
    soustrait (MTI) : ne restent que les objets mobiles ;
-5. `Radar_Track` — association globale, identifiants stables, filtre
+5. `Radar_Track` — association gloutonne (la paire piste-détection la
+   plus proche d'abord), identifiants stables, filtre
    alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées (position
    **et** vitesse : deux cibles qui se croisent restent deux pistes),
    regroupement guidé par les pistes et recollage d'une piste perdue qui
@@ -125,8 +126,9 @@ Acquis :
       fenêtre d'association et la durée de coasting se comptent en temps.
 - [x] Pistage robuste : prédiction et coasting, filtre **alpha-beta**,
       confirmation **M-sur-N** (ni les tentatives ni les fantômes ne sont
-      affichés), association globale, fusion anti-fragmentation, exclusion
-      logicielle des 8 premières cases simulées (625 mm).
+      affichés), association gloutonne par paire la plus proche, fusion
+      anti-fragmentation, exclusion logicielle des 8 premières cases
+      simulées (625 mm).
 - [x] **MTI** par carte de clutter adaptative — apprentissage de fond et
       oubli lent — embarquable et cross-compilée pour ARM en CI.
 - [x] Cibles simulées imparfaites : 4 réflecteurs, fading uniforme inspiré
@@ -219,7 +221,7 @@ soit branchée.
 
 ## Tests
 
-**37 tests AUnit** répartis en quatre suites :
+**38 tests AUnit** répartis en quatre suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -227,7 +229,8 @@ soit branchée.
   M-sur-N, coasting, mort des tentatives, traversée de la zone aveugle,
   croisement de deux cibles, recollage d'une piste perdue),
   deux échos sur un même rayon,
-  murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif,
+  murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif
+  (tout angle fini accepté, sans boucle ni exception),
   pilotage de la source par l'interface,
   format de sérialisation, vitesse en mm/s indépendante de la cadence de
   balayage, cycle de vie des pistes compté en temps ;

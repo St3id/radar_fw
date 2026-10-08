@@ -20,17 +20,30 @@ is
       --  Depose un balayage dans la boite (appele par le producteur).
       --  Ecrase l'eventuel balayage precedent non lu : on veut toujours
       --  la donnee la plus fraiche (boite aux lettres, pas une file).
-      procedure Put (S : Sweep);
+      --  Last = True pour le dernier balayage de la serie.
+      procedure Put (S : Sweep; Last : Boolean);
 
       --  Recupere un balayage. entry a barriere : l'appelant est suspendu
       --  tant que la boite est vide ; le reveil est gere par le noyau,
       --  pas par du polling. Ravenscar exige une barriere simple (une
       --  seule variable booleenne) : c'est le cas.
-      entry Get (S : out Sweep);
+      --
+      --  Last dit au consommateur quand s'arreter. Il ne doit PAS compter
+      --  ses lectures : Put ecrase une donnee non lue, si bien qu'un
+      --  consommateur qui attendrait N balayages en recevrait peut-etre
+      --  N - 1, et attendrait le dernier pour toujours. Le dernier
+      --  balayage, lui, ne peut pas etre ecrase : rien ne vient apres.
+      entry Get (S : out Sweep; Last : out Boolean);
+
+      --  Balayages ecrases avant d'avoir ete lus (sature a Natural'Last) :
+      --  une perte doit etre visible, pas silencieuse.
+      function Overwritten return Natural;
 
    private
       Data     : Sweep := (others => 0);
       Has_Data : Boolean := False;
+      Is_Last  : Boolean := False;
+      Lost     : Natural := 0;
    end Mailbox;
 
 end Radar_Buffer;

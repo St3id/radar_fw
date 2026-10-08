@@ -78,7 +78,7 @@ parade retenue :
 | --------------- | ------- | --------------------- |
 | Vitesse = différence de positions brutes | jitter ± 20–30 cm par mesure | vitesse inutilisable sans **filtre** (alpha-beta, puis Kalman) |
 | `Cluster_Radius` fixe 300 mm | cible étendue + jitter | fragmentation d'une personne en 2–3 pistes, ou fusion de 2 personnes proches |
-| Association gloutonne au plus proche | deux personnes qui se croisent | **échanges d'ID** quasi garantis (parade : association globale type hongrois/GNN) |
+| Chaque piste prend la détection la plus proche | deux personnes qui se croisent | **échanges d'ID** quasi garantis (parade retenue : traiter d'abord la paire piste-détection la plus proche au monde, ce qui reste glouton ; l'optimum serait une affectation de type hongrois/GNN) |
 | Une détection = une piste affichée | dropouts + fantômes fréquents | pistes fantômes clignotantes (parade : cycle de vie **M-sur-N**, piste « tentative » non affichée) |
 | Seuil fixe (100) | bruit variable selon distance/scène | fausses alarmes en avalanche OU cibles faibles ratées (parade : **CFAR**) |
 | Clutter appris une fois pour toutes | rideaux, ventilateurs, meubles déplacés | carte de clutter à **oubli lent** (moyenne exponentielle) |
@@ -188,11 +188,27 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    d'environ 520 mm à 3 m. Revers assumé : deux objets réels à moins de
    600 mm fusionnent ; ce rayon est un réglage de regroupement simulé, pas une
    résolution physique mesurée.
-2. **Bruit de fond et CFAR** — **mis en œuvre.** Bruit aléatoire dans chaque
-   case et seuil CA-CFAR (fenêtre 8, garde 2, facteur 4). SPARK prouve ici que
-   toute case rapportée dépasse le seuil calculé par le code ; cela ne prouve
-   ni un taux de fausse alarme physique, ni qu'une case au-dessus du seuil
-   correspond à une cible réelle. Le bruit simulé et les amplitudes doivent
+2. **Bruit de fond et CFAR** — **en place, mais le bruit simulé ne met pas
+   encore le CFAR à l'épreuve.** Bruit aléatoire dans chaque case et seuil
+   CA-CFAR (fenêtre 8, garde 2, facteur 4). SPARK prouve ici que toute case
+   rapportée dépasse le seuil calculé par le code ; cela ne prouve ni un taux
+   de fausse alarme physique, ni qu'une case au-dessus du seuil correspond à
+   une cible réelle.
+
+   Le bruit simulé est **uniforme et borné** (0 à 80), alors que le seuil
+   vaut en moyenne environ 160. Une case de bruit ne le franchit que si sa
+   fenêtre est anormalement calme et que le seuil retombe vers son plancher
+   (60) : environ 1·10⁻⁵ par case (tirage de Monte-Carlo), soit 2 à 3 fausses
+   alarmes par tour de veille simulée, plus celles du bout du profil, où la
+   fenêtre est tronquée. Ce mécanisme n'a rien de physique. Le bruit d'un
+   récepteur a une queue : son amplitude suit une loi de **Rayleigh**. Avec
+   ce même CA-CFAR sur 16 cases et le facteur 4, le taux attendu est
+   d'environ 1·10⁻⁴ par case, soit une **vingtaine** de fausses alarmes par
+   tour. C'est presque trente fois le chiffre idéal (3,5·10⁻⁶) d'un bruit
+   parfaitement connu : l'estimation sur 16 cases seulement coûte cher. Il
+   faudrait un facteur proche de 5 pour revenir à moins d'une fausse alarme
+   par tour. Le CFAR, la règle M-sur-N et la fusion de pistes n'ont donc pas
+   encore été éprouvés à ce régime. Le bruit simulé et les amplitudes doivent
    être recalés sur les données du profil choisi.
 3. **Cycle de vie M-sur-N** — **mis en œuvre.** Une piste tentative reste
    invisible avant 3 détections, et une tentative non revue meurt en
@@ -240,8 +256,8 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    oublié, et un mobile qui ne fait que passer n'empoisonne pas la carte —
    tandis qu'un mobile qui se gare y fond, réalisme assumé. Limite connue du
    mécanisme : la fragmentation d'une cible étendue peut confirmer une piste
-   « ombre » ; ce sont l'association globale et la fusion de pistes, dans
-   `Radar_Track`, qui l'écartent.
+   « ombre » ; ce sont l'association (la paire piste-détection la plus proche
+   d'abord) et la fusion de pistes, dans `Radar_Track`, qui l'écartent.
 
    *Le réglage de l'oubli se calcule.* Une case détectée avec la
    probabilité p gagne en moyenne `p × N / 4` crans par période d'oubli de
@@ -255,11 +271,15 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    plutôt que le nombre de détections (carte de clutter de type MTD)
    supprimerait la cause, mais au prix d'une mémoire que la cible embarquée
    ne peut pas offrir sans réduire la plage utile.
-7. **Émulateur LD2450** — **non implémenté.** Il s'agirait d'une source de
-   niveau détection (x, y, vitesse, cadence et nombre de cibles à confirmer sur
-   la version de trame utilisée, jitter, dropouts, fantômes), afin que le
-   pipeline PC soit prêt avant l'arrivée du module. Il remplacerait
-   l'émulateur trame pour trame, sous réserve de la géométrie par capteur.
+7. **Émulateur LD2450** — **mis en œuvre au niveau de la liaison série.**
+   `Radar_Ld2450_Sim` émet, dix fois par seconde, les octets que le module
+   enverrait pour la scène simulée, au format prouvé de `Radar_Ld2450`, avec
+   ce qu'il voulait envoyer comme vérité : distance oblique, champ de ±60°,
+   portée selon l'angle, trois cibles au plus, jitter, pertes, fantômes et
+   défauts de liaison (octet abîmé, silence, redémarrage). Il remplace le
+   port série, pas le décodeur : le parseur de trames et le pistage planaire
+   restent à écrire, et seront éprouvés contre cet émulateur **et** contre
+   les trames du manuel (§2.6).
 8. **Cartographie progressive** — **mise en œuvre en deux résolutions.** Le
    mode `scan` commence par une couverture globale de 60 × 8 directions, puis
    ajoute une passe détaillée de 180 × 24. Dans la démo, une colonne prend

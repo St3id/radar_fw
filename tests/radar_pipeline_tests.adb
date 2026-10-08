@@ -699,6 +699,44 @@ package body Radar_Pipeline_Tests is
               "Le decor disparu devrait finir par etre oublie");
    end Test_Clutter_Filter;
 
+   --  Test 8bis : la carte de clutter accepte tout angle FINI, sans
+   --  boucler ni lever d'exception (code embarque). Mesure sur l'ancien
+   --  To_Cell : l'elevation de 1E30 levait Constraint_Error ("overflow
+   --  check failed") a sa conversion en entier, et un azimut de 1E30
+   --  bouclait sans fin (toujours en cours apres 10 s) - il etait ramene
+   --  dans [0, 360[ en retranchant 360, et a 1E30, Az - 360.0 vaut Az.
+   procedure Test_Clutter_Any_Angle
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      C   : Clutter_Map;
+      One : constant Detection :=
+        (Targets => (1 => 100, others => Bin_Index'First), Count => 1);
+   begin
+      Clear (C);
+      Learn (C, 9.0, 0.0, One);
+      Learn (C, 9.0, 0.0, One);
+
+      --  La meme direction, ecrite autrement : la meme case.
+      Assert (Filter (C, 369.0, 0.0, One).Count = 0,
+              "369 deg devrait designer la meme case que 9 deg");
+      Assert (Filter (C, -351.0, 0.0, One).Count = 0,
+              "-351 deg devrait designer la meme case que 9 deg");
+
+      --  Elevation demesuree : bornee au bord haut de la grille (+30).
+      Learn (C, 90.0, 1.0E30, One);
+      Learn (C, 90.0, 1.0E30, One);
+      Assert (Filter (C, 90.0, 30.0, One).Count = 0,
+              "Une elevation de 1E30 devrait tomber sur le bord haut");
+
+      --  Azimut demesure : une case, toujours la meme d'un appel a
+      --  l'autre, et un retour (pas de boucle sans fin).
+      Learn (C, 1.0E30, 0.0, One);
+      Learn (C, 1.0E30, 0.0, One);
+      Assert (Filter (C, 1.0E30, 0.0, One).Count = 0,
+              "Un azimut de 1E30 devrait designer une case stable");
+   end Test_Clutter_Any_Angle;
+
    --  Test 9 : CFAR. Un pic net au-dessus du bruit local est detecte ;
    --  un champ uniformement fort n'est pas une cible (chaque case vaut
    --  son bruit voisin) - un seuil fixe est incapable de faire ca.
@@ -894,6 +932,9 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Clutter_Filter'Access,
          "Carte de clutter adaptative (MTI)");
+      Register_Routine
+        (T, Test_Clutter_Any_Angle'Access,
+         "Clutter : tout angle fini, sans boucle ni exception");
       Register_Routine
         (T, Test_CFAR'Access,
          "Seuil adaptatif CFAR");

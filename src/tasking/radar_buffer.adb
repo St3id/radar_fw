@@ -12,9 +12,14 @@ is
       -- Put --
       ---------
 
-      procedure Put (S : Sweep) is
+      procedure Put (S : Sweep; Last : Boolean) is
       begin
+         --  Une donnee encore la n'a pas ete lue : elle est perdue.
+         if Has_Data and then Lost < Natural'Last then
+            Lost := Lost + 1;
+         end if;
          Data     := S;
+         Is_Last  := Last;
          Has_Data := True;
       end Put;
 
@@ -22,11 +27,21 @@ is
       -- Get --
       ---------
 
-      entry Get (S : out Sweep) when Has_Data is
+      entry Get (S : out Sweep; Last : out Boolean) when Has_Data is
       begin
          S        := Data;
+         Last     := Is_Last;
          Has_Data := False;   --  on a consomme la donnee
       end Get;
+
+      -----------------
+      -- Overwritten --
+      -----------------
+
+      function Overwritten return Natural is
+      begin
+         return Lost;
+      end Overwritten;
 
    end Mailbox;
 

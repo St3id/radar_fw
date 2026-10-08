@@ -16,3 +16,11 @@ gnatprove = "^15.1.0"
 
 [[depends-on]]
 aunit = "^26.0.0"
+
+# Contrats evalues a l'execution (-gnata) dans le profil de developpement,
+# celui des tests et de la CI. Sans cette ligne, Alire n'ajoute pas -gnata :
+# les Pre, Post et Assert du code hors SPARK ne sont jamais verifies, et un
+# test peut passer alors qu'un contrat est viole. Le profil release reste
+# sans contrats.
+[build-switches]
+development.contracts = "Yes"
