@@ -149,7 +149,9 @@ procedure Radar_Run_Tracking is
 
       --  Fin d'un tour : regroupement -> tracking -> ecriture d'une frame.
       procedure End_Of_Turn is
-         C : constant Frame := Cluster (F);
+         --  Regroupement guide par les pistes : au croisement du tour 25,
+         --  les deux objets ne fusionnent plus en une detection.
+         C : constant Frame := Cluster (F, Owners (Trk, F));
       begin
          Update (Trk, C);
 

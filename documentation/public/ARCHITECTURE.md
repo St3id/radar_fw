@@ -120,7 +120,12 @@ angulaire nette.
   selon la trueness, le profil et les angles morts. Un pas d'échantillonnage
   réglable jusqu'à environ 2,5 mm ne signifie pas que deux cibles séparées de
   2,5 mm sont résolues : la résolution radiale dépend du profil et se mesure
-  séparément. [A121](https://developer.acconeer.com/a121/),
+  séparément. Ce « 2,5 mm » est d'ailleurs une valeur arrondie : la valeur
+  exacte se lit dans les métadonnées de session (`base_step_length_m`), et un
+  projet public de SAR sur A121 y relève 2,5023 mm. L'écart de 0,09 % paraît
+  négligeable, mais il fait 1,8 mm à 2 m, soit plus que λ/4 (1,24 mm) : de quoi
+  défocaliser une image synthétique. Un adaptateur doit donc lire ce pas, et non
+  supposer 2,5 mm. [Plateforme SAR A121, code de session](https://github.com/BigMorton/acconeer-a121-sar-platform). [A121](https://developer.acconeer.com/a121/),
   [principe PCR et mesure sans angle](https://docs.acconeer.com/en/latest/pcr_tech/overview.html),
   [plage, pas et limites PRF](https://docs.acconeer.com/en/latest/radar_data_and_control/a121/measurement_range.html),
   [résolution radiale](https://docs.acconeer.com/en/latest/figure_of_merits/a121.html),
@@ -1171,6 +1176,24 @@ les pistes à la fin du tour ; il ne démontre donc pas un suivi rapide matérie
 prochaine intégration doit raccorder le flux planaire à un filtre 2D, garder
 `Radar_Target_Source` pour les rapports réellement 3D, puis faire tourner le
 suivi prioritaire et le scan de détail en parallèle.
+
+**Afficher vite, sans saccade.** La fluidité d'une vue 3D dans le navigateur
+tient moins à l'outil qu'à quelques règles, que les visualiseurs de nuages de
+points appliquent tous :
+
+| Règle | Pourquoi | Où en est le projet |
+| ----- | -------- | ------------------- |
+| Un seul objet `Points` pour tout le nuage, dans un tampon **préalloué** | un appel de dessin au lieu de milliers ; pas de géométrie recréée | fait dans `scan` (8 192 points, `setDrawRange`) |
+| Ne transférer à la carte graphique que les **points nouveaux** | le tampon entier repart sinon à chaque lot | à faire si la carte grossit (rendu SAR) |
+| Envoyer les gros nuages en **binaire** (tableau de flottants) plutôt qu'en JSON | environ trois fois moins d'octets, et aucun décodage de texte | à faire avec la carte vivante |
+| **Réutiliser** les objets des pistes (étiquette, flèche, traînée) d'une mise à jour à l'autre | recréer une texture d'étiquette à chaque état fait travailler le ramasse-miettes du navigateur, d'où des à-coups | fait dans `live` |
+| États **poussés** par le serveur dès qu'ils existent | aucun retard de sondage, aucune mise à jour sautée | fait (`/events`, Server-Sent Events) |
+| Mouvement lissé entre deux mesures par une **prédiction calculée en Ada** | la page ne fait que dessiner : interpoler en JavaScript reviendrait à y mettre une décision de pistage | à faire si 10 états/s paraissent saccadés |
+
+Comme dans les projets comparables, une position de cible n'est jamais
+**extrapolée** au-delà de ce que le pistage annonce : une piste non revue est
+marquée « en roue libre », et elle disparaît à l'échéance fixée par le
+pistage.
 
 ### 2.9 Synthèse d'ouverture en arc (simulée)
 

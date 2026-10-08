@@ -125,38 +125,63 @@ procedure Radar_Run_Live is
       L (" scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x1f7a5a,size:35})));});");
       L ("const dyn=new THREE.Group();scene.add(dyn);");
       L ("function v3(p){return new THREE.Vector3(p.x,p.z,p.y);}");
-      L ("function makeLabel(t){");
+      --  Une reserve d'objets PAR PISTE, reutilises d'un etat a l'autre.
+      --  La version precedente detruisait et recreait tout a chaque etat :
+      --  sphere, fleche, trainee, et surtout un canvas et une texture
+      --  d'etiquette neufs. Sans enjeu a un etat par seconde ; a 10 Hz avec
+      --  plusieurs pistes, des centaines d'allocations par seconde, que le
+      --  ramasse-miettes du navigateur paie en a-coups. Ici, geometrie et
+      --  materiaux sont partages, l'etiquette n'est redessinee que si son
+      --  texte change, et la trainee vit dans un tampon de 11 points.
+      --  Purement de l'affichage : aucune decision n'est prise (R1).
+      L ("const BALL=new THREE.SphereGeometry(70,16,16);");
+      L ("const M_ON=new THREE.MeshBasicMaterial({color:0x34e29b}),M_COAST=new THREE.MeshBasicMaterial({color:0x777777});");
+      L ("const M_TRAIL=new THREE.LineBasicMaterial({color:0x1f7a5a});");
+      L ("const pool={};");
+      L ("function objFor(id){");
+      L (" let o=pool[id];if(o)return o;");
       L (" const c=document.createElement('canvas');c.width=256;c.height=64;");
-      L (" const g=c.getContext('2d');g.font='26px monospace';g.fillStyle='#d8f5e8';g.textAlign='center';g.fillText(t,128,40);");
-      L (" const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));");
-      L (" s.scale.set(1100,275,1);return s;}");
-      L ("function clearDyn(){");
-      L (" dyn.traverse(o=>{if(o!==dyn){if(o.geometry)o.geometry.dispose();if(o.material){if(o.material.map)o.material.map.dispose();o.material.dispose();}}});");
-      L (" while(dyn.children.length)dyn.remove(dyn.children[0]);}");
+      L (" const tex=new THREE.CanvasTexture(c);");
+      L (" const lab=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));lab.scale.set(1100,275,1);");
+      L (" const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(33),3));");
+      L (" o={ball:new THREE.Mesh(BALL,M_ON),arrow:new THREE.ArrowHelper(new THREE.Vector3(1,0,0),new THREE.Vector3(),1,0xffd23b),");
+      L ("    lab:lab,g:c.getContext('2d'),tex:tex,text:'',trail:new THREE.Line(tg,M_TRAIL)};");
+      L (" o.trail.frustumCulled=false;dyn.add(o.ball,o.arrow,o.lab,o.trail);pool[id]=o;return o;}");
+      L ("function setLabel(o,t){");
+      L (" if(o.text===t)return;o.text=t;");
+      L (" o.g.clearRect(0,0,256,64);o.g.font='26px monospace';o.g.fillStyle='#d8f5e8';o.g.textAlign='center';o.g.fillText(t,128,40);");
+      L (" o.tex.needsUpdate=true;}");
+      L ("function drop(id){");
+      L (" const o=pool[id];dyn.remove(o.ball,o.arrow,o.lab,o.trail);");
+      L (" o.lab.material.dispose();o.tex.dispose();o.trail.geometry.dispose();");
+      L (" o.arrow.line.material.dispose();o.arrow.cone.material.dispose();delete pool[id];}");
       --  Etat courant + trainees cote client (id -> dernieres positions).
       L ("const status=document.getElementById('status'),tgts=document.getElementById('tgts');");
       L ("let TURN_MS=800,lastTurn=-1;const trails={};");
       L ("function draw(s){");
-      L (" clearDyn();let list='';");
+      L (" let list='';const seen={};");
       L (" for(const tk of s.tracks){");
+      L ("  const o=objFor(tk.id);seen[tk.id]=1;");
       L ("  const p=v3(tk);");
-      L ("  const col=tk.coast?0x777777:0x34e29b;");
-      L ("  const b=new THREE.Mesh(new THREE.SphereGeometry(70,16,16),new THREE.MeshBasicMaterial({color:col}));");
-      L ("  b.position.copy(p);dyn.add(b);");
+      L ("  o.ball.position.copy(p);o.ball.material=tk.coast?M_COAST:M_ON;");
       L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),sp=vel.length();");
-      L ("  if(sp>1){const len=Math.min(2500,sp*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
+      L ("  if(sp>1){const len=Math.min(2500,sp*5);o.arrow.position.copy(p);o.arrow.setDirection(vel.normalize());o.arrow.setLength(len,len*0.3,len*0.2);o.arrow.visible=true;}else{o.arrow.visible=false;}");
       L ("  const d=Math.round(Math.sqrt(tk.x*tk.x+tk.y*tk.y+tk.z*tk.z));");
       --  Les vitesses arrivent en mm/s : la page divise par 1000 pour
       --  afficher des m/s, et rien de plus. Avant la base de temps elle
       --  devait connaitre TURN_MS pour interpreter un "mm/tour" - une
       --  regle metier dans la page, et fausse des que le dt varie (R1).
       L ("  const ms=(sp/1000).toFixed(2);");
-      L ("  const lab=makeLabel('#'+tk.id+'  '+d+'mm  '+ms+'m/s'+(tk.coast?' *':''));");
-      L ("  lab.position.copy(p).add(new THREE.Vector3(0,220,0));dyn.add(lab);");
+      L ("  setLabel(o,'#'+tk.id+'  '+d+'mm  '+ms+'m/s'+(tk.coast?' *':''));");
+      L ("  o.lab.position.copy(p).add(new THREE.Vector3(0,220,0));");
       L ("  const tp=(trails[tk.id]||[]).map(v3);tp.push(p);");
-      L ("  if(tp.length>1)dyn.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tp),new THREE.LineBasicMaterial({color:0x1f7a5a})));");
+      L ("  const a=o.trail.geometry.attributes.position,n=Math.min(tp.length,11);");
+      L ("  for(let i=0;i<n;i++){const q=tp[tp.length-n+i];a.setXYZ(i,q.x,q.y,q.z);}");
+      L ("  a.needsUpdate=true;o.trail.geometry.setDrawRange(0,n);o.trail.visible=n>1;");
       L ("  list+='#'+tk.id+' &mdash; '+d+' mm &mdash; '+ms+' m/s<br>';");
       L (" }");
+      --  Une piste qui n'est plus publiee rend ses objets.
+      L (" for(const id in pool)if(!seen[id])drop(id);");
       L (" status.innerHTML=s.calibrating?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
       L (" tgts.innerHTML=list;}");
       --  Flux pousse par le serveur (Server-Sent Events, route /events) :
@@ -325,7 +350,9 @@ procedure Radar_Run_Live is
       end if;
 
       if Turn >= Calibration_Turns then
-         Update (Trk, Cluster (F));
+         --  Regroupement guide par les pistes : deux personnes qui se
+         --  croisent ne deviennent pas une seule detection (CAP dette 16).
+         Update (Trk, Cluster (F, Owners (Trk, F)));
       end if;
 
       --  Oubli lent du decor disparu.

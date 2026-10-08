@@ -63,6 +63,9 @@ package body Radar_Detect is
    -------------
 
    function Cluster (F : Frame) return Frame is
+     (Cluster (F, No_Owner));
+
+   function Cluster (F : Frame; Owners : Owner_List) return Frame is
       Result : Frame;
       Used   : array (1 .. Max_Detections) of Boolean := (others => False);
 
@@ -88,14 +91,24 @@ package body Radar_Detect is
                Sum_Z : Float := F.Items (I).Pos.Z;
                Sum_D : Float := F.Items (I).Distance;
                N     : Natural := 1;
+
+               --  La piste qui revendique le groupe (0 = aucune encore). On
+               --  la suit pour le GROUPE et non pour la seule graine : une
+               --  graine sans proprietaire ne doit pas servir de pont entre
+               --  les detections de deux pistes differentes.
+               Group_Owner : Natural := Owners (I);
             begin
                Used (I) := True;
 
-               --  On cherche toutes les detections proches de I.
+               --  On cherche toutes les detections proches de I, sauf
+               --  celles d'une AUTRE piste confirmee que celle du groupe.
                for J in I + 1 .. F.Count loop
                   if not Used (J)
                     and then Dist3D (F.Items (I).Pos, F.Items (J).Pos)
                              < Cluster_Radius
+                    and then (Owners (J) = 0
+                              or else Group_Owner = 0
+                              or else Owners (J) = Group_Owner)
                   then
                      Sum_X := Sum_X + F.Items (J).Pos.X;
                      Sum_Y := Sum_Y + F.Items (J).Pos.Y;
@@ -103,6 +116,9 @@ package body Radar_Detect is
                      Sum_D := Sum_D + F.Items (J).Distance;
                      N := N + 1;
                      Used (J) := True;
+                     if Group_Owner = 0 then
+                        Group_Owner := Owners (J);
+                     end if;
                   end if;
                end loop;
 

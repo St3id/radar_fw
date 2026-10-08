@@ -74,8 +74,56 @@ package body Radar_Track is
    --  regroupement pour ne pas coller deux objets vraiment distincts).
    Merge_Radius : constant Float := 400.0;
 
+   --  Ecart de vitesse (mm/s) au-dela duquel deux pistes CONFIRMEES
+   --  proches sont deux objets distincts, et non un objet fragmente.
+   --
+   --  La proximite seule ne suffit pas : deux personnes qui se croisent
+   --  passent a quelques centimetres l'une de l'autre (112 mm au croisement
+   --  du mode track), et la fusion tuait l'une des deux pistes. Ce qui les
+   --  distingue d'un fragment, c'est le mouvement : un fragment suit son
+   --  objet, a la meme vitesse ; deux objets qui se croisent vont dans des
+   --  directions differentes. On fusionne donc dans l'espace des etats
+   --  (position ET vitesse), comme les pisteurs radar usuels.
+   --
+   --  150 mm/s : au-dessus du bruit de vitesse d'une piste de ce filtre
+   --  (~50 mm/s par axe pour un jitter de 120 mm a 0,84 s par tour, donc
+   --  ~100 mm/s d'ecart entre deux pistes du meme objet), en dessous de
+   --  l'ecart des deux objets simules qui se croisent (~220 mm/s). Les
+   --  tentatives, dont la vitesse n'est pas encore connue, fusionnent
+   --  comme avant : la protection contre les pistes "ombre" reste entiere.
+   Merge_Speed_Gap : constant Float := 150.0;
+
    function Dist3D (A, B : Point_3D) return Float is
      (Sqrt ((A.X - B.X) ** 2 + (A.Y - B.Y) ** 2 + (A.Z - B.Z) ** 2));
+
+   --  Recollage des pistes ("track stitching"). Une piste confirmee peut
+   --  mourir alors que son objet est toujours la : trou de detection plus
+   --  long que le coasting, bord de faisceau, ou perte interne au module
+   --  (les integrateurs du RD-03D/LD2450 constatent que le module perd
+   --  lui-meme ses cibles par intermittence). Sans recollage, l'objet
+   --  revient sous un NOUVEL identifiant : une saccade pour l'utilisateur.
+   --
+   --  On ne recolle qu'a la CONFIRMATION de la nouvelle piste, jamais a sa
+   --  naissance : une fausse alarme, qui ne se confirme pas, ne peut pas
+   --  voler l'identifiant d'un objet disparu.
+   --
+   --  6 s : au-dela, la position extrapolee ne vaut plus rien, et un autre
+   --  objet entre dans la piece a cet endroit devient trop vraisemblable.
+   Stitch_Window_Ms : constant Time_Ms := 6_000;
+
+   --  Marge de recollage : la fenetre d'association de base, plus une
+   --  derive qui grandit avec la duree de l'absence (mm par seconde).
+   --  300 mm/s laisse a un pieton ~1,2 m de deviation en 4 s d'absence sans
+   --  ouvrir le recollage a toute la piece, ce que ferait une marge en
+   --  vitesse maximale (1,5 m/s x 4 s = 6 m).
+   Stitch_Drift : constant Float := 300.0;
+
+   --  Deux pistes proches sont-elles le MEME objet ? Toujours si l'une
+   --  n'est qu'une tentative ; pour deux confirmees, seulement si elles
+   --  vont a la meme vitesse.
+   function Same_Object (A, B : Track) return Boolean is
+     (not (A.Confirmed and then B.Confirmed)
+      or else Dist3D (A.Velocity, B.Velocity) < Merge_Speed_Gap);
 
    --  Temps ecoule depuis la derniere association de cette piste.
    function Since_Seen (Tk : Track; Now : Time_Ms) return Time_Ms is
@@ -108,6 +156,80 @@ package body Radar_Track is
    function Gate_Of (Tk : Track; Dt : Float) return Float is
      (Base_Gate + Speed_Of (Tk) * Dt);
 
+   --  Temps ecoule (s) entre la derniere frame traitee et F. Partage par
+   --  Update et Owners : la position que Owners croit "predite" doit etre
+   --  exactement celle qu'Update predira ensuite, sinon une detection
+   --  serait attribuee a une piste qu'Update ne lui associerait pas.
+   function Frame_Dt (T : Tracker; F : Frame) return Float is
+     (Float'Max (Min_Dt,
+                 Float (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp
+                        else 0) / 1000.0));
+
+   --  Position d'une piste avancee de Dt secondes sur sa vitesse.
+   function Predicted (Tk : Track; Dt : Float) return Point_3D is
+     ((X => Tk.Pos.X + Tk.Velocity.X * Dt,
+       Y => Tk.Pos.Y + Tk.Velocity.Y * Dt,
+       Z => Tk.Pos.Z + Tk.Velocity.Z * Dt));
+
+   --  Garde la trace d'une piste confirmee qui meurt, dans un emplacement
+   --  libre ou, a defaut, a la place de la plus ancienne.
+   procedure Bury (Lost : in out Lost_Array; Tk : Track; Now : Time_Ms) is
+      Slot : Positive := Lost'First;
+   begin
+      for L in Lost'Range loop
+         if Lost (L).Id = 0 then
+            Slot := L;
+            exit;
+         elsif Lost (L).Lost_At < Lost (Slot).Lost_At then
+            Slot := L;
+         end if;
+      end loop;
+      Lost (Slot) := (Id       => Tk.Id,
+                      Pos      => Tk.Pos,
+                      Velocity => Tk.Velocity,
+                      Lost_At  => Now);
+   end Bury;
+
+   --  La piste I vient de se confirmer : se trouve-t-elle la ou une piste
+   --  perdue depuis moins de Stitch_Window_Ms aurait du etre ? Si oui, elle
+   --  reprend son identifiant (la plus proche si plusieurs conviennent).
+   procedure Try_Stitch
+     (T : in out Tracker; I : Positive; Now : Time_Ms)
+   is
+      Best      : Natural := 0;
+      Best_Dist : Float   := Float'Last;
+   begin
+      for L in T.Lost'Range loop
+         if T.Lost (L).Id /= 0 then
+            declare
+               Age : constant Time_Ms :=
+                 (if Now > T.Lost (L).Lost_At then Now - T.Lost (L).Lost_At
+                  else 0);
+               Age_S : constant Float := Float (Age) / 1000.0;
+               Expected : constant Point_3D :=
+                 (X => T.Lost (L).Pos.X + T.Lost (L).Velocity.X * Age_S,
+                  Y => T.Lost (L).Pos.Y + T.Lost (L).Velocity.Y * Age_S,
+                  Z => T.Lost (L).Pos.Z + T.Lost (L).Velocity.Z * Age_S);
+               D : constant Float := Dist3D (Expected, T.Tracks (I).Pos);
+            begin
+               if Age > Stitch_Window_Ms then
+                  T.Lost (L).Id := 0;   --  trop vieille : on l'oublie
+               elsif D <= Base_Gate + Stitch_Drift * Age_S
+                 and then D < Best_Dist
+               then
+                  Best      := L;
+                  Best_Dist := D;
+               end if;
+            end;
+         end if;
+      end loop;
+
+      if Best /= 0 then
+         T.Tracks (I).Id := T.Lost (Best).Id;
+         T.Lost (Best).Id := 0;
+      end if;
+   end Try_Stitch;
+
    ------------
    -- Update --
    ------------
@@ -116,17 +238,12 @@ package body Radar_Track is
       Matched : array (1 .. Max_Detections) of Boolean := (others => False);
 
       --  Temps ecoule depuis la frame precedente, en SECONDES.
-      Elapsed : constant Time_Ms :=
-        (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp else 0);
-      Dt : constant Float := Float'Max (Min_Dt, Float (Elapsed) / 1000.0);
+      Dt : constant Float := Frame_Dt (T, F);
    begin
       --  ----- 1. Prediction : chaque piste avance de v x dt -----
       for I in T.Tracks'Range loop
          if T.Tracks (I).Active then
-            T.Tracks (I).Pos :=
-              (X => T.Tracks (I).Pos.X + T.Tracks (I).Velocity.X * Dt,
-               Y => T.Tracks (I).Pos.Y + T.Tracks (I).Velocity.Y * Dt,
-               Z => T.Tracks (I).Pos.Z + T.Tracks (I).Velocity.Z * Dt);
+            T.Tracks (I).Pos := Predicted (T.Tracks (I), Dt);
          end if;
       end loop;
 
@@ -193,8 +310,11 @@ package body Radar_Track is
                T.Tracks (Best_I).Missing   := 0;
                T.Tracks (Best_I).Last_Seen := F.Stamp;
                T.Tracks (Best_I).Hits      := T.Tracks (Best_I).Hits + 1;
-               if T.Tracks (Best_I).Hits >= Confirm_Hits then
+               if T.Tracks (Best_I).Hits >= Confirm_Hits
+                 and then not T.Tracks (Best_I).Confirmed
+               then
                   T.Tracks (Best_I).Confirmed := True;
+                  Try_Stitch (T, Best_I, F.Stamp);
                end if;
                Track_Done (Best_I) := True;
                Matched (Best_J)    := True;
@@ -219,6 +339,10 @@ package body Radar_Track is
                   Tk.Missing := Tk.Missing + 1;
                   if Since_Seen (Tk, F.Stamp) > Limit then
                      Tk.Active := False;
+                     --  Une piste confirmee qui meurt peut etre recollee.
+                     if Tk.Confirmed then
+                        Bury (T.Lost, Tk, F.Stamp);
+                     end if;
                   end if;
                end;
             end if;
@@ -257,6 +381,7 @@ package body Radar_Track is
                if T.Tracks (J).Active
                  and then Dist3D (T.Tracks (I).Pos, T.Tracks (J).Pos)
                           < Merge_Radius
+                 and then Same_Object (T.Tracks (I), T.Tracks (J))
                then
                   declare
                      Keep  : constant Natural :=
@@ -282,5 +407,40 @@ package body Radar_Track is
       --  L heure de reference du prochain tour.
       T.Last_Stamp := F.Stamp;
    end Update;
+
+   ------------
+   -- Owners --
+   ------------
+
+   function Owners (T : Tracker; F : Frame) return Owner_List is
+      Result : Owner_List := No_Owner;
+      Dt     : constant Float := Frame_Dt (T, F);
+   begin
+      for J in 1 .. F.Count loop
+         declare
+            Best_Dist : Float := Float'Last;
+         begin
+            --  Seules les pistes CONFIRMEES revendiquent : une tentative
+            --  est peut-etre un fantome, et la laisser couper un groupe
+            --  reintroduirait la fragmentation que le regroupement evite.
+            for I in T.Tracks'Range loop
+               if T.Tracks (I).Active and then T.Tracks (I).Confirmed then
+                  declare
+                     D : constant Float :=
+                       Dist3D (Predicted (T.Tracks (I), Dt), F.Items (J).Pos);
+                  begin
+                     if D <= Gate_Of (T.Tracks (I), Dt)
+                       and then D < Best_Dist
+                     then
+                        Best_Dist  := D;
+                        Result (J) := I;
+                     end if;
+                  end;
+               end if;
+            end loop;
+         end;
+      end loop;
+      return Result;
+   end Owners;
 
 end Radar_Track;

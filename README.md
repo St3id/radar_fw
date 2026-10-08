@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **35 tests AUnit**, rejoués à chaque commit |
+| Tests | **37 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -102,8 +102,11 @@ Au-dessus vient la perception 3D :
 4. `Radar_Clutter` — en surveillance par profils, le décor appris est
    soustrait (MTI) : ne restent que les objets mobiles ;
 5. `Radar_Track` — association globale, identifiants stables, filtre
-   alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées. Il reçoit
-   des frames horodatées, quel que soit le contrat d'entrée.
+   alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées (position
+   **et** vitesse : deux cibles qui se croisent restent deux pistes),
+   regroupement guidé par les pistes et recollage d'une piste perdue qui
+   réapparaît. Il reçoit des frames horodatées, quel que soit le contrat
+   d'entrée.
 
 ## État d'avancement
 
@@ -216,12 +219,13 @@ soit branchée.
 
 ## Tests
 
-**35 tests AUnit** répartis en quatre suites :
+**37 tests AUnit** répartis en quatre suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
   zénith, regroupement spatial, cycle de vie du pistage (filtre,
-  M-sur-N, coasting, mort des tentatives, traversée de la zone aveugle),
+  M-sur-N, coasting, mort des tentatives, traversée de la zone aveugle,
+  croisement de deux cibles, recollage d'une piste perdue),
   deux échos sur un même rayon,
   murs (distance, incidence, écho spéculaire ou diffus), clutter adaptatif,
   pilotage de la source par l'interface,

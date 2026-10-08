@@ -90,4 +90,24 @@ package Radar_Detect is
    --  (a la position moyenne de ses detections).
    function Cluster (F : Frame) return Frame;
 
+   --  Proprietaire de chaque detection brute d'un tour : le numero de
+   --  l'emplacement de la piste CONFIRMEE qui la revendique, 0 si aucune.
+   --  C'est le pistage qui le calcule (Radar_Track.Owners) : lui seul
+   --  connait les pistes, et ce paquet ne doit pas dependre de lui.
+   type Owner_List is array (1 .. Max_Detections) of Natural;
+   No_Owner : constant Owner_List := (others => 0);
+
+   --  Regroupement GUIDE PAR LES PISTES : comme Cluster, mais un groupe ne
+   --  reunit jamais des detections revendiquees par deux pistes
+   --  confirmees differentes.
+   --
+   --  Pourquoi : quand deux personnes se croisent a moins de
+   --  Cluster_Radius, le regroupement aveugle en faisait UNE detection, et
+   --  l'une des deux pistes mourait faute d'echo (mesure : la moitie des
+   --  changements d'identifiant du mode live, CAP dette 16). Les pistes
+   --  savent, elles, qu'il y a deux objets : on leur demande avant de
+   --  fusionner. Une detection sans proprietaire se regroupe comme avant,
+   --  si bien que Cluster (F, No_Owner) = Cluster (F).
+   function Cluster (F : Frame; Owners : Owner_List) return Frame;
+
 end Radar_Detect;

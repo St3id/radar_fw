@@ -47,9 +47,22 @@ package Radar_Track is
 
    type Track_Array is array (1 .. Max_Tracks) of Track;
 
+   --  Une piste CONFIRMEE morte recemment, gardee quelques secondes pour
+   --  lui rendre son identifiant si l'objet reapparait la ou il devait
+   --  etre ("recollage", ou track stitching). Id = 0 : emplacement libre.
+   type Lost_Track is record
+      Id       : Natural  := 0;
+      Pos      : Point_3D := (0.0, 0.0, 0.0);  --  position a sa mort
+      Velocity : Point_3D := (0.0, 0.0, 0.0);  --  vitesse a sa mort (mm/s)
+      Lost_At  : Time_Ms  := 0;                --  heure de sa mort
+   end record;
+
+   type Lost_Array is array (1 .. Max_Tracks) of Lost_Track;
+
    --  L'ensemble des pistes suivies + le prochain ID a attribuer.
    type Tracker is record
       Tracks     : Track_Array;
+      Lost       : Lost_Array;
       Next_Id    : Positive := 1;
 
       --  Heure de la derniere frame traitee : la difference avec la
@@ -87,9 +100,25 @@ package Radar_Track is
    --       tel quel dans la vitesse) ;
    --    4. vie et mort : confirmation M-sur-N, abandon des pistes
    --       perdues, creation de tentatives pour les detections orphelines ;
-   --    5. fusion : deux pistes trop proches = un meme objet fragmente
-   --       (cible etendue scindee par la quantification) - la plus
-   --       ancienne absorbe l'autre, pas de piste "ombre".
+   --       une piste qui se confirme la ou une piste confirmee vient de
+   --       mourir reprend son identifiant (recollage) ;
+   --    5. fusion : deux pistes trop proches ET de meme vitesse = un meme
+   --       objet fragmente (cible etendue scindee par la quantification) -
+   --       la plus ancienne absorbe l'autre, pas de piste "ombre". Deux
+   --       pistes confirmees proches mais de vitesses differentes sont deux
+   --       objets qui se croisent : elles survivent toutes les deux.
    procedure Update (T : in out Tracker; F : Frame);
+
+   --  La piste confirmee qui revendique chaque detection BRUTE de F (avant
+   --  regroupement) : la plus proche de sa position PREDITE a l'heure de
+   --  F, dans sa fenetre d'association. 0 = aucune. A passer a
+   --  Radar_Detect.Cluster pour qu'un croisement ne fasse pas d'un couple
+   --  d'objets une seule detection :
+   --
+   --     Update (Trk, Cluster (F, Owners (Trk, F)));
+   --
+   --  Ne modifie pas le pistage : c'est une lecture, appelee juste avant
+   --  Update sur la meme frame.
+   function Owners (T : Tracker; F : Frame) return Owner_List;
 
 end Radar_Track;

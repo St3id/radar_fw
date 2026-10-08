@@ -386,6 +386,146 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Track_Merge;
 
+   --  Test : deux cibles qui se croisent gardent chacune leur identifiant
+   --  (CAP dette 16, la moitie des changements d'ID du mode live). A part
+   --  de x = -3000, B de x = +3000 a 100 mm de lui, chacun a 500 mm/s en
+   --  sens oppose ; chaque cible etendue renvoie deux echos a +/-80 mm. Au
+   --  croisement (6e seconde), les quatre echos tiennent dans le rayon de
+   --  regroupement : sans regroupement guide par les pistes, ils ne
+   --  faisaient qu'UNE detection, et la fusion de pistes (400 mm) tuait
+   --  ensuite l'une des deux. Le test verifie aussi que les pistes ne se
+   --  sont pas ECHANGE les objets : celle de A doit finir a droite.
+   procedure Test_Crossing_Keeps_Ids
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk  : Tracker;
+      Now  : Time_Ms := 0;
+      F    : Frame;
+      Id_A : Natural := 0;
+      Id_B : Natural := 0;
+
+      --  Un tour : les deux cibles a l'instant K (secondes), regroupement
+      --  guide par les pistes, puis pistage.
+      procedure Step (K : Natural) is
+         Xa : constant Float := -3000.0 + 500.0 * Float (K);
+         Xb : constant Float :=  3000.0 - 500.0 * Float (K);
+      begin
+         Reset (F);
+         F.Count := 4;
+         F.Items (1) := (Pos => (Xa, -80.0, 0.0), Distance => abs Xa);
+         F.Items (2) := (Pos => (Xa, 80.0, 0.0), Distance => abs Xa);
+         F.Items (3) := (Pos => (Xb, 20.0, 0.0), Distance => abs Xb);
+         F.Items (4) := (Pos => (Xb, 180.0, 0.0), Distance => abs Xb);
+         Now     := Now + Turn_Ms;
+         F.Stamp := Now;
+         Update (Trk, Cluster (F, Owners (Trk, F)));
+      end Step;
+   begin
+      --  Avant le croisement : les deux pistes se confirment.
+      for K in 0 .. 3 loop
+         Step (K);
+      end loop;
+      for Tk of Trk.Tracks loop
+         if Tk.Active and then Tk.Confirmed then
+            if Tk.Pos.X < 0.0 then
+               Id_A := Tk.Id;
+            else
+               Id_B := Tk.Id;
+            end if;
+         end if;
+      end loop;
+      Assert (Id_A /= 0 and then Id_B /= 0,
+              "Les deux pistes devraient etre confirmees avant le croisement");
+
+      --  Le croisement (K = 6) et la suite.
+      for K in 4 .. 11 loop
+         Step (K);
+      end loop;
+
+      declare
+         Confirmed : Natural := 0;
+      begin
+         for Tk of Trk.Tracks loop
+            if Tk.Active and then Tk.Confirmed then
+               Confirmed := Confirmed + 1;
+               Assert (Tk.Id = Id_A or else Tk.Id = Id_B,
+                       "Nouvel identifiant apres le croisement :"
+                       & Tk.Id'Image);
+               if Tk.Id = Id_A then
+                  Assert (Tk.Pos.X > 1000.0,
+                          "La piste de A devrait finir a droite (echange ?)");
+               else
+                  Assert (Tk.Pos.X < -1000.0,
+                          "La piste de B devrait finir a gauche (echange ?)");
+               end if;
+            end if;
+         end loop;
+         Assert (Confirmed = 2,
+                 "Deux pistes confirmees attendues apres le croisement, obtenu"
+                 & Confirmed'Image);
+      end;
+   end Test_Crossing_Keeps_Ids;
+
+   --  Test : recollage des pistes. Une cible a 500 mm/s disparait 4 s,
+   --  plus longtemps que la roue libre d'une piste confirmee (2,5 s) : sa
+   --  piste meurt. Quand l'objet reapparait la ou il devait etre, la
+   --  nouvelle piste doit reprendre l'ANCIEN identifiant a sa
+   --  confirmation. Contre-epreuve : un objet qui apparait a 3 m de cette
+   --  trajectoire n'herite de rien.
+   procedure Test_Stitching_Keeps_Id
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+
+      --  Rejoue le scenario ; Offset_Y decale l'objet qui reapparait.
+      --  Rend l'identifiant initial et celui de la piste finale.
+      procedure Scenario (Offset_Y : Float; Before, After : out Natural) is
+         Trk : Tracker;
+         Now : Time_Ms := 0;
+         F   : Frame;
+      begin
+         Before := 0;
+         After  := 0;
+         for K in 0 .. 10 loop
+            Reset (F);
+            if K <= 3 then
+               F.Count := 1;
+               F.Items (1) := (Pos => (-2000.0 + 500.0 * Float (K), 0.0, 0.0),
+                               Distance => 0.0);
+            elsif K >= 8 then
+               F.Count := 1;
+               F.Items (1) := (Pos => (-2000.0 + 500.0 * Float (K),
+                                       Offset_Y, 0.0),
+                               Distance => 0.0);
+            end if;
+            Tick (Trk, F, Now);
+            if K = 3 then
+               Before := First_Active (Trk).Id;
+            end if;
+         end loop;
+         for Tk of Trk.Tracks loop
+            if Tk.Active and then Tk.Confirmed then
+               After := Tk.Id;
+            end if;
+         end loop;
+      end Scenario;
+
+      Before, After : Natural;
+   begin
+      Scenario (0.0, Before, After);
+      Assert (Before /= 0 and then After /= 0,
+              "Pistes confirmees attendues avant et apres la disparition");
+      Assert (After = Before,
+              "L'objet revenu sur sa trajectoire devrait garder l'ID"
+              & Before'Image & ", obtenu" & After'Image);
+
+      Scenario (3000.0, Before, After);
+      Assert (After /= 0 and then After /= Before,
+              "Un objet apparu a 3 m de la trajectoire ne doit pas heriter"
+              & " de l'ID" & Before'Image);
+   end Test_Stitching_Keeps_Id;
+
    --  Test 5bis : une tentative non re-detectee meurt vite. C'est le
    --  filtre anti-fantomes : un echo de multitrajet, intermittent,
    --  ne survit pas assez longtemps pour etre confirme.
@@ -733,6 +873,12 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Track_Merge'Access,
          "Pistage : fusion anti-fragmentation");
+      Register_Routine
+        (T, Test_Crossing_Keeps_Ids'Access,
+         "Pistage : deux cibles qui se croisent gardent leur ID");
+      Register_Routine
+        (T, Test_Stitching_Keeps_Id'Access,
+         "Pistage : une cible perdue puis revue reprend son ID");
       Register_Routine
         (T, Test_Two_Echoes_Same_Ray'Access,
          "Deux echos sur un meme rayon");
