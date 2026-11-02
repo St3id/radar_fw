@@ -20,7 +20,7 @@ dans le navigateur.
 | | |
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
-| Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
+| Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) : absence d'erreur d'exécution et cohérence au seuil calculé, pas qualité de détection |
 | Tests | **45 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
@@ -102,7 +102,7 @@ Au-dessus vient la perception 3D :
 4. `Radar_Clutter` — en surveillance par profils, le décor appris est
    soustrait (MTI) : ne restent que les objets mobiles ;
 5. `Radar_Track` — association gloutonne (la paire piste-détection la
-   plus proche d'abord), identifiants stables, filtre
+   plus proche d'abord), identifiants conservés d'un tour à l'autre (objets simulés lents), filtre
    alpha-beta, confirmation M-sur-N, fusion des pistes fragmentées (position
    **et** vitesse : deux cibles qui se croisent restent deux pistes),
    regroupement guidé par les pistes et recollage d'une piste perdue qui
@@ -117,11 +117,17 @@ Acquis :
       distance, multi-cibles (`Detect_All`) et regroupement des échos
       voisins (`Detect_Clustered`).
 - [x] Vérification formelle SPARK à contrats **fonctionnels** — dont le
-      CFAR, seuil adaptatif au bruit local — et terminaison prouvée.
+      CFAR, seuil adaptatif au bruit local — et terminaison prouvée. La
+      preuve porte sur le code, pas sur la qualité de détection (voir
+      « Vérification formelle »).
 - [x] Pipeline 3D complet sur source simulée : interface abstraite, monde
       simulé mobile, détections 3D, regroupement spatial, pistage à
-      identifiants stables et vitesses.
-- [x] **Base de temps réelle** : chaque mesure est horodatée, les vitesses
+      identifiants conservés d'un tour à l'autre et vitesses. Les objets
+      simulés se déplacent à environ 0,14 m/s ; le comportement face à des
+      cibles réelles plus rapides n'est pas établi, et la gestion du temps
+      réel du pistage (cadence, retards, trames hors ordre) reste une dette
+      ouverte.
+- [x] **Horodatage sur horloge simulée** : chaque mesure est horodatée, les vitesses
       sont en mm/s et ne dépendent plus de la cadence de balayage ; la
       fenêtre d'association et la durée de coasting se comptent en temps.
 - [x] Pistage robuste : prédiction et coasting, filtre **alpha-beta**,
@@ -134,10 +140,10 @@ Acquis :
 - [x] Cibles simulées imparfaites : 4 réflecteurs, fading uniforme inspiré
       des modèles de Swerling (sans en reprendre la loi statistique), trous de
       détection, bruit de fond et fantômes multitrajet.
-      Le pipeline est éprouvé contre des données imparfaites, voir
-      `documentation/public/ARCHITECTURE.md` §1.
+      Ces conditions sont simulées : le CFAR n'a pas affronté un bruit
+      réaliste (voir `documentation/public/ARCHITECTURE.md` §1).
 - [x] Concurrence **Ravenscar** réelle : profil imposé à la compilation,
-      tâche cyclique, objet protégé prouvé, tâche sporadique.
+      tâche cyclique, objet protégé analysé en SPARK, tâche sporadique.
 - [x] Cross-compilation du cœur prouvé pour Cortex-M4F, sans la carte.
 - [x] **Format de trame du LD2450** prouvé et embarquable : les quatre
       trames du manuel du fabricant sont reproduites octet pour octet.
@@ -166,26 +172,40 @@ Reste à faire :
 ## Vérification formelle
 
 Le code en `SPARK_Mode` est prouvé avec SPARK (prouveur CVC5) :
-**112 checks, 0 non prouvé**. Ce qui est établi :
+**112 checks, 0 non prouvé** pour le projet principal, dont 55 contrôles
+d'exécution, 30 assertions, 16 de terminaison et 11 contrats fonctionnels.
+Ce qui est établi :
 
 - l'absence d'erreur d'exécution : débordements, indices hors bornes ;
 - des contrats **fonctionnels**, et non des tautologies : `Peak_Bin`
   renvoie bien le maximum du balayage, `Peak_Distance` vaut exactement
   `Bin_Distance (Peak_Bin (S))`, et les détecteurs ne rapportent que des
   cases au-dessus de leur seuil logiciel. Cela ne prouve pas un taux de fausse
-  alarme réel ni qu'un écho provient d'une cible ;
+  alarme réel ni qu'un écho provient d'une cible. La preuve établit donc
+  l'absence d'erreur d'exécution et une cohérence au seuil calculé, **pas la
+  qualité de détection** : des mutants du détecteur ont été exécutés, et un
+  détecteur muet ou un facteur CFAR de 2 ou de 16 restent prouvés ;
 - le codage des trames LD2450 (`Radar_Ld2450`) : décoder une valeur codée
   rend toujours cette valeur, pour les 65 535 possibles, et chaque trame
   construite porte son en-tête et sa fin ;
 - la terminaison des sous-programmes (aspect implicite
-  `Always_Terminates`) ;
-- l'objet protégé `Mailbox`, prouvé dans le contexte Ravenscar (projet
-  `radar_demo.gpr`).
+  `Always_Terminates`).
 
-Reproduire les deux preuves :
+L'objet protégé `Mailbox` est analysé à part, dans le contexte Ravenscar
+(projet `radar_demo.gpr`) : absence d'erreur d'exécution et de flot, sans
+propriété fonctionnelle. Il ne fait pas partie des 112 checks.
 
-    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on
-    alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
+Reproduire les trois preuves, sur un répertoire `obj/` neuf :
+
+    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 85 checks
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 112 au total (85 + 27)
+    alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on                       # 89 checks
+
+La première commande n'analyse que ce qu'utilise l'exécutable (85 checks) ;
+`Radar_Ld2450`, utilisé seulement par les tests, exige la seconde, qui
+amène le total du projet principal à 112. Le projet de démonstration en
+compte 89 ; les deux projets partagent des unités du cœur, ce qui donne
+116 checks distincts au total.
 
 ## Concurrence Ravenscar
 
@@ -196,7 +216,8 @@ Ravenscar canonique. Le profil n'est pas seulement annoncé : il est
 
 - `Producer`, tâche **cyclique** cadencée par `delay until`, dépose un
   balayage toutes les 250 ms dans l'objet protégé ;
-- `Mailbox`, objet protégé **prouvé SPARK**, expose une `entry Get` à
+- `Mailbox`, objet protégé **analysé en SPARK** (absence d'erreur d'exécution
+  et de flot), expose une `entry Get` à
   barrière simple : le consommateur est suspendu par le noyau tant qu'il
   n'y a rien à lire, sans aucun sondage ;
 - `Consumer`, tâche **sporadique**, est réveillée par la barrière et

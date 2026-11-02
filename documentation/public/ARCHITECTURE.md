@@ -198,16 +198,16 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    Le bruit simulé est **uniforme et borné** (0 à 80), alors que le seuil
    vaut en moyenne environ 160. Une case de bruit ne le franchit que si sa
    fenêtre est anormalement calme et que le seuil retombe vers son plancher
-   (60) : environ 1·10⁻⁵ par case (tirage de Monte-Carlo), soit 2 à 3 fausses
-   alarmes par tour de veille simulée, plus celles du bout du profil, où la
-   fenêtre est tronquée. Ce mécanisme n'a rien de physique. Le bruit d'un
-   récepteur a une queue : son amplitude suit une loi de **Rayleigh**. Avec
-   ce même CA-CFAR sur 16 cases et le facteur 4, le taux attendu est
-   d'environ 1·10⁻⁴ par case, soit une **vingtaine** de fausses alarmes par
-   tour. C'est presque trente fois le chiffre idéal (3,5·10⁻⁶) d'un bruit
-   parfaitement connu : l'estimation sur 16 cases seulement coûte cher. Il
-   faudrait un facteur proche de 5 pour revenir à moins d'une fausse alarme
-   par tour. Le CFAR, la règle M-sur-N et la fusion de pistes n'ont donc pas
+   (60) : 3,21·10⁻⁵ par case (mesuré sur 1,24·10⁸ cases tirées), soit environ
+   **6,3 fausses alarmes par tour** de veille simulée. Ce mécanisme n'a rien
+   de physique. Le bruit d'un récepteur a une queue : son amplitude suit une
+   loi de **Rayleigh**. Avec ce même CA-CFAR sur 16 cases et le facteur 4, le
+   taux mesuré est de 1,39·10⁻⁴ par case, soit environ **28,8 fausses
+   alarmes par tour**. C'est près de quarante fois le chiffre idéal
+   (3,5·10⁻⁶) d'un bruit parfaitement connu : l'estimation sur 16 cases
+   seulement coûte cher. Avec un facteur 5, le taux mesuré reste d'environ
+   1,2 fausse alarme par tour : il faut dépasser 5 pour passer sous une par
+   tour. Le CFAR, la règle M-sur-N et la fusion de pistes n'ont donc pas
    encore été éprouvés à ce régime. Le bruit simulé et les amplitudes doivent
    être recalés sur les données du profil choisi.
 3. **Cycle de vie M-sur-N** — **mis en œuvre.** Une piste tentative reste
@@ -480,8 +480,9 @@ environ 12 s, sans arrêt ni inversion de la tête. Il en découle :
   moteur tourne à 1,5 tr/s, loin de ses limites ;
 - **un collecteur tournant** dans le passage central, à la place de la boucle
   de câble. Il permet une rotation illimitée. Le module XM125 communique par
-  UART ou I²C, des liaisons lentes qui traversent un collecteur sans
-  difficulté ;
+  UART ou I²C, des liaisons lentes, mais la carte SparkFun XM125 ne sort pas
+  son UART : le lien qui traverserait un collecteur reste à définir et à
+  éprouver, il n'est pas acquis ;
 - **un recalage à chaque tour** : l'index est franchi à chaque révolution, si
   bien qu'un pas perdu ne se propage jamais au-delà d'un tour ;
 - **plus de jeu à l'inversion** : en tournant toujours dans le même sens, la
@@ -910,7 +911,8 @@ soit éprouvé avant le matériel.
   n'est publiée : c'est elle qui tranchera.
 - Une lentille augmente la PIRE : ramener le plan E de l'A121 de 53 à 12°
   ajoute ~6,5 dB (~17,5 dBm crête, sous 20 dBm) ; une lentille ronde à 17°
-  ajouterait ~11 dB (~22 dBm crête, au-dessus). L'agrément FCC de l'A121 ne
+  ajouterait ~11 dB : 16,3 à 19,7 dBm crête calculés selon les gains Acconeer
+  retenus, soit sous 20 dBm mais avec une marge qui peut tomber à 0,3 dB. L'agrément FCC de l'A121 ne
   couvre d'ailleurs que les lentilles qui n'augmentent pas la PIRE.
 
 **8. Essais sans instrument : les radars se mesurent eux-mêmes.** Chaque

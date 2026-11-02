@@ -168,6 +168,7 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
     alr exec -- ./bin/run_tests                     # les lancer
 
     alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on
     alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
 
     alr exec -- gprbuild -p -P radar_demo.gpr   # la demo Ravenscar

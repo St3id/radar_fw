@@ -153,6 +153,7 @@ procedure Radar_Run_Scan is
       L (".opts label{cursor:pointer}.opts input{accent-color:#34e29b}");
       L (".opts button{grid-column:1/-1;padding:6px;border:1px solid #355244;background:#101b16;color:#b9d8cc;cursor:pointer}</style></head><body>");
       L ("<div id='info'><b>radar_fw - carte progressive</b>");
+      L ("<div style='color:#ffd08a;font-weight:700'>SIMULATION : scene simulee, aucune mesure reelle.</div>");
       L ("<div id='status'>connexion...</div><div id='sel'></div>");
       L ("<div class='hint'>Vue rapide en gris, detail ajoute en vert.<br>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
       L ("<div class='opts'><label><input id='grid-toggle' type='checkbox' checked> Grille</label>");

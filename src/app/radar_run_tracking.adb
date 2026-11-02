@@ -52,7 +52,7 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "<div class=""playback""><button id=""play"" type=""button"">Pause</button><button id=""prev"" type=""button"">Precedent</button><button id=""next"" type=""button"">Suivant</button><button id=""reset-view"" type=""button"">Vue initiale</button></div>");
       Put_Line (Out_F, "<label class=""ctl"">Tour <input type=""range"" id=""frame"" min=""0"" max=""0"" value=""0""> <span id=""frameval""></span></label>");
       Put_Line (Out_F, "<div class=""layers""><label><input id=""show-vectors"" type=""checkbox"" checked> Vecteurs</label><label><input id=""show-trails"" type=""checkbox"" checked> Trainees</label><label><input id=""show-labels"" type=""checkbox""> Etiquettes</label></div>");
-      Put_Line (Out_F, "<div class=""note"">Decoche = positions reellement mesurees, tour par tour (la verite de la perception, saccadee).<br>Coche = interpolation visuelle entre deux mesures (positions intermediaires inventees).</div>");
+      Put_Line (Out_F, "<div class=""note"">SIMULATION : pistes estimees sur donnees simulees, aucune mesure reelle.<br>Decoche = positions estimees tour par tour (saccadees).<br>Coche = interpolation visuelle entre deux estimations (positions intermediaires inventees).</div>");
       Put_Line (Out_F, "</div>");
       Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
       --  Frames : un tableau par tour ; chaque tour = la liste des pistes
