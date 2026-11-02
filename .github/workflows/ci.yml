@@ -71,6 +71,12 @@ jobs:
       - name: Compile orphan contracts
         run: alr exec -- gprbuild -c -u -P radar_fw.gpr radar_planar_source.ads radar_target_source.ads
 
+      # L'enregistreur appelle l'API Windows : ce runner Linux le compile
+      # (-c) sans edition de liens, pour qu'il ne pourrisse pas en silence.
+      # Compiler ne prouve rien de son fonctionnement sur un vrai port.
+      - name: Compile recorder (compile only on Linux)
+        run: alr exec -- gprbuild -c -p -P radar_ld2450_record.gpr
+
       # ===== Demonstrateur Ravenscar =====
       # Projet separe (radar_demo.gpr) : le profil Ravenscar est impose a
       # tout l'executable par ravenscar.adc. La demo tourne REELLEMENT
@@ -95,6 +101,11 @@ jobs:
       # l'analyse pas seul. Cette seconde passe le prouve explicitement.
       - name: SPARK proof (Radar_Ld2450)
         run: alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on
+
+      # Meme raison : le parseur de flux et le filtre de plausibilite ne sont
+      # pas dans la fermeture de l'executable.
+      - name: SPARK proof (parseur LD2450 et plausibilite)
+        run: alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on
 
       # Preuve du projet demo : l'objet protege Mailbox est en SPARK.
       # L'analyse de code concurrent exige le profil Ravenscar et

@@ -20,6 +20,15 @@ project Radar_Fw is
       for Switches ("Ada") use ("-Es"); --  Symbolic traceback
    end Binder;
 
+   --  Niveau 1 pour ces deux unites : CVC5 seul, au niveau par defaut, ne
+   --  relie pas certains quantificateurs (les rangs de la fenetre, le
+   --  verdict des cibles retenues) ; Z3 les etablit en quelques pas. Reglage
+   --  par fichier : les commandes de preuve restent les memes pour tous.
+   package Prove is
+      for Proof_Switches ("radar_ld2450_stream.adb") use ("--level=1");
+      for Proof_Switches ("radar_ld2450_plausibility.adb") use ("--level=1");
+   end Prove;
+
    package Install is
       for Artifacts (".") use ("share");
    end Install;

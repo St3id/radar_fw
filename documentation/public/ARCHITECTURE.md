@@ -867,8 +867,10 @@ devra être détecté et reconfiguré si besoin : le mode multi-cible est une
 commande de l'hôte, dont la persistance après redémarrage reste à vérifier.
 Le LD6004 (deux sommes de contrôle), le XM125 (USB) et la télémétrie vers
 le PC (§2.7, CRC) sont protégés par leur transport. L'émulateur du capteur
-(`Radar_Ld2450_Sim`, §2.6) injecte déjà ces défauts, pour que le décodeur
-soit éprouvé avant le matériel.
+(`Radar_Ld2450_Sim`, §2.6) injecte déjà ces défauts ; le parseur et le filtre
+de plausibilité (§2.6, « Lire un flux abîmé ») y sont éprouvés avant le
+matériel. Les erreurs d'USART et la reconfiguration après redémarrage
+attendent un module réel.
 
 **6. Masses, décharges électrostatiques et collecteur.**
 
@@ -1013,6 +1015,72 @@ vient d'un générateur congruentiel écrit dans le paquet, et non de
 compilateur : la même graine donne les mêmes octets partout. Le côté du `x`
 positif (droite ou gauche), le sens de la vitesse et le comportement après
 un redémarrage restent à vérifier sur un module réel.
+
+**Lire un flux abîmé.** La lecture d'une liaison série peut commencer au
+milieu d'une trame, perdre des octets ou en recevoir de parasites, et rien
+dans le format ne le signale. `Radar_Ld2450_Stream`, dans le cœur embarquable,
+reçoit les octets un par un et garde une fenêtre : les octets qui peuvent
+encore être le début d'une trame. Quand un octet contredit son rang, il
+abandonne le **premier octet seulement** et réexamine le reste. Vider la
+fenêtre serait plus simple et faux : une trame amputée de sa fin contient déjà
+l'en-tête de la suivante. Après n'importe quel défaut, la trame suivante
+intacte sort donc au plus 59 octets après la fin du défaut : les 29 octets au
+plus qui restent de la trame atteinte, puis les 30 de la suivante. La seule
+exception est une fausse trame formée par hasard, avec en-tête et fin à leurs
+rangs, à cheval sur la suivante : le format ne permet pas de la distinguer.
+
+La preuve SPARK établit, pour **toute** suite d'octets : aucune erreur
+d'exécution ; toute trame livrée porte `AA FF 03 00` et `55 CC` à leurs rangs,
+et ses champs sont ceux que lisent ses octets ; seuls sont écartés des débuts
+qui ne pouvaient pas ouvrir une trame, le reste étant gardé intact ; et tant
+que les compteurs saturés ne sont pas à leur borne, octets lus = 30 × trames
+livrées + octets écartés + octets en attente. Elle ne dit rien de la vérité
+du contenu : une trame bien encadrée dont un octet du milieu est abîmé est
+**livrée**, faute de somme de contrôle.
+
+**La plausibilité est à part, et ses seuils sont des hypothèses.**
+`Radar_Ld2450_Plausibility` juge les trois emplacements d'une trame. Un
+emplacement tout à zéros est valide et absent, comme le veut le manuel.
+Sinon, une cible est rejetée, avec un compteur par motif, si `y` n'est pas
+strictement positif, si elle est à plus de 10 m, si sa vitesse dépasse 10 m/s
+en valeur absolue, si sa résolution sort de 200 à 500 mm, ou si elle saute,
+sur un axe, de plus de 1 500 mm + 3 m/s × dt depuis la trame précédente. Un
+saut isolé est rejeté ; une seconde trame qui confirme la nouvelle position
+est acceptée, car un module peut changer une cible d'emplacement ; après 2 s
+sans trame, le passé est oublié. Aucun de ces nombres n'a été mesuré : ils
+sont nommés et commentés comme tels dans le paquet, et les compteurs serviront
+à les corriger.
+
+Ce filtre a une limite qui se chiffre : sur les 768 inversions d'un bit
+possibles dans le corps des quatre trames du manuel, il en rejette 577 avec ces
+seuils. Les 191 autres passent : bits de poids faible, déplacements dans la
+porte, ou un emplacement vide resté vide. Ce total mesure ces seuils sur ces
+quatre trames, pas un taux de détection sur un module réel.
+
+**Rejouer une capture.** `Radar_Ld2450_Log` définit un fichier qui garde les
+octets tels qu'ils sont arrivés, parasites compris, avec leur heure de
+réception : 8 octets `RFWLD2S1`, puis des blocs (heure en ms sur 4 octets,
+longueur `L` sur 2 octets, `L` octets), en petit-boutiste. Un bloc vide dit que
+la liaison était ouverte et que rien n'est arrivé. `Radar_Ld2450_Replay`
+relit ce fichier par le même parseur et le même filtre, et implémente
+`Radar_Planar_Source` : `x`, `y` et la vitesse, rien de plus, sans altitude. Le
+contrat distingue déjà la fin du silence : `Available = False` avec
+`Has_More = True` signale, une fois, un trou de plus de 300 ms (hypothèse) ;
+avec `Has_More = False`, c'est la fin du fichier. Un fichier coupé net ou
+hors format ne lève pas d'exception : la lecture s'arrête et dit pourquoi.
+L'heure d'un rapport est celle de la **réception** du bloc qui contient la fin
+de la trame ; le contrat demande l'heure de capture, dont l'écart (1,2 ms de
+ligne, plus la latence de l'adaptateur USB, inconnue) reste à mesurer.
+
+**L'enregistreur n'est pas validé.** `radar_ld2450_record` copie un port série
+vers ce fichier. `GNAT.Serial_Communications` ne convient pas : son type
+`Data_Rate` est une énumération fermée qui passe de `B230400` à `B460800`, sans
+256 000 bauds, le débit par défaut du module. L'outil appelle donc directement
+l'API Windows (`src/tools/radar_serial_win32`), ce qui le limite à Windows
+x86_64 ; il reste hors de `src/core` et de l'application. **Aucun module
+n'existe encore : seuls ses chemins d'erreur ont été exécutés.** La lecture du
+port, l'acceptation de 256 000 bauds par le pilote de l'adaptateur et les
+délais sont à vérifier au premier branchement. Il ne transmet rien au module.
 
 **La vitesse est en cm/s**, pas en mm/s : elle se multiplie par 10 avant
 d'entrer dans le pistage, qui travaille en mm/s. Une implémentation tierce la
