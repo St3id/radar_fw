@@ -120,7 +120,9 @@ angulaire nette.
   selon la trueness, le profil et les angles morts. Un pas d'échantillonnage
   réglable jusqu'à environ 2,5 mm ne signifie pas que deux cibles séparées de
   2,5 mm sont résolues : la résolution radiale dépend du profil et se mesure
-  séparément. Ce « 2,5 mm » est d'ailleurs une valeur arrondie : la valeur
+  séparément. Le datasheet A121 v1.8 (table 10, à 25 °C) donne une largeur à
+  mi-hauteur **en puissance** de 30, 55, 89, 129 et 222 mm pour les profils 1
+  à 5. Ce « 2,5 mm » est d'ailleurs une valeur arrondie : la valeur
   exacte se lit dans les métadonnées de session (`base_step_length_m`), et un
   projet public de SAR sur A121 y relève 2,5023 mm. L'écart de 0,09 % paraît
   négligeable, mais il fait 1,8 mm à 2 m, soit plus que λ/4 (1,24 mm) : de quoi
@@ -470,32 +472,57 @@ transmission, câblage et mesure. Le rapport et le type d'entraînement ne peuve
 être choisis sérieusement qu'après avoir posé le temps de scan accepté, la
 masse/inertie du plateau et l'erreur angulaire tolérée.
 
-**Choix retenu : rotation continue dans un seul sens.** Le temps de scan est
-désormais posé : un plan à 360° en environ 2 s, un volume de six rangées en
-environ 12 s, sans arrêt ni inversion de la tête. Il en découle :
+**Choix retenu : aller-retour continu sans collecteur.** Deux exigences
+sont posées : un balayage rapide, et une position exacte de la tête. Il en
+découle :
 
 - **un moteur pas-à-pas de type NEMA 17** avec un driver à micropas
   interpolés (TMC2209), par **courroie crantée de rapport 3:1**. Le moteur
   reste en périphérie et l'axe central libre. À 0,5 tr/s au plateau, le
   moteur tourne à 1,5 tr/s, loin de ses limites ;
-- **un collecteur tournant** dans le passage central, à la place de la boucle
-  de câble. Il permet une rotation illimitée. Le module XM125 communique par
-  UART ou I²C, des liaisons lentes, mais la carte SparkFun XM125 ne sort pas
-  son UART : le lien qui traverserait un collecteur reste à définir et à
-  éprouver, il n'est pas acquis ;
-- **un recalage à chaque tour** : l'index est franchi à chaque révolution, si
-  bien qu'un pas perdu ne se propage jamais au-delà d'un tour ;
-- **plus de jeu à l'inversion** : en tournant toujours dans le même sens, la
-  transmission reste appuyée du même côté ;
+- **des passes d'environ 420° en mouvement continu**, dans un sens puis dans
+  l'autre : 360° plus la marge du faisceau. Le câble USB du module forme une
+  boucle, sans collecteur tournant. Un cran d'élévation est pris au
+  retournement ;
+- **un index et une roue codeuse de 90 fentes** : la position exacte ne vient
+  pas du comptage de pas seul. Le micro-pas vaut 0,0375° au plateau
+  (1,8° ÷ 3 ÷ 16, valeur calculée), mais l'angle n'est exact qu'après
+  recalage sur l'index et vérification par la roue ;
 - **une acquisition au vol** : chaque profil est horodaté, et l'angle est
   interpolé à l'instant de la trame. Le faisceau défile alors de 180°/s :
   une trame doit durer moins d'environ 12 ms pour que l'étalement reste sous
   le quart d'un faisceau de 9°. C'est à vérifier sur le module réel.
 
+Ordre de grandeur de la durée, sous hypothèses de consigne (0,5 tr/s,
+inversion d'environ 0,1 s, cran d'élévation d'environ 0,37 s) : 420° durent
+2,33 s, soit environ 2,8 s par rangée et environ 17 s pour six rangées, sans
+retour à vide. Avec un pas de 2°, une passe compte 210 balayages, soit
+90 balayages/s et 11 ms par balayage. À 124 points et 1,23 µs par point et par
+moyennage matériel (HWAAS), cela limite HWAAS à environ 72 au lieu de 256 :
+−5,5 dB de rapport signal/bruit, en supposant le gain de +3 dB par doublement
+que le constructeur écrit (datasheet A121 v1.8) et que le montage doit encore
+confirmer. Un premier volume rapide met donc surtout en évidence les échos
+forts, et la carte s'affine sur les volumes suivants si la phase reste
+stable (à mesurer). Le débit est de 90 × 516 octets, soit environ 46 ko/s :
+cela exige une liaison à 921 600 bauds (environ 50 % d'occupation) ; 115 200
+bauds ne suffisent pas.
+
+**Option écartée : rotation continue dans un seul sens.** Elle supprimerait
+l'inversion et le jeu de transmission, et un recalage par l'index serait
+possible à chaque tour. Elle demande en revanche un collecteur tournant dans
+le passage central. Le module XM125 ne sort que son USB sur la carte SparkFun
+(l'UART n'est pas accessible) : le lien de données traverserait le collecteur,
+ce qu'il n'est pas prévu de faire, ou nécessiterait un microcontrôleur
+supplémentaire sur la tête (un ESP32-S3, hôte USB du module et pont sans fil),
+dont la synchronisation horaire à quelques millisecondes n'est pas acquise.
+L'aller-retour évite ces deux inconnues pour une inversion de l'ordre de
+0,1 s par rangée. La rotation continue reste une option documentée.
+
 La cadence est bornée par le lien du capteur, pas par le moteur : un profil
 tous les 3° représente 60 profils/s, soit quelques dizaines de ko/s selon la
 plage et le pas configurés. Les mesures du montage (pas par tour, répétabilité
-de l'index, bruit du collecteur sur la liaison série) restent à faire.
+de l'index, erreur d'angle contre la roue, débit réel de la liaison série à
+921 600 bauds) restent à faire.
 
 **L'angle et l'heure se prennent à la source.** Un point est rangé à l'angle
 attribué à sa mesure : si cet angle est lu avec un retard `Δt` pendant que la
@@ -530,8 +557,7 @@ Trois moyens de détection, du plus grossier au plus fin :
   vitesse ;
 - **une roue codeuse solidaire du plateau**, 90 fentes lues par deux fourches
   optiques décalées d'un quart de fente : 360 repères par tour, donc l'angle
-  réel du plateau au degré près, compatible avec l'axe creux et le
-  collecteur. Les pas moteur interpolent entre deux repères, et un pas perdu
+  réel du plateau au degré près, compatible avec l'axe creux. Les pas moteur interpolent entre deux repères, et un pas perdu
   est révélé au repère suivant.
 
 Le contrôleur suit une machine à états. **Nominal** : l'angle mesuré suit la
@@ -617,7 +643,7 @@ des hypothèses tant que ces essais ne sont pas faits.
        +-------+--------+
                | GPIO (plus tard : drivers ULN2003)
                v
-       [azimut : rotation continue, collecteur, index + elevation]
+       [azimut : aller-retour ~420 deg, index + roue codeuse, elevation]
 
 Ce schéma décrit la **première phase** : un capteur unique, pour valider la
 chaîne. La cible est une **couronne** de capteurs fixes orientés dans des
@@ -641,11 +667,12 @@ démontré par `radar_demo`, transposé au matériel) :
 Le moteur d'azimut n'a pas d'encodeur : c'est le plateau qui porte la mesure
 d'angle, une roue codeuse de 90 fentes lue par deux fourches optiques, et un
 capteur d'index fixe donne l'origine. Le contrôleur compte les pas entre deux
-repères. La tête tourne en continu, toujours dans le même sens (voir le choix
-de transmission en §1.7) : un pas perdu est révélé au repère suivant, et
-l'index recale le compte à chaque tour. La conduite à tenir en cas de
-ralentissement ou de blocage est décrite au §1.7. Un collecteur tournant
-relie la tête au reste du montage.
+repères. La tête balaie en aller-retour d'environ 420°, en mouvement continu sur
+chaque passe (voir le choix de transmission en §1.7) : un pas perdu est révélé
+au repère suivant, et l'index recale le compte à chaque passage. La conduite à
+tenir en cas de ralentissement ou de blocage est décrite au §1.7. Un câble USB
+en boucle relie la tête au reste du montage ; le collecteur tournant est une
+option écartée (§1.7).
 
 Phase matérielle suivante (XM125/A121) : un service configuré peut exposer des
 profils Sparse IQ via l'Exploration Server ; les registres I²C peuvent exposer
@@ -754,7 +781,7 @@ signalés comme tels, que les essais du point 8 confirment ou corrigent.
 | ------- | ---- | ------------------------- |
 | LD2450 (couronne) | émetteur et victime | FMCW 24,00–24,25 GHz (250 MHz de balayage) ; 5 V, 120 mA en moyenne, source d'au moins 200 mA ; aucune exigence d'ondulation publiée |
 | LD6004 | émetteur et victime | FMCW 58–64 GHz, 12 dBm (en sortie selon le manuel, en PIRE selon la page produit : point 7) et 4 dBi d'antenne ; 3,1–3,5 V, 135 à 600 mA, source d'au moins 1 A, **ondulation ≤ 50 mV, découpage ≥ 2 MHz** si l'alimentation est à découpage |
-| A121 (XM125) | émetteur et victime | impulsions cohérentes 57–64 GHz, PIRE 11 dBm ; **ondulation ≤ 25 mV crête à crête de 10 kHz à 4 MHz** sur son 1,8 V numérique ; appel de ~3 à ~75 mA au passage en mesure |
+| A121 (XM125) | émetteur et victime | impulsions cohérentes 57–64 GHz, PIRE typique 11,4 dBm (datasheet A121 v1.8) ; **ondulation ≤ 25 mV crête à crête de 10 kHz à 4 MHz** sur son 1,8 V numérique ; appel de ~3 à ~75 mA au passage en mesure |
 | TMC2209 + NEMA 17 | source | découpage à 23, 35 (défaut), 47 ou 59 kHz (2/1024 à 2/410 de son horloge de 12 MHz) ; ~1 A par phase, fronts rapides |
 | ULN2003 + 28BYJ-48 | source | commutation inductive au rythme des pas, ~100 mA par phase |
 | Convertisseurs | source | de 150 kHz (LM2596) à 1,5 MHz au plus (MP1584) pour les modules courants |
@@ -784,7 +811,7 @@ couronne, un noyau métallique au centre (tôle ou ruban de cuivre) applique
 cette dernière consigne.
 
 À 60 GHz, le LD6004 et l'A121 partagent la bande 57–64 GHz. Même calcul,
-LD6004 à 10 cm (1 ou 5 dB de PIRE de plus que l'A121, selon la valeur du
+LD6004 à 10 cm (0,6 ou 4,6 dB de PIRE de plus que l'A121 (11,4 dBm), selon la valeur du
 fabricant retenue : point 7), personne à 3 m : le brouilleur arrive entre
 −9 et +35 dB par rapport à l'écho pour des lobes de −30 à −10 dB de chaque
 côté. L'intégration cohérente de l'A121 rabat une partie de ce signal
@@ -886,7 +913,7 @@ attendent un module réel.
   publient pas de tenue. Un corps humain atteint couramment plusieurs kV par
   temps sec : boîtier imprimé isolant, aucune pièce métallique touchable
   reliée à l'électronique, connecteurs en retrait.
-- Si un collecteur tournant est ajouté, il ne porte que l'alimentation ; les
+- Si un collecteur tournant était ajouté (option écartée, §1.7), il ne porte que l'alimentation ; les
   données de la tête passent par radio. Chaque variation de résistance de
   contact devient un creux de tension : condensateur de réserve et diode de
   protection (TVS) côté tournant.
@@ -905,7 +932,7 @@ attendent un module réel.
   PIRE n'est pas publiée : le cadre qui le couvre se lit dans sa déclaration
   de conformité.
 - 57–64 GHz, annexe 1 bande n1 : 100 mW PIRE et 10 mW en sortie
-  d'émetteur. L'A121 (11 dBm PIRE) est déclaré conforme à la directive
+  d'émetteur. L'A121 (11,4 dBm PIRE typique) est déclaré conforme à la directive
   2014/53/UE. Pour le LD6004, les deux documents du fabricant se
   contredisent : 12 dBm en sortie selon le manuel (16 mW, plus que les
   10 mW), 12 dBm de PIRE selon la page produit, soit 8 dBm en sortie avec
@@ -1328,7 +1355,8 @@ pistage.
 Un capteur à un seul canal TX/RX, comme l'A121, mesure la distance mais pas
 l'angle. Sur une tourelle, l'angle vient de la direction visée, avec la
 finesse du faisceau : ~65° à mi-puissance pour l'A121 nu (plan H, datasheet
-v1.3), ~17° avec la lentille hyperbolique citée au §1.2. Mais l'A121 est
+A121 v1.8, table 8 : valeur typique, « TX HPBW », convention aller simple, établie
+par simulation du constructeur ; le diagramme réel reste à mesurer), ~17° avec la lentille hyperbolique citée au §1.2. Mais l'A121 est
 **cohérent** : il mesure aussi la phase de l'écho. Monté **décentré**, à la
 distance `r` de l'axe, il décrit un arc ; d'un balayage à l'autre, la phase
 de l'écho d'un point fixe change selon `4π d / λ`. En compensant cette phase
