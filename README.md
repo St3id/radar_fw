@@ -20,8 +20,8 @@ dans le navigateur.
 | | |
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
-| Vérification formelle | **252 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé et contrats du parseur LD2450, pas qualité de détection ni validité sur un module réel |
-| Tests | **61 tests AUnit**, rejoués à chaque commit |
+| Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé et contrats du parseur LD2450 et du plan de balayage, pas qualité de détection ni validité sur un module réel |
+| Tests | **71 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -42,6 +42,7 @@ d'octets enregistrés, et n'a encore jamais relu une capture réelle.
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live  # temps reel -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
+    alr exec -- ./bin/radar_fw scan --dwell  # idem, en ralentissant sur les cibles
     alr exec -- ./bin/radar_fw sar   # synthese d'ouverture simulee (texte)
 
 - **`track` — rejeu du pistage.** 60 tours d'un monde d'objets mobiles :
@@ -66,7 +67,9 @@ d'octets enregistrés, et n'a encore jamais relu une capture réelle.
   démonstration, la première passe prend environ 1,5 s et le détail 10,8 s ;
   ce sont des cadences d'animation, pas des mesures du moteur ou du capteur.
   Les nouveaux points sont transmis par lots, sans renvoyer tout le nuage à
-  chaque rafraîchissement.
+  chaque rafraîchissement. Avec `--dwell`, la passe de détail garde sa durée et
+  son nombre de mesures, mais les resserre sur les objets simulés, à parts
+  égales entre eux : voir `ARCHITECTURE.md` §2.8.
 - **`sar` — synthèse d'ouverture simulée.** Un capteur cohérent décentré de
   60 mm sur une tourelle voit une mire à 3 m ; la somme cohérente des échos
   de tout l'arc affine l'azimut de ~44° (faisceau réel) à ~2,2°. Le mode
@@ -190,9 +193,9 @@ Reste à faire :
 ## Vérification formelle
 
 Le code en `SPARK_Mode` est prouvé avec SPARK (prouveurs CVC5 et Z3) :
-**252 checks, 0 non prouvé** pour le projet principal, dont 112 contrôles
-d'exécution, 50 assertions, 44 contrats fonctionnels, 40 de terminaison et
-6 d'initialisation.
+**354 checks, 0 non prouvé** pour le projet principal, dont 154 contrôles
+d'exécution, 67 assertions, 77 contrats fonctionnels, 49 de terminaison et
+7 d'initialisation.
 Ce qui est établi :
 
 - l'absence d'erreur d'exécution : débordements, indices hors bornes ;
@@ -217,27 +220,33 @@ Ce qui est établi :
 - le filtre `Radar_Ld2450_Plausibility` : toute cible retenue respecte les
   seuils. Cela ne valide ni ces seuils, posés sans module réel, ni le contenu
   d'une trame, qui n'a pas de somme de contrôle ;
+- le plan de balayage `Radar_Dwell` : sans cible, la passe dure exactement sa
+  durée nominale ; sinon, la somme vaut le temps minimal plus une part par
+  cible, en gardant la réserve de rampe, et aucun secteur ne dépasse la vitesse
+  maximale. Donner une part ajoute exactement ce temps à la fenêtre de la cible
+  et ne change rien ailleurs. Cela ne valide ni ces durées et ces angles, qui
+  sont des hypothèses, ni la tenue d'un vrai moteur ;
 - la terminaison des sous-programmes (aspect implicite
   `Always_Terminates`).
 
 L'objet protégé `Mailbox` est analysé à part, dans le contexte Ravenscar
 (projet `radar_demo.gpr`) : absence d'erreur d'exécution et de flot, sans
-propriété fonctionnelle. Il ne fait pas partie des 252 checks.
+propriété fonctionnelle. Il ne fait pas partie des 354 checks.
 
 Reproduire les quatre preuves, sur un répertoire `obj/` neuf :
 
-    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 85 checks
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 112 au total (85 + 27)
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 252 au total (112 + 140)
+    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 187 checks
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 214 au total (187 + 27)
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 354 au total (214 + 140)
     alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on                       # 89 checks
 
-La première commande n'analyse que ce qu'utilise l'exécutable (85 checks) ;
+La première commande n'analyse que ce qu'utilise l'exécutable (187 checks) ;
 `Radar_Ld2450`, hors de cette fermeture, exige la seconde, qui amène le total
-à 112, et le parseur et sa plausibilité la troisième, qui l'amène à 252. Ces
-deux unités se prouvent au niveau 1 (réglage de `radar_fw.gpr`, fichier par
+à 214, et le parseur et sa plausibilité la troisième, qui l'amène à 354. Ces
+unités et `Radar_Dwell` se prouvent au niveau 1 (réglage de `radar_fw.gpr`, fichier par
 fichier) : CVC5 seul ne relie pas certains quantificateurs, que Z3 établit. Le
 projet de démonstration compte 89 checks ; les deux projets partagent des
-unités du cœur, ce qui donne 256 checks distincts au total.
+unités du cœur, ce qui donne 358 checks distincts au total.
 
 ## Concurrence Ravenscar
 
@@ -278,9 +287,11 @@ du code, du temps d'exécution ni du comportement sur la carte.
 
 ## Tests
 
-**61 tests AUnit** répartis en cinq suites :
+**71 tests AUnit** répartis en six suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
+- balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes
+  d'un moteur simulé, gain en mesures et en échos sur les objets ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
   zénith, regroupement spatial, cycle de vie du pistage (filtre,
   M-sur-N, coasting, mort des tentatives, traversée de la zone aveugle,

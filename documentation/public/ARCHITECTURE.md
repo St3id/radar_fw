@@ -1350,6 +1350,41 @@ Comme dans les projets comparables, une position de cible n'est jamais
 marquée « en roue libre », et elle disparaît à l'échéance fixée par le
 pistage.
 
+#### Balayage adaptatif : ralentir sur les cibles
+
+Le capteur mesure à cadence constante : la vitesse de la tête fixe le nombre de
+balayages par degré. `Radar_Dwell` garde la durée d'une passe, fait tourner la
+tête au maximum hors des cibles et partage le temps gagné à parts égales. Deux
+cibles proches additionnent leurs parts dans la zone commune, sans étape de
+fusion, et une cible au bord de la passe garde sa part sur une fenêtre coupée.
+
+Les valeurs du plan sont des hypothèses : passe de 2,65 s sur 420°, plafond de
+0,9 tr/s, fenêtre de 60°, accélération de 2 000 °/s². Le modèle `Radar_Turret_Sim`
+applique des rampes à ce plan, et 240 ms de réserve les absorbent : sur des
+cibles régulièrement espacées, la pire passe dure 2,64 s, pour un budget de
+2,65 s. Colonnes de mesure à moins de 30° d'une cible, sur les 180 d'une passe :
+
+| Cibles | Colonnes sur la cible | Gain |
+| ------ | --------------------- | ---- |
+| aucune | 26 | référence |
+| 1 | 93 | × 3,6 |
+| 2 | 52 | × 2,0 |
+| 4 | 32 | × 1,2 |
+| 8 | 28 | × 1,1 |
+
+Ce résultat est simulé, et il a un prix et des limites :
+
+- **Prix.** Dès qu'une cible est présente, la densité hors des fenêtres tombe à
+  son plancher, environ deux fois moins que sans cible.
+- **Finesse.** Le gain porte sur le signal et le nombre de points. La résolution
+  d'une synthèse d'ouverture dépend de la longueur de l'arc, qui ne change pas.
+- **Cible mobile.** La scène reste figée pendant une passe simulée. Une personne
+  qui marche sort de la cohérence pendant le ralentissement : elle gagne des
+  mesures, pas de netteté.
+- **Repères.** La simulation prend la position vraie des objets. Un système réel
+  devra la tirer d'un capteur de veille ou de la passe précédente, et son erreur
+  réduira le gain. Une cible dans le recouvrement de 60° n'est servie qu'une fois.
+
 ### 2.9 Synthèse d'ouverture en arc (simulée)
 
 Un capteur à un seul canal TX/RX, comme l'A121, mesure la distance mais pas

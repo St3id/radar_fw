@@ -25,16 +25,18 @@ begin
    elsif Argument (1) = "live" then
       Radar_Run_Live;
    elsif Argument (1) = "scan" then
-      Radar_Run_Scan;
+      Radar_Run_Scan
+        (Dwell => Argument_Count >= 2 and then Argument (2) = "--dwell");
    elsif Argument (1) = "sar" then
       Radar_Run_Sar;
    else
-      Put_Line ("usage : radar_fw [track|map|live|scan|sar]");
+      Put_Line ("usage : radar_fw [track|map|live|scan [--dwell]|sar]");
       Put_Line ("  track : rejeu du pistage (defaut)");
       Put_Line ("  map   : cartographie 3D d'une piece statique (fichier)");
       Put_Line ("  live  : surveillance temps reel (http://localhost:8080)");
       Put_Line ("  scan  : carte rapide puis detaillee (http://localhost:"
                 & "8080)");
+      Put_Line ("  scan --dwell : idem, en ralentissant sur les cibles");
       Put_Line ("  sar   : synthese d'ouverture simulee (texte)");
       Set_Exit_Status (Failure);
    end if;

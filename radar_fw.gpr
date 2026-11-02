@@ -27,6 +27,7 @@ project Radar_Fw is
    package Prove is
       for Proof_Switches ("radar_ld2450_stream.adb") use ("--level=1");
       for Proof_Switches ("radar_ld2450_plausibility.adb") use ("--level=1");
+      for Proof_Switches ("radar_dwell.adb") use ("--level=1");
    end Prove;
 
    package Install is

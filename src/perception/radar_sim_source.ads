@@ -1,5 +1,7 @@
+with Radar_Dwell;
 with Radar_Source;  use Radar_Source;
 with Radar_Sweep;
+with Radar_Turret_Sim;
 with Radar_World;   use Radar_World;
 
 --  Radar_Sim_Source : la source simulee, qui balaie une grille azimut par
@@ -46,6 +48,22 @@ package Radar_Sim_Source is
      (Az_Steps : Grid_Steps := 180;
       El_Steps : Grid_Steps := 24) return Simulated_Source;
 
+   --  Les reperes de Radar_Dwell tires de la position VRAIE des objets de la
+   --  scene : la simulation se passe d'un capteur de veille, qu'un systeme
+   --  reel devra fournir (pistes LD2450 ou passe precedente).
+   procedure Scene_Cues
+     (Cues  : out Radar_Dwell.Cue_List;
+      Count : out Radar_Dwell.Cue_Count);
+
+   --  Mode balayage adaptatif : une passe de la tourelle sur la piece et ses
+   --  objets. Le capteur mesure a cadence constante pendant que la tete suit
+   --  Times : les colonnes se resserrent la ou elle ralentit. Le nombre de
+   --  mesures reste celui d'une passe uniforme.
+   function Make_Planned_Scan
+     (Times    : Radar_Turret_Sim.Realised_Times;
+      Az_Steps : Grid_Steps := 180;
+      El_Steps : Grid_Steps := 24) return Simulated_Source;
+
    overriding
    procedure Next
      (Self      : in out Simulated_Source;
@@ -83,6 +101,9 @@ private
    --  echo fantome derriere le mur (signal rebondi mur -> cible) ?
    type Object_Flags is array (1 .. Max_Objects) of Boolean;
 
+   --  Azimut de chaque colonne d'un balayage planifie.
+   type Az_Schedule is array (1 .. Grid_Steps'Last) of Float;
+
    type Simulated_Source is new Source with record
       Az_Step      : Natural := 0;   --  position azimut dans le tour
       El_Step      : Natural := 0;   --  position elevation dans le tour
@@ -112,6 +133,10 @@ private
       Ms_Per_Step  : Time_Ms := Default_Ms_Per_Step;
 
       Scene        : World;
+
+      --  Balayage planifie : azimuts imposes, au lieu de la grille reguliere.
+      Planned      : Boolean := False;
+      Schedule     : Az_Schedule := (others => 0.0);
    end record;
 
 end Radar_Sim_Source;

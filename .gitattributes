@@ -1,0 +1,7 @@
+# Fins de ligne LF partout, y compris sur un poste Windows (core.autocrlf=true).
+# Sans cette regle, certains fichiers passent en CRLF dans l'arbre de travail
+# alors que l'index reste en LF : les patchs y echouent et les diffs mentent.
+* text=auto eol=lf
+
+*.pdf binary
+*.png binary
