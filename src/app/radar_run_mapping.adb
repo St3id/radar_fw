@@ -60,19 +60,26 @@ begin
    Create (Out_F, Out_File, File_Name);
 
    Put_Line (Out_F, "<!DOCTYPE html><html lang=""fr""><head><meta charset=""UTF-8"">");
+   Put_Line (Out_F, "<meta name=""viewport"" content=""width=device-width, initial-scale=1"">");
    Put_Line (Out_F, "<title>radar_fw - Cartographie 3D</title><style>");
    Put_Line (Out_F, "body{margin:0;background:#0a0f0d;color:#b9d8cc;font-family:monospace;overflow:hidden}");
-   Put_Line (Out_F, "#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.6;background:rgba(6,16,12,.6);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
+   Put_Line (Out_F, "#info{position:absolute;z-index:2;top:12px;left:12px;font-size:13px;line-height:1.6;background:rgba(6,16,12,.92);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
    Put_Line (Out_F, "#info b{color:#34e29b}");
    Put_Line (Out_F, "#sel{margin-top:8px;color:#ffd23b;line-height:1.5}");
-   Put_Line (Out_F, ".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
+   Put_Line (Out_F, ".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}");
+   Put_Line (Out_F, ".opts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:11px}");
+   Put_Line (Out_F, ".opts label{cursor:pointer}.opts input{accent-color:#34e29b}");
+   Put_Line (Out_F, ".opts button{grid-column:1/-1;padding:6px;border:1px solid #355244;background:#101b16;color:#b9d8cc;cursor:pointer}</style></head><body>");
    Put_Line (Out_F, "<div id=""info""><b>radar_fw</b> - cartographie d'une piece (scan simule)");
    if Cloud.Dropped > 0 then
       Put_Line (Out_F, "<div class=""hint"" style=""color:#ff8b72"">Attention : " &
                 Img (Cloud.Dropped) & " points ignores, carte incomplete.</div>");
    end if;
    Put_Line (Out_F, "<div class=""hint"">Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
-   Put_Line (Out_F, "<div id=""sel""></div></div>");
+   Put_Line (Out_F, "<div class=""opts""><label><input id=""grid-toggle"" type=""checkbox"" checked> Grille</label>");
+   Put_Line (Out_F, "<label><input id=""height-toggle"" type=""checkbox"" checked> Couleur = hauteur</label>");
+   Put_Line (Out_F, "<button id=""reset-view"" type=""button"">Recentrer la camera</button></div>");
+   Put_Line (Out_F, "<div id=""sel"" aria-live=""polite""></div></div>");
    Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
 
    --  Les points accumules par le scan, chacun accompagne de sa
@@ -122,7 +129,7 @@ begin
    --  Marqueur du radar (au centre) + grille de sol.
    Put_Line (Out_F, "const r=new THREE.Mesh(new THREE.SphereGeometry(80,16,16),");
    Put_Line (Out_F, "new THREE.MeshBasicMaterial({color:0xff5d3b}));scene.add(r);");
-   Put_Line (Out_F, "scene.add(new THREE.GridHelper(6000,12,0x1c3a2e,0x1c3a2e));");
+   Put_Line (Out_F, "const grid=new THREE.GridHelper(6000,12,0x1c3a2e,0x1c3a2e);scene.add(grid);");
 
    --  Marqueur du point selectionne (sphere jaune en fil de fer).
    Put_Line (Out_F, "const selM=new THREE.Mesh(new THREE.SphereGeometry(70,12,12),new THREE.MeshBasicMaterial({color:0xffd23b,wireframe:true}));");
@@ -133,17 +140,21 @@ begin
    --  tourner autour de ctr ; ZQSD/WASD = deplacer ctr ; molette = zoom.
    Put_Line (Out_F, "let rotY=0.6,rotX=0.4,dist=5000;");
    Put_Line (Out_F, "const ctr=new THREE.Vector3(0,0,0);");
+   Put_Line (Out_F, "document.getElementById('grid-toggle').addEventListener('change',e=>grid.visible=e.target.checked);");
+   Put_Line (Out_F, "document.getElementById('height-toggle').addEventListener('change',e=>{mat.vertexColors=e.target.checked;mat.color.set(e.target.checked?0xffffff:0x65d8a5);mat.needsUpdate=true;});");
+   Put_Line (Out_F, "document.getElementById('reset-view').addEventListener('click',()=>{ctr.set(0,0,0);rotY=0.6;rotX=0.4;dist=5000;});");
    Put_Line (Out_F, "let down=false,px=0,py=0,moved=0;");
-   Put_Line (Out_F, "addEventListener('mousedown',e=>{down=true;moved=0;px=e.clientX;py=e.clientY;});");
-   Put_Line (Out_F, "addEventListener('mouseup',e=>{down=false;if(moved<5)pick(e);});");
-   Put_Line (Out_F, "addEventListener('mousemove',e=>{if(!down)return;moved+=Math.abs(e.clientX-px)+Math.abs(e.clientY-py);");
+   Put_Line (Out_F, "rnd.domElement.addEventListener('pointerdown',e=>{down=true;moved=0;px=e.clientX;py=e.clientY;rnd.domElement.setPointerCapture(e.pointerId);});");
+   Put_Line (Out_F, "addEventListener('pointerup',e=>{if(!down)return;down=false;if(moved<5)pick(e);});");
+   Put_Line (Out_F, "addEventListener('pointercancel',()=>down=false);");
+   Put_Line (Out_F, "rnd.domElement.addEventListener('pointermove',e=>{if(!down)return;moved+=Math.abs(e.clientX-px)+Math.abs(e.clientY-py);");
    Put_Line (Out_F, "rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
-   Put_Line (Out_F, "addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(200,Math.min(30000,dist));});");
+   Put_Line (Out_F, "rnd.domElement.addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(200,Math.min(30000,dist));},{passive:true});");
 
    --  Clavier (ZQSD azerty, WASD qwerty, R/F vertical). Le deplacement
    --  suit l'orientation de la camera, vitesse proportionnelle au zoom.
    Put_Line (Out_F, "const keys={};");
-   Put_Line (Out_F, "addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);");
+   Put_Line (Out_F, "addEventListener('keydown',e=>{if(!e.target.closest('button,input'))keys[e.key.toLowerCase()]=true;});");
    Put_Line (Out_F, "addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);");
    Put_Line (Out_F, "function moveCtr(){const sp=dist*0.02;");
    Put_Line (Out_F, " const fwd=new THREE.Vector3(ctr.x-cam.position.x,0,ctr.z-cam.position.z).normalize();");

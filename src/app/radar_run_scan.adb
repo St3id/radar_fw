@@ -143,14 +143,21 @@ procedure Radar_Run_Scan is
       end L;
    begin
       L ("<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'>");
+      L ("<meta name='viewport' content='width=device-width, initial-scale=1'>");
       L ("<title>radar_fw - Scan progressif</title><style>");
       L ("body{margin:0;background:#0a0f0d;color:#b9d8cc;font-family:monospace;overflow:hidden}");
-      L ("#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.7;background:rgba(6,16,12,.6);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
+      L ("#info{position:absolute;z-index:2;top:12px;left:12px;font-size:13px;line-height:1.7;background:rgba(6,16,12,.92);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
       L ("#info b{color:#34e29b}#sel{margin-top:8px;color:#ffd23b;line-height:1.5}");
-      L (".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
+      L (".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}");
+      L (".opts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:11px}");
+      L (".opts label{cursor:pointer}.opts input{accent-color:#34e29b}");
+      L (".opts button{grid-column:1/-1;padding:6px;border:1px solid #355244;background:#101b16;color:#b9d8cc;cursor:pointer}</style></head><body>");
       L ("<div id='info'><b>radar_fw - carte progressive</b>");
       L ("<div id='status'>connexion...</div><div id='sel'></div>");
-      L ("<div class='hint'>Vue rapide en gris, detail ajoute en vert.<br>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div></div>");
+      L ("<div class='hint'>Vue rapide en gris, detail ajoute en vert.<br>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
+      L ("<div class='opts'><label><input id='grid-toggle' type='checkbox' checked> Grille</label>");
+      L ("<label><input id='detail-toggle' type='checkbox' checked> Couleur = passe</label>");
+      L ("<button id='reset-view' type='button'>Recentrer la camera</button></div></div>");
       L ("<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'></script>");
       L ("<script>");
       L ("const scene=new THREE.Scene();");
@@ -158,7 +165,7 @@ procedure Radar_Run_Scan is
       L ("const rnd=new THREE.WebGLRenderer({antialias:true});");
       L ("rnd.setSize(innerWidth,innerHeight);rnd.setClearColor(0x06100c);");
       L ("document.body.appendChild(rnd.domElement);");
-      L ("scene.add(new THREE.GridHelper(6000,12,0x1c3a2e,0x1c3a2e));");
+      L ("const grid=new THREE.GridHelper(6000,12,0x1c3a2e,0x1c3a2e);scene.add(grid);");
       L ("scene.add(new THREE.Mesh(new THREE.SphereGeometry(80,16,16),new THREE.MeshBasicMaterial({color:0xff5d3b})));");
       --  Marqueur du point selectionne + panneau de details.
       L ("const selM=new THREE.Mesh(new THREE.SphereGeometry(70,12,12),new THREE.MeshBasicMaterial({color:0xffd23b,wireframe:true}));");
@@ -171,7 +178,8 @@ procedure Radar_Run_Scan is
       L ("const geo=new THREE.BufferGeometry();");
       L ("geo.setAttribute('position',new THREE.BufferAttribute(pos,3));");
       L ("geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setDrawRange(0,0);");
-      L ("const ptsObj=new THREE.Points(geo,new THREE.PointsMaterial({vertexColors:true,size:45}));scene.add(ptsObj);");
+      L ("const ptsMat=new THREE.PointsMaterial({vertexColors:true,size:45});");
+      L ("const ptsObj=new THREE.Points(geo,ptsMat);scene.add(ptsObj);");
       L ("function appendPoints(batch){");
       L (" for(const p of batch){if(PTS.length>=MAX_PTS)break;const i=PTS.length;PTS.push(p);");
       L ("  pos.set([p[0],p[2],p[1]],i*3);const c=p[6]?fine:quick;col.set([c.r,c.g,c.b],i*3);}");
@@ -191,14 +199,18 @@ procedure Radar_Run_Scan is
       --  Camera : orbite autour d'un centre deplacable + clic-details
       --  (memes commandes que le mode map).
       L ("let rotY=0.6,rotX=0.4,dist=5000;const ctr=new THREE.Vector3(0,0,0);");
+      L ("document.getElementById('grid-toggle').addEventListener('change',e=>grid.visible=e.target.checked);");
+      L ("document.getElementById('detail-toggle').addEventListener('change',e=>{ptsMat.vertexColors=e.target.checked;ptsMat.color.set(e.target.checked?0xffffff:0x65d8a5);ptsMat.needsUpdate=true;});");
+      L ("document.getElementById('reset-view').addEventListener('click',()=>{ctr.set(0,0,0);rotY=0.6;rotX=0.4;dist=5000;});");
       L ("let down=false,px=0,py=0,moved=0;");
-      L ("addEventListener('mousedown',e=>{down=true;moved=0;px=e.clientX;py=e.clientY;});");
-      L ("addEventListener('mouseup',e=>{down=false;if(moved<5)pick(e);});");
-      L ("addEventListener('mousemove',e=>{if(!down)return;moved+=Math.abs(e.clientX-px)+Math.abs(e.clientY-py);");
+      L ("rnd.domElement.addEventListener('pointerdown',e=>{down=true;moved=0;px=e.clientX;py=e.clientY;rnd.domElement.setPointerCapture(e.pointerId);});");
+      L ("addEventListener('pointerup',e=>{if(!down)return;down=false;if(moved<5)pick(e);});");
+      L ("addEventListener('pointercancel',()=>down=false);");
+      L ("rnd.domElement.addEventListener('pointermove',e=>{if(!down)return;moved+=Math.abs(e.clientX-px)+Math.abs(e.clientY-py);");
       L ("rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
-      L ("addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(200,Math.min(30000,dist));});");
+      L ("rnd.domElement.addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(200,Math.min(30000,dist));},{passive:true});");
       L ("const keys={};");
-      L ("addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);");
+      L ("addEventListener('keydown',e=>{if(!e.target.closest('button,input'))keys[e.key.toLowerCase()]=true;});");
       L ("addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);");
       L ("function moveCtr(){const sp=dist*0.02;");
       L (" const fwd=new THREE.Vector3(ctr.x-cam.position.x,0,ctr.z-cam.position.z).normalize();");

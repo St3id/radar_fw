@@ -34,18 +34,24 @@ procedure Radar_Run_Tracking is
    procedure Write_Head is
    begin
       Put_Line (Out_F, "<!DOCTYPE html><html lang=""fr""><head><meta charset=""UTF-8"">");
+      Put_Line (Out_F, "<meta name=""viewport"" content=""width=device-width, initial-scale=1"">");
       Put_Line (Out_F, "<title>radar_fw - Tracking 3D</title><style>");
       Put_Line (Out_F, "body{margin:0;background:#0a0f0d;color:#b9d8cc;font-family:monospace;overflow:hidden}");
-      Put_Line (Out_F, "#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.7;background:rgba(6,16,12,.6);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:300px}");
+      Put_Line (Out_F, "#info{position:absolute;z-index:2;top:12px;left:12px;font-size:13px;line-height:1.7;background:rgba(6,16,12,.92);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:300px}");
       Put_Line (Out_F, "#info b{color:#34e29b}");
       Put_Line (Out_F, ".ctl{margin-top:8px}.ctl input[type=range]{vertical-align:middle;width:120px}");
-      Put_Line (Out_F, ".note{margin-top:8px;color:#6f8c80;font-size:11px;line-height:1.4}</style></head><body>");
+      Put_Line (Out_F, ".note{margin-top:8px;color:#6f8c80;font-size:11px;line-height:1.4}");
+      Put_Line (Out_F, ".playback{display:flex;gap:5px;margin-top:8px}.playback button{padding:5px 8px;border:1px solid #355244;background:#101b16;color:#b9d8cc;cursor:pointer}");
+      Put_Line (Out_F, ".layers{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px;font-size:11px}.layers label{cursor:pointer}.layers input{accent-color:#34e29b}</style></head><body>");
       --  Panneau : titre, statut (mis a jour a part), controles, legende.
       Put_Line (Out_F, "<div id=""info"">");
       Put_Line (Out_F, "<b>radar_fw - tracking percu</b>");
       Put_Line (Out_F, "<div id=""status""></div>");
       Put_Line (Out_F, "<label class=""ctl""><input type=""checkbox"" id=""smooth"" checked> Lissage (interpolation)</label>");
       Put_Line (Out_F, "<div class=""ctl"">Vitesse <input type=""range"" id=""speed"" min=""100"" max=""1500"" step=""50"" value=""800""> <span id=""speedval"">800</span> ms/tour</div>");
+      Put_Line (Out_F, "<div class=""playback""><button id=""play"" type=""button"">Pause</button><button id=""prev"" type=""button"">Precedent</button><button id=""next"" type=""button"">Suivant</button><button id=""reset-view"" type=""button"">Vue initiale</button></div>");
+      Put_Line (Out_F, "<label class=""ctl"">Tour <input type=""range"" id=""frame"" min=""0"" max=""0"" value=""0""> <span id=""frameval""></span></label>");
+      Put_Line (Out_F, "<div class=""layers""><label><input id=""show-vectors"" type=""checkbox"" checked> Vecteurs</label><label><input id=""show-trails"" type=""checkbox"" checked> Trainees</label><label><input id=""show-labels"" type=""checkbox""> Etiquettes</label></div>");
       Put_Line (Out_F, "<div class=""note"">Decoche = positions reellement mesurees, tour par tour (la verite de la perception, saccadee).<br>Coche = interpolation visuelle entre deux mesures (positions intermediaires inventees).</div>");
       Put_Line (Out_F, "</div>");
       Put_Line (Out_F, "<script src=""https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js""></script>");
@@ -63,7 +69,11 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "const smoothBox=document.getElementById('smooth');");
       Put_Line (Out_F, "const speedRange=document.getElementById('speed');");
       Put_Line (Out_F, "const speedVal=document.getElementById('speedval');");
+      Put_Line (Out_F, "const frameRange=document.getElementById('frame'),frameVal=document.getElementById('frameval');");
+      Put_Line (Out_F, "const playButton=document.getElementById('play'),showVectors=document.getElementById('show-vectors');");
+      Put_Line (Out_F, "const showTrails=document.getElementById('show-trails'),showLabels=document.getElementById('show-labels');");
       Put_Line (Out_F, "let TURN_MS=+speedRange.value;");
+      Put_Line (Out_F, "frameRange.max=Math.max(0,FRAMES.length-1);");
       Put_Line (Out_F, "speedRange.addEventListener('input',()=>{TURN_MS=+speedRange.value;speedVal.textContent=TURN_MS;});");
       Put_Line (Out_F, "const scene=new THREE.Scene();");
       Put_Line (Out_F, "const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,100000);");
@@ -105,31 +115,37 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "  s.position.copy(p);dyn.add(s);");
       --  Fleche = direction du vecteur vitesse percu, longueur proportionnelle.
       Put_Line (Out_F, "  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),speed=vel.length();");
-      Put_Line (Out_F, "  if(speed>1){const len=Math.min(2500,speed*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
+      Put_Line (Out_F, "  if(showVectors.checked&&speed>1){const len=Math.min(2500,speed*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
       --  Label : identifiant + distance au radar (a la position affichee).
-      Put_Line (Out_F, "  const lab=makeLabel('#'+tk.id+'  '+distOf(ip)+'mm');lab.position.copy(p).add(new THREE.Vector3(0,200,0));dyn.add(lab);");
+      Put_Line (Out_F, "  if(showLabels.checked){const lab=makeLabel('#'+tk.id+'  '+distOf(ip)+'mm');lab.position.copy(p).add(new THREE.Vector3(0,200,0));dyn.add(lab);}");
       --  Trainee : positions reelles passees (max 7) + la position courante.
       Put_Line (Out_F, "  const tp=[],start=Math.max(0,turn-7);");
       Put_Line (Out_F, "  for(let f=start;f<turn;f++){const o=FRAMES[f].find(x=>x.id===tk.id);if(o)tp.push(v3(o));}");
       Put_Line (Out_F, "  tp.push(p);");
-      Put_Line (Out_F, "  if(tp.length>1){dyn.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tp),new THREE.LineBasicMaterial({color:0x1f7a5a})));}");
+      Put_Line (Out_F, "  if(showTrails.checked&&tp.length>1){dyn.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tp),new THREE.LineBasicMaterial({color:0x1f7a5a})));}");
       Put_Line (Out_F, " }");
+      Put_Line (Out_F, " frameRange.value=turn;frameVal.textContent=(turn+1)+' / '+FRAMES.length;");
       Put_Line (Out_F, " status.innerHTML='Tour '+(turn+1)+' / '+FRAMES.length+'<br>Cibles suivies : '+toF.length;}");
       --  Etat du rejeu + controles souris (rotation / zoom).
-      Put_Line (Out_F, "let turn=0,acc=0,last=performance.now();");
+      Put_Line (Out_F, "let turn=0,acc=0,last=performance.now(),paused=false;");
       Put_Line (Out_F, "let rotY=0.6,rotX=0.4,down=false,px=0,py=0,camDist=7000;");
-      Put_Line (Out_F, "addEventListener('mousedown',e=>{down=true;px=e.clientX;py=e.clientY;});");
-      Put_Line (Out_F, "addEventListener('mouseup',()=>down=false);");
-      Put_Line (Out_F, "addEventListener('mousemove',e=>{if(!down)return;rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;px=e.clientX;py=e.clientY;});");
-      Put_Line (Out_F, "addEventListener('wheel',e=>{camDist*=(1+e.deltaY*0.001);});");
+      Put_Line (Out_F, "rnd.domElement.addEventListener('pointerdown',e=>{down=true;px=e.clientX;py=e.clientY;rnd.domElement.setPointerCapture(e.pointerId);});");
+      Put_Line (Out_F, "addEventListener('pointerup',()=>down=false);addEventListener('pointercancel',()=>down=false);");
+      Put_Line (Out_F, "rnd.domElement.addEventListener('pointermove',e=>{if(!down)return;rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
+      Put_Line (Out_F, "rnd.domElement.addEventListener('wheel',e=>{camDist*=(1+e.deltaY*0.001);camDist=Math.max(300,Math.min(40000,camDist));},{passive:true});");
+      Put_Line (Out_F, "playButton.addEventListener('click',()=>{paused=!paused;playButton.textContent=paused?'Reprendre':'Pause';});");
+      Put_Line (Out_F, "document.getElementById('prev').addEventListener('click',()=>{turn=(turn+FRAMES.length-1)%FRAMES.length;acc=0;});");
+      Put_Line (Out_F, "document.getElementById('next').addEventListener('click',()=>{turn=(turn+1)%FRAMES.length;acc=0;});");
+      Put_Line (Out_F, "frameRange.addEventListener('input',()=>{turn=+frameRange.value;acc=0;});");
+      Put_Line (Out_F, "document.getElementById('reset-view').addEventListener('click',()=>{rotY=0.6;rotX=0.4;camDist=7000;});");
       Put_Line (Out_F, "addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rnd.setSize(innerWidth,innerHeight);});");
       --  Boucle : on avance d'un tour toutes les TURN_MS ms (curseur Vitesse).
       --  'a' = progression dans le tour ; si lissage decoche, a=1 => saut net
       --  (positions brutes reellement mesurees, comportement saccade).
       Put_Line (Out_F, "function loop(now){");
       Put_Line (Out_F, " requestAnimationFrame(loop);");
-      Put_Line (Out_F, " const dt=now-last;last=now;acc+=dt;");
-      Put_Line (Out_F, " if(acc>=TURN_MS){acc-=TURN_MS;turn=(turn+1)%FRAMES.length;}");
+      Put_Line (Out_F, " const dt=now-last;last=now;if(!paused)acc+=dt;");
+      Put_Line (Out_F, " if(!paused&&acc>=TURN_MS){acc-=TURN_MS;turn=(turn+1)%FRAMES.length;}");
       Put_Line (Out_F, " const a=smoothBox.checked?Math.min(1,acc/TURN_MS):1;");
       Put_Line (Out_F, " drawScene(a);");
       Put_Line (Out_F, " cam.position.x=Math.cos(rotY)*Math.cos(rotX)*camDist;");

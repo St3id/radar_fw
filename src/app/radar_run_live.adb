@@ -100,14 +100,70 @@ procedure Radar_Run_Live is
       end L;
    begin
       L ("<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'>");
-      L ("<title>radar_fw - Live</title><style>");
-      L ("body{margin:0;background:#0a0f0d;color:#b9d8cc;font-family:monospace;overflow:hidden}");
-      L ("#info{position:absolute;top:12px;left:12px;font-size:13px;line-height:1.7;background:rgba(6,16,12,.6);padding:10px 12px;border:1px solid #1c3a2e;border-radius:6px;max-width:320px}");
-      L ("#info b{color:#34e29b}#tgts{color:#ffd23b}");
-      L (".hint{color:#6f8c80;font-size:11px;margin-top:6px;line-height:1.4}</style></head><body>");
-      L ("<div id='info'><b>radar_fw - surveillance live</b>");
-      L ("<div id='status'>connexion...</div><div id='tgts'></div>");
-      L ("<div class='hint'>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Points verts : decor appris &middot; spheres : cibles CONFIRMEES<br>Gris + * : piste non revue ce tour (position extrapolee)</div></div>");
+      L ("<title>radar_fw - Surveillance live</title>");
+      L ("<meta name='viewport' content='width=device-width, initial-scale=1'>");
+      L ("<style>");
+      L ("*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}");
+      L ("body{background:#080d0b;color:#d8e6df;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px}");
+      L ("canvas{position:fixed;inset:0;display:block;touch-action:none}");
+      L (":root{--panel:rgba(10,17,14,.94);--line:#26372f;--muted:#91a49a;--green:#49e0a2;--amber:#ffc36a}");
+      L ("#topbar{position:fixed;z-index:2;inset:0 0 auto;height:62px;display:flex;align-items:center;justify-content:space-between;" &
+         "padding:0 22px;background:rgba(8,13,11,.88);border-bottom:1px solid #22332b;pointer-events:none}");
+      L (".brand{display:flex;align-items:center;gap:13px}.brand-mark{width:29px;height:29px;display:grid;place-items:center;border:1px solid #39775d;color:var(--green);font-size:11px;font-weight:800;letter-spacing:-1px}");
+      L (".brand-name{font-size:13px;font-weight:750;letter-spacing:.13em;color:#edf7f2}.brand-sub{margin-top:2px;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}");
+      L (".top-right{display:flex;align-items:center;gap:15px}.mode-tag,.link-state{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}");
+      L (".mode-tag{padding:7px 10px;border:1px solid #72502b;color:#ffd08a;background:#291e12}.link-state{color:#aab9b1}" &
+         ".dot{width:7px;height:7px;border-radius:50%;background:#718078}.link-state.online .dot{background:var(--green);box-shadow:0 0 10px #49e0a255}" &
+         ".link-state.offline .dot{background:#f07867}");
+      L ("#console{position:fixed;z-index:2;top:82px;left:20px;width:318px;max-height:calc(100vh - 112px);overflow:auto;background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 44px #0007;pointer-events:auto}");
+      L (".panel-head{padding:15px 16px 11px;border-bottom:1px solid #22332b;color:var(--muted);font-size:10px;font-weight:750;letter-spacing:.13em;text-transform:uppercase}");
+      L (".status-row{display:flex;align-items:flex-start;gap:10px;padding:15px 16px 13px}.status-indicator{width:8px;height:8px;flex:none;margin-top:4px;background:var(--amber);box-shadow:0 0 10px #ffc36a44}.status-indicator.active{background:var(--green);box-shadow:0 0 10px #49e0a255}");
+      L ("#status{font-size:14px;font-weight:700;color:#f1f6f3;line-height:1.3}.status-note{margin-top:4px;color:var(--muted);font-size:11px;line-height:1.45}");
+      L (".count-row{display:flex;align-items:baseline;justify-content:space-between;padding:12px 16px;border-top:1px solid #22332b;border-bottom:1px solid #22332b}");
+      L (".count-label{color:var(--muted);font-size:10px;font-weight:750;letter-spacing:.1em;text-transform:uppercase}#target-count{color:var(--green);font-size:25px;font-weight:700;font-variant-numeric:tabular-nums}");
+      L (".target-list{padding:3px 16px 10px}.empty-state{padding:11px 0 13px;color:#9aaca2;font-size:12px}");
+      L (".target-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #1e2b25}.target-row:last-child{border-bottom:0}");
+      L (".target-id{display:flex;align-items:center;gap:8px;color:#e4eee8;font-weight:700;font-variant-numeric:tabular-nums}");
+      L (".target-mark{width:7px;height:7px;background:var(--green);border-radius:50%}.target-row.coasting .target-mark{background:#929a96}");
+      L (".target-data{display:flex;align-items:center;gap:9px;color:#d9e5de;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}");
+      L (".target-speed{color:var(--amber)}.track-state{color:#91a49a;font-size:9px;letter-spacing:.06em;text-transform:uppercase}");
+      L (".target-row{width:100%;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}");
+      L (".target-row:hover,.target-row.selected{background:#17251e}.display-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 16px;border-top:1px solid #22332b;color:#c4d2ca;font-size:10px}");
+      L (".display-options label{display:flex;align-items:center;gap:6px;cursor:pointer}.display-options input{accent-color:var(--green)}");
+      L (".view-reset{grid-column:1/-1;padding:7px 9px;border:1px solid #45564d;background:#131e18;color:#e5eee9;font:inherit;cursor:pointer}.view-reset:hover{border-color:var(--green)}");
+      L ("#legend{position:fixed;z-index:2;left:20px;bottom:20px;display:flex;flex-wrap:wrap;gap:10px 15px;max-width:430px;padding:11px 13px;background:var(--panel);border:1px solid var(--line);color:#c4d2ca;font-size:10px;pointer-events:none}");
+      L (".legend-item{display:flex;align-items:center;gap:7px;white-space:nowrap}.legend-dot{width:7px;height:7px;border-radius:50%;background:#1f7a5a}" &
+         ".legend-target{background:var(--green)}.legend-sensor{background:#ff7657}.legend-coast{background:#929a96}" &
+         ".legend-arrow{width:15px;height:2px;background:var(--amber);position:relative}.legend-arrow:after{content:'';position:absolute;right:-1px;top:-3px;border-left:5px solid var(--amber);border-top:4px solid transparent;border-bottom:4px solid transparent}");
+      L ("#controls{position:fixed;z-index:2;right:20px;bottom:20px;max-width:350px;padding:11px 13px;background:var(--panel);border:1px solid var(--line);color:#c4d2ca;font-size:10px;line-height:1.8;pointer-events:none}");
+      L (".control-title{margin-bottom:3px;color:var(--muted);font-size:9px;font-weight:750;letter-spacing:.12em;text-transform:uppercase}.key{display:inline-block;min-width:19px;margin-right:2px;padding:0 4px;border:1px solid #45564d;color:#e5eee9;text-align:center;line-height:17px}");
+      L ("@media(max-width:700px){#topbar{height:54px;padding:0 13px}.brand-mark{width:25px;height:25px}.brand-name{font-size:11px}.brand-sub{font-size:9px}" &
+         ".top-right{gap:8px}.mode-tag,.link-state{font-size:9px;padding:6px 7px}#console{top:66px;left:10px;width:min(310px,calc(100vw - 20px));max-height:calc(100vh - 155px)}" &
+         ".panel-head{padding:11px 13px 8px}.status-row{padding:11px 13px}.count-row{padding:8px 13px}#target-count{font-size:21px}.target-list{padding:2px 13px 7px}.target-row{padding:8px 0}" &
+         "#legend{left:10px;right:10px;bottom:10px;max-width:none;gap:7px 11px;padding:9px 10px;font-size:9px}#controls{display:none}}");
+      L ("@media(max-width:390px){.brand-sub{display:none}.mode-tag{font-size:8px}.target-data{gap:6px;font-size:10px}#legend{gap:6px 9px}.legend-item{font-size:8px}}");
+      L ("@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}</style></head><body>");
+      L ("<header id='topbar'><div class='brand'><div class='brand-mark'>RF</div><div><div class='brand-name'>RADAR_FW</div><div class='brand-sub'>Console de surveillance</div></div></div>");
+      L ("<div class='top-right'><div class='mode-tag'>LIVE &middot; SIMULATION</div><div id='link-state' class='link-state'><span class='dot'></span><span id='link-label'>Connexion...</span></div></div></header>");
+      L ("<main id='console' aria-label='Etat de la surveillance'>");
+      L ("<div class='panel-head'>Etat du radar</div><div class='status-row'><span id='status-indicator' class='status-indicator'></span>" &
+         "<div><div id='status' aria-live='polite'>Connexion en cours...</div><div id='status-note' class='status-note'>Reception du premier etat de simulation.</div></div></div>");
+      L ("<div class='count-row'><span class='count-label'>Pistes confirmees</span><strong id='target-count'>0</strong></div>");
+      L ("<div id='tgts' class='target-list' role='list'><div id='empty-state' class='empty-state'>En attente de pistes confirmees.</div></div>");
+      L ("<div class='display-options' aria-label='Options visuelles'>");
+      L ("<label><input id='show-cloud' type='checkbox' checked> Decor</label><label><input id='show-vectors' type='checkbox' checked> Vecteurs</label>");
+      L ("<label><input id='show-trails' type='checkbox' checked> Trainees</label><label><input id='show-labels' type='checkbox'> Etiquettes 3D</label>");
+      L ("<button id='reset-view' class='view-reset' type='button'>Recentrer la vue</button></div></main>");
+      L ("<aside id='legend' aria-label='Legende de la scene 3D'>");
+      L ("<span class='legend-item'><i class='legend-dot legend-sensor'></i>Capteur</span><span class='legend-item'><i class='legend-dot'></i>Decor appris</span>");
+      L ("<span class='legend-item'><i class='legend-dot legend-target'></i>Cible confirmee</span>" &
+         "<span class='legend-item'><i class='legend-arrow'></i>Vitesse</span>" &
+         "<span class='legend-item'><i class='legend-dot legend-coast'></i>Piste extrapolee</span></aside>");
+      L ("<aside id='controls' aria-label='Commandes de camera'><div class='control-title'>Navigation 3D</div>");
+      L ("Glisser : orbiter &middot; Molette : zoom<br><span class='key'>Z</span><span class='key'>Q</span>" &
+         "<span class='key'>S</span><span class='key'>D</span> / <span class='key'>W</span><span class='key'>A</span>" &
+         "<span class='key'>S</span><span class='key'>D</span> : deplacer<br><span class='key'>R</span>" &
+         " / <span class='key'>F</span> : monter / descendre</aside>");
       L ("<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'></script>");
       L ("<script>");
       L ("const scene=new THREE.Scene();");
@@ -118,11 +174,12 @@ procedure Radar_Run_Live is
       L ("scene.add(new THREE.GridHelper(8000,16,0x1c3a2e,0x1c3a2e));");
       L ("scene.add(new THREE.Mesh(new THREE.SphereGeometry(90,16,16),new THREE.MeshBasicMaterial({color:0xff5d3b})));");
       --  Decor statique : charge une fois (il ne change pas).
-      L ("fetch('/cloud.json').then(r=>r.json()).then(c=>{");
+      L (" let cloudObject=null;fetch('/cloud.json').then(r=>r.json()).then(c=>{");
       L (" const g=new THREE.BufferGeometry(),pos=[];");
       L (" c.points.forEach(p=>pos.push(p[0],p[2],p[1]));");
       L (" g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));");
-      L (" scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x1f7a5a,size:35})));});");
+      L (" cloudObject=new THREE.Points(g,new THREE.PointsMaterial({color:0x1f7a5a,size:35}));scene.add(cloudObject);");
+      L (" cloudObject.visible=showCloud.checked;});");
       L ("const dyn=new THREE.Group();scene.add(dyn);");
       L ("function v3(p){return new THREE.Vector3(p.x,p.z,p.y);}");
       --  Une reserve d'objets PAR PISTE, reutilises d'un etat a l'autre.
@@ -135,7 +192,7 @@ procedure Radar_Run_Live is
       --  texte change, et la trainee vit dans un tampon de 11 points.
       --  Purement de l'affichage : aucune decision n'est prise (R1).
       L ("const BALL=new THREE.SphereGeometry(70,16,16);");
-      L ("const M_ON=new THREE.MeshBasicMaterial({color:0x34e29b}),M_COAST=new THREE.MeshBasicMaterial({color:0x777777});");
+      L ("const M_ON=new THREE.MeshBasicMaterial({color:0x34e29b}),M_COAST=new THREE.MeshBasicMaterial({color:0x777777}),M_SELECTED=new THREE.MeshBasicMaterial({color:0xffd23b});");
       L ("const M_TRAIL=new THREE.LineBasicMaterial({color:0x1f7a5a});");
       L ("const pool={};");
       L ("function objFor(id){");
@@ -156,16 +213,25 @@ procedure Radar_Run_Live is
       L (" o.lab.material.dispose();o.tex.dispose();o.trail.geometry.dispose();");
       L (" o.arrow.line.material.dispose();o.arrow.cone.material.dispose();delete pool[id];}");
       --  Etat courant + trainees cote client (id -> dernieres positions).
-      L ("const status=document.getElementById('status'),tgts=document.getElementById('tgts');");
-      L ("let TURN_MS=800,lastTurn=-1;const trails={};");
+      L ("const statusEl=document.getElementById('status'),statusNote=document.getElementById('status-note');");
+      L ("const statusIndicator=document.getElementById('status-indicator'),linkState=document.getElementById('link-state');");
+      L ("const linkLabel=document.getElementById('link-label'),tgts=document.getElementById('tgts');");
+      L ("const emptyState=document.getElementById('empty-state'),targetCount=document.getElementById('target-count');");
+      L ("const showCloud=document.getElementById('show-cloud'),showVectors=document.getElementById('show-vectors');");
+      L ("const showTrails=document.getElementById('show-trails'),showLabels=document.getElementById('show-labels');");
+      L ("let lastTurn=-1,selectedId=null;const trails={};");
+      L ("showCloud.addEventListener('change',()=>{if(cloudObject)cloudObject.visible=showCloud.checked;});");
+      L ("showVectors.addEventListener('change',()=>{for(const id in pool)pool[id].arrow.visible=showVectors.checked&&pool[id].hasVelocity;});");
+      L ("showTrails.addEventListener('change',()=>{for(const id in pool)pool[id].trail.visible=showTrails.checked&&pool[id].hasTrail;});");
+      L ("showLabels.addEventListener('change',()=>{for(const id in pool)pool[id].lab.visible=showLabels.checked&&Number(id)===selectedId;});");
       L ("function draw(s){");
-      L (" let list='';const seen={};");
+      L (" const list=document.createDocumentFragment(),seen={};");
       L (" for(const tk of s.tracks){");
       L ("  const o=objFor(tk.id);seen[tk.id]=1;");
       L ("  const p=v3(tk);");
-      L ("  o.ball.position.copy(p);o.ball.material=tk.coast?M_COAST:M_ON;");
+      L ("  o.ball.position.copy(p);o.ball.material=tk.id===selectedId?M_SELECTED:(tk.coast?M_COAST:M_ON);");
       L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),sp=vel.length();");
-      L ("  if(sp>1){const len=Math.min(2500,sp*5);o.arrow.position.copy(p);o.arrow.setDirection(vel.normalize());o.arrow.setLength(len,len*0.3,len*0.2);o.arrow.visible=true;}else{o.arrow.visible=false;}");
+      L ("  if(sp>1){const len=Math.min(2500,sp*5);o.arrow.position.copy(p);o.arrow.setDirection(vel.normalize());o.arrow.setLength(len,len*0.3,len*0.2);o.hasVelocity=true;}else{o.hasVelocity=false;}o.arrow.visible=showVectors.checked&&o.hasVelocity;");
       L ("  const d=Math.round(Math.sqrt(tk.x*tk.x+tk.y*tk.y+tk.z*tk.z));");
       --  Les vitesses arrivent en mm/s : la page divise par 1000 pour
       --  afficher des m/s, et rien de plus. Avant la base de temps elle
@@ -173,34 +239,49 @@ procedure Radar_Run_Live is
       --  regle metier dans la page, et fausse des que le dt varie (R1).
       L ("  const ms=(sp/1000).toFixed(2);");
       L ("  setLabel(o,'#'+tk.id+'  '+d+'mm  '+ms+'m/s'+(tk.coast?' *':''));");
+      L ("  o.lab.visible=showLabels.checked&&tk.id===selectedId;");
       L ("  o.lab.position.copy(p).add(new THREE.Vector3(0,220,0));");
       L ("  const tp=(trails[tk.id]||[]).map(v3);tp.push(p);");
       L ("  const a=o.trail.geometry.attributes.position,n=Math.min(tp.length,11);");
       L ("  for(let i=0;i<n;i++){const q=tp[tp.length-n+i];a.setXYZ(i,q.x,q.y,q.z);}");
-      L ("  a.needsUpdate=true;o.trail.geometry.setDrawRange(0,n);o.trail.visible=n>1;");
-      L ("  list+='#'+tk.id+' &mdash; '+d+' mm &mdash; '+ms+' m/s<br>';");
+      L ("  a.needsUpdate=true;o.trail.geometry.setDrawRange(0,n);o.hasTrail=n>1;o.trail.visible=showTrails.checked&&o.hasTrail;");
+      L ("  const row=document.createElement('button');row.type='button';row.className='target-row'+(tk.coast?' coasting':'')+(tk.id===selectedId?' selected':'');row.setAttribute('aria-pressed',tk.id===selectedId);");
+      L ("  row.addEventListener('click',()=>{selectedId=tk.id;ctr.copy(p);});");
+      L ("  const ident=document.createElement('span');ident.className='target-id';");
+      L ("  const mark=document.createElement('i');mark.className='target-mark';ident.append(mark,document.createTextNode('#'+tk.id));");
+      L ("  const details=document.createElement('span');details.className='target-data';");
+      L ("  const range=document.createElement('span');range.textContent=(d/1000).toFixed(2)+' m';");
+      L ("  const speed=document.createElement('span');speed.className='target-speed';speed.textContent=ms+' m/s';");
+      L ("  const state=document.createElement('span');state.className='track-state';state.textContent=tk.coast?'Extrapolee':'Suivi';");
+      L ("  details.append(range,speed,state);row.append(ident,details);list.append(row);");
       L (" }");
       --  Une piste qui n'est plus publiee rend ses objets.
       L (" for(const id in pool)if(!seen[id])drop(id);");
-      L (" status.innerHTML=s.calibrating?'calibration du decor...':'Tour '+s.turn+' &middot; '+s.tracks.length+' cible(s) confirmee(s)';");
-      L (" tgts.innerHTML=list;}");
+      L (" if(selectedId!==null&&!seen[selectedId])selectedId=null;");
+      L (" targetCount.textContent=s.tracks.length;");
+      L (" statusEl.textContent=s.calibrating?'Calibration du decor':'Surveillance active';");
+      L (" statusNote.textContent=s.calibrating?'Tour '+s.turn+' : apprentissage des echos fixes.':'Tour '+s.turn+' : suivi des mouvements en temps reel.';");
+      L (" statusIndicator.classList.toggle('active',!s.calibrating);");
+      L (" emptyState.hidden=s.tracks.length>0;tgts.replaceChildren(emptyState,list);}");
       --  Flux pousse par le serveur (Server-Sent Events, route /events) :
       --  chaque etat arrive des qu'il est calcule, au lieu d'etre redemande
       --  toutes les 250 ms. EventSource se reconnecte seul si le lien tombe.
       L ("const es=new EventSource('/events');");
-      L ("es.onmessage=ev=>{const s=JSON.parse(ev.data);TURN_MS=s.turn_ms;");
+      L ("es.onopen=()=>{linkState.classList.add('online');linkState.classList.remove('offline');linkLabel.textContent='Connecte';};");
+      L ("es.onmessage=ev=>{const s=JSON.parse(ev.data);");
       L (" if(s.turn!==lastTurn){lastTurn=s.turn;");
       L ("  for(const tk of s.tracks){(trails[tk.id]=trails[tk.id]||[]).push({x:tk.x,y:tk.y,z:tk.z});if(trails[tk.id].length>10)trails[tk.id].shift();}}");
       L (" draw(s);};");
-      L ("es.onerror=()=>{status.innerHTML='liaison perdue, reconnexion...';};");
+      L ("es.onerror=()=>{linkState.classList.remove('online');linkState.classList.add('offline');linkLabel.textContent='Reconnexion';};");
       --  Camera : orbite autour d'un centre deplacable (memes commandes
       --  que le mode cartographie).
       L ("let rotY=0.6,rotX=0.4,dist=7000;const ctr=new THREE.Vector3(0,0,0);");
+      L ("document.getElementById('reset-view').addEventListener('click',()=>{selectedId=null;ctr.set(0,0,0);rotY=0.6;rotX=0.4;dist=7000;});");
       L ("let down=false,px=0,py=0;");
-      L ("addEventListener('mousedown',e=>{down=true;px=e.clientX;py=e.clientY;});");
-      L ("addEventListener('mouseup',()=>down=false);");
-      L ("addEventListener('mousemove',e=>{if(!down)return;rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
-      L ("addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(300,Math.min(40000,dist));});");
+      L ("rnd.domElement.addEventListener('pointerdown',e=>{down=true;px=e.clientX;py=e.clientY;rnd.domElement.setPointerCapture(e.pointerId);});");
+      L ("addEventListener('pointerup',()=>down=false);addEventListener('pointercancel',()=>down=false);");
+      L ("rnd.domElement.addEventListener('pointermove',e=>{if(!down)return;rotY+=(e.clientX-px)*0.005;rotX+=(e.clientY-py)*0.005;rotX=Math.max(-1.5,Math.min(1.5,rotX));px=e.clientX;py=e.clientY;});");
+      L ("rnd.domElement.addEventListener('wheel',e=>{dist*=(1+e.deltaY*0.001);dist=Math.max(300,Math.min(40000,dist));},{passive:true});");
       L ("const keys={};");
       L ("addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);");
       L ("addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);");
