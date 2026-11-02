@@ -35,7 +35,8 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`) | oui |
 | `alire.toml` | le manifeste Alire (dépendances, exécutable) | oui |
 | `radar_fw.gpr` et les 3 autres `.gpr` | les projets de compilation (voir §4) | oui |
-| `ravenscar.adc` | impose `pragma Profile (Ravenscar)` à la compilation de la démo | oui |
+| `ravenscar.adc` | impose `pragma Profile (Ravenscar)` et `No_Allocators` à la compilation de la démo | oui |
+| `core_restrictions.adc` | restrictions du cœur embarquable (`No_Allocators`, `No_Exceptions`, pas de `Ada.Text_IO` ni `Ada.Calendar`), branchées par `radar_core.gpr` | oui |
 | `.github/workflows/ci.yml` | l'intégration continue | oui |
 | `.gitignore`, `.markdownlint.json`, `.vscode/settings.json` | configuration | oui |
 | `out/` | **généré** : les visualiseurs HTML des modes `map` et `track` | non |

@@ -1,0 +1,15 @@
+--  Pragmas de configuration du coeur embarquable (radar_core.gpr).
+--  Elles traduisent en regles verifiees par le compilateur ce que la CI
+--  annonce : src/core ne depend ni du PC ni du tas.
+--  Branchees par radar_core.gpr (Builder.Global_Configuration_Pragmas).
+
+--  Pas d'allocation dynamique (aucun "new") : memoire entierement statique.
+pragma Restrictions (No_Allocators);
+
+--  Pas de dependance a Text_IO ni a Calendar : des services de PC,
+--  absents d'une cible nue.
+pragma Restrictions (No_Dependence => Ada.Text_IO);
+pragma Restrictions (No_Dependence => Ada.Calendar);
+
+--  Pas d'instruction "raise" explicite, pas de gestionnaire d'exception.
+pragma Restrictions (No_Exceptions);

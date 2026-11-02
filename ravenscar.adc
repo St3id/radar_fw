@@ -9,3 +9,7 @@ pragma Profile (Ravenscar);
 --  l'elaboration terminee : pas de course au demarrage. Exige par
 --  SPARK pour analyser du code concurrent (SPARK RM 9(2)).
 pragma Partition_Elaboration_Policy (Sequential);
+
+--  Pas d'allocation dynamique dans le demonstrateur : la memoire des
+--  taches et des objets proteges est statique.
+pragma Restrictions (No_Allocators);

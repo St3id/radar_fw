@@ -214,10 +214,14 @@ Compiler puis exécuter la démonstration :
 
 `radar_core.gpr` compile le cœur algorithmique pour **arm-eabi /
 Cortex-M4F** avec le runtime réduit `light` — le processeur du STM32G474
-visé. La CI rejoue cette compilation à chaque commit : tout ajout au cœur
-qui dépendrait du PC (`Ada.Text_IO`, `Ada.Calendar`, exceptions
-propagées) casse le build immédiatement, longtemps avant qu'une carte
-soit branchée.
+visé. La CI rejoue cette compilation à chaque commit, sans édition de
+liens : le build produit des objets, pas d'image exécutable. Le fichier
+`core_restrictions.adc` rend la compilation fatale pour tout ajout au
+cœur qui utiliserait `Ada.Text_IO`, `Ada.Calendar`, un allocateur `new`,
+une instruction `raise` ou un gestionnaire d'exception, longtemps avant
+qu'une carte soit branchée. Ces rejets ont été vérifiés par des unités
+sondes injectées dans `src/core`. La compilation ne dit rien de la taille
+du code, du temps d'exécution ni du comportement sur la carte.
 
 ## Tests
 

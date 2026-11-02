@@ -1,11 +1,16 @@
 --  Coeur de traitement compile pour la CIBLE EMBARQUEE, sans la carte.
 --
 --  Ce projet ne produit pas d'executable : il verifie en continu (CI)
---  que le coeur algorithmique (src/core, prouve SPARK) compile
+--  que le coeur algorithmique (src/core, prouve SPARK) COMPILE
 --  pour un Cortex-M4F avec le runtime reduit "light" - celui du
---  STM32G474 vise. C'est le garde-fou "embedded-ready" du depot : tout
---  ajout au coeur qui dependrait du PC (Text_IO, Calendar, exceptions
---  propagees, allocation...) casse cette compilation immediatement.
+--  STM32G474 vise. Il n'y a PAS d'edition de liens : ni image
+--  executable, ni taille de code, ni test sur carte.
+--
+--  Garde-fou "embedded-ready" : core_restrictions.adc (branche plus bas)
+--  rend la compilation fatale pour tout ajout au coeur qui utiliserait
+--  Ada.Text_IO, Ada.Calendar, un allocateur "new", une instruction
+--  "raise" ou un gestionnaire d'exception. Ces rejets ont ete verifies
+--  par des unites sondes injectees dans src/core.
 --
 --  NB : light-cortex-m4f est le runtime generique M4F livre avec
 --  gnat_arm_elf ; le passage au runtime specifique STM32G474
@@ -33,5 +38,10 @@ project Radar_Core is
          --  Memes controles de style que le projet principal.
          "-gnaty3aAbBcefhiIklmnOprStux");
    end Compiler;
+
+   package Builder is
+      --  Restrictions verifiees a la compilation (voir l'en-tete).
+      for Global_Configuration_Pragmas use "core_restrictions.adc";
+   end Builder;
 
 end Radar_Core;
