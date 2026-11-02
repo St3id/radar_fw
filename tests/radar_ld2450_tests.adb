@@ -2,6 +2,7 @@ with Ada.Numerics;                      use Ada.Numerics;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with AUnit.Assertions;                  use AUnit.Assertions;
 with Radar_Ld2450;                      use Radar_Ld2450;
+with Radar_Ld2450_Faults;               use Radar_Ld2450_Faults;
 with Radar_Ld2450_Sim;                  use Radar_Ld2450_Sim;
 with Radar_Source;
 with Radar_World;                       use Radar_World;
@@ -17,24 +18,6 @@ use type Radar_Source.Time_Ms;
 --  son format est deja couvert par ces trames du manuel.
 
 package body Radar_Ld2450_Tests is
-
-   --  Les 8 octets de chaque cible de reference, tels que le manuel les
-   --  imprime.
-   Example_Bytes : constant Byte_Array :=     --  -782, 1713, -16 cm/s, 320
-     (16#0E#, 16#03#, 16#B1#, 16#86#, 16#10#, 16#00#, 16#40#, 16#01#);
-   Faq_1_Bytes   : constant Byte_Array :=     --  -272, 850, 0 cm/s, 360
-     (16#10#, 16#01#, 16#52#, 16#83#, 16#00#, 16#00#, 16#68#, 16#01#);
-   Faq_2_Bytes   : constant Byte_Array :=     --  -228, 903, +17 cm/s, 360
-     (16#E4#, 16#00#, 16#87#, 16#83#, 16#11#, 16#80#, 16#68#, 16#01#);
-   Faq_3_Bytes   : constant Byte_Array :=     --  2750, 3655, -17 cm/s, 360
-     (16#BE#, 16#8A#, 16#47#, 16#8E#, 16#11#, 16#00#, 16#68#, 16#01#);
-
-   Empty_Slot : constant Byte_Array (1 .. Target_Length) := (others => 0);
-
-   --  La trame attendue pour une seule cible : en-tete, ses 8 octets, deux
-   --  emplacements vides, fin.
-   function Manual_Frame (Slot_Bytes : Byte_Array) return Frame_Bytes is
-     (Header & Slot_Bytes & Empty_Slot & Empty_Slot & Tail);
 
    --  Une cible dans les unites du module.
    function Target

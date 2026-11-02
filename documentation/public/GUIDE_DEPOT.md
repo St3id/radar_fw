@@ -67,10 +67,12 @@ C'est exactement le contenu que compile `radar_core.gpr` pour la cible ARM
 | `radar_sweep.ads/.adb` | `Radar_Sweep` | types bornés, seuil, pic, distance, multi-cibles, CFAR | oui |
 | `radar_clutter.ads/.adb` | `Radar_Clutter` | carte de clutter MTI adaptative | pas encore |
 | `radar_ld2450.ads/.adb` | `Radar_Ld2450` | format des trames du LD2450 : codage à bit de signe, encodeur | oui |
+| `radar_ld2450_stream.ads/.adb` | `Radar_Ld2450_Stream` | parseur de flux : fenêtre glissante, resynchronisation, compteurs | oui |
+| `radar_ld2450_plausibility.ads/.adb` | `Radar_Ld2450_Plausibility` | plausibilité des cibles : seuils nommés (hypothèses), compteur par motif | oui |
 
 Les unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep`,
-`Radar_Ld2450` et `Radar_Buffer` (`src/tasking/`). Vérifiable d'une
-commande :
+`Radar_Ld2450`, `Radar_Ld2450_Stream`, `Radar_Ld2450_Plausibility` et
+`Radar_Buffer` (`src/tasking/`). Vérifiable d'une commande :
 `grep -rn "SPARK_Mode" src/`
 
 ### `src/perception/` — voir et suivre : des données brutes aux pistes
@@ -135,6 +137,8 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_pipeline_tests.ads/.adb` | suite 2 : géométrie, regroupement, pistage, clutter, CFAR |
 | `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
 | `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage, émulateur) |
+| `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité) |
+| `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---
 
@@ -169,10 +173,12 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
 
     alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on
     alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on
     alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on
 
     alr exec -- gprbuild -p -P radar_demo.gpr   # la demo Ravenscar
     alr exec -- gprbuild -p -P radar_core.gpr   # le garde-fou ARM
+
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
 `live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`
