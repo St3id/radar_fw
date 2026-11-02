@@ -1,3 +1,5 @@
+with Ada.Numerics.Elementary_Functions;
+use  Ada.Numerics.Elementary_Functions;
 with AUnit.Assertions;  use AUnit.Assertions;
 with Radar_Geometry;    use Radar_Geometry;
 with Radar_Detect;      use Radar_Detect;
@@ -126,7 +128,8 @@ package body Radar_Pipeline_Tests is
       end loop;
       return (Id => 0, Pos => (0.0, 0.0, 0.0), Velocity => (0.0, 0.0, 0.0),
               Missing => 0, Last_Seen => 0, Hits => 0,
-              Confirmed => False, Active => False);
+              Confirmed => False, Active => False,
+              Vel_Stamp => 0, Vel_Anchor => (0.0, 0.0, 0.0));
    end First_Active;
 
    --  Test 5 : cycle de vie et filtre de piste. Une cible qui avance de
@@ -353,6 +356,246 @@ package body Radar_Pipeline_Tests is
          end if;
       end loop;
    end Test_Global_Association;
+
+   --  ----- Politique de temps du pistage (P3) -----
+
+   --  Nombre de pistes confirmees actives.
+   function Confirmed_Count (Trk : Tracker) return Natural is
+      N : Natural := 0;
+   begin
+      for Tk of Trk.Tracks loop
+         if Tk.Active and then Tk.Confirmed then
+            N := N + 1;
+         end if;
+      end loop;
+      return N;
+   end Confirmed_Count;
+
+   --  La premiere piste confirmee (appelee apres Confirmed_Count >= 1).
+   function First_Confirmed (Trk : Tracker) return Track is
+   begin
+      for Tk of Trk.Tracks loop
+         if Tk.Active and then Tk.Confirmed then
+            return Tk;
+         end if;
+      end loop;
+      raise Program_Error with "aucune piste confirmee";
+   end First_Confirmed;
+
+   --  Une frame d'une seule detection en (X, 2000, 0), datee S.
+   function One_At (S : Time_Ms; X : Float) return Frame is
+      F : Frame;
+   begin
+      Reset (F);
+      F.Count := 1;
+      F.Items (1) := (Pos => (X, 2000.0, 0.0), Distance => 0.0);
+      F.Stamp := S;
+      return F;
+   end One_At;
+
+   --  Piste etablie : cible a 1 m/s vue a 10 Hz pendant 2 s ; x = 0 a 2 s.
+   procedure Establish (Trk : in out Tracker) is
+   begin
+      for K in 1 .. 20 loop
+         Update (Trk, One_At (Time_Ms (K * 100),
+                              -2000.0 + 100.0 * Float (K)));
+      end loop;
+   end Establish;
+
+   --  Bruit uniforme +/- 50 mm, deterministe et independant de GNAT
+   --  (congruentiel, a = 1103515245, c = 12345, modulo 2**31).
+   type Lcg is record
+      S : Long_Long_Integer := 1;
+   end record;
+
+   function Next_Noise (G : in out Lcg) return Float is
+   begin
+      G.S := (G.S * 1103515245 + 12345) mod 2 ** 31;
+      return (Float (G.S) / Float (2 ** 31) - 0.5) * 100.0;
+   end Next_Noise;
+
+   --  Test : une frame au meme instant n'infere aucune vitesse et ne fait
+   --  pas reculer l'horloge. Mesure sur l'ancien code : 29 m/s.
+   procedure Test_Same_Stamp_Keeps_Velocity
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+   begin
+      Establish (Trk);
+      Assert (Confirmed_Count (Trk) = 1, "Une piste confirmee attendue");
+      declare
+         Before : constant Track := First_Confirmed (Trk);
+      begin
+         Update (Trk, One_At (2000, 100.0));   --  meme instant, 100 mm
+         Assert (Confirmed_Count (Trk) = 1
+                 and then First_Confirmed (Trk).Id = Before.Id,
+                 "La meme piste devrait rester seule confirmee");
+         Assert (First_Confirmed (Trk).Last_Seen = 2000,
+                 "La frame simultanee devrait etre associee");
+         Assert (First_Confirmed (Trk).Velocity = Before.Velocity,
+                 "Aucune vitesse ne s'infere d'une observation simultanee");
+         Assert (Trk.Last_Stamp = 2000, "L'horloge ne doit pas bouger");
+      end;
+   end Test_Same_Stamp_Keeps_Velocity;
+
+   --  Test : une frame tardive est rejetee entiere et comptee, Owners ne
+   --  la revendique pas, et le pistage reprend ensuite normalement.
+   procedure Test_Late_Frame_Rejected
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+      Late : constant Frame := One_At (1950, -50.0);
+   begin
+      Establish (Trk);
+      Assert (Confirmed_Count (Trk) = 1, "Une piste confirmee attendue");
+      declare
+         Saved : constant Track_Array := Trk.Tracks;
+         Id0   : constant Natural := First_Confirmed (Trk).Id;
+      begin
+         Assert (Owners (Trk, Late) = No_Owner,
+                 "Owners ne doit pas revendiquer une frame tardive");
+         Update (Trk, Late);
+         Assert (Trk.Late_Frames = 1, "La frame tardive devrait etre comptee");
+         Assert (Trk.Last_Stamp = 2000, "L'horloge ne doit pas reculer");
+         Assert (Trk.Tracks = Saved, "Les pistes devraient etre intactes");
+         Update (Trk, One_At (2100, 100.0));
+         Assert (Confirmed_Count (Trk) = 1
+                 and then First_Confirmed (Trk).Id = Id0
+                 and then First_Confirmed (Trk).Last_Seen = 2100,
+                 "La frame suivante devrait s'associer a la meme piste");
+      end;
+   end Test_Late_Frame_Rejected;
+
+   --  Test : apres 0,7 s sans detection, une cible reapparue a 0,5 m/s
+   --  garde le signe de sa vitesse. Mesure sur l'ancien code : -51 mm/s
+   --  (l'ecart accumule sur 0,7 s etait divise par 0,1 s). Ne dit rien de
+   --  la porte d'association d'une cible ARRETEE, sujet distinct.
+   procedure Test_Velocity_After_Gap
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk  : Tracker;
+      Id0  : Natural;
+      F    : Frame;
+   begin
+      Establish (Trk);
+      Assert (Confirmed_Count (Trk) = 1, "Une piste confirmee attendue");
+      Id0 := First_Confirmed (Trk).Id;
+      for K in 21 .. 26 loop
+         Reset (F);
+         F.Stamp := Time_Ms (K * 100);
+         Update (Trk, F);
+      end loop;
+      Update (Trk, One_At (2700, 350.0));
+      Assert (Confirmed_Count (Trk) = 1
+              and then First_Confirmed (Trk).Id = Id0
+              and then First_Confirmed (Trk).Last_Seen = 2700,
+              "La piste devrait etre reassociee");
+      Assert (First_Confirmed (Trk).Velocity.X >= 400.0
+              and then First_Confirmed (Trk).Velocity.X <= 1000.0,
+              "Vitesse apres l'absence hors de [400, 1000] :"
+              & Integer'Image (Integer (First_Confirmed (Trk).Velocity.X)));
+   end Test_Velocity_After_Gap;
+
+   --  Garde : a cadence reguliere (10 Hz), le pistage reste exactement le
+   --  filtre alpha-beta de reference, recalcule ici (alpha 0,5, beta 0,3 :
+   --  a mettre a jour si ces gains changent).
+   procedure Test_Regular_Cadence_Unchanged
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+      G   : Lcg := (S => 4242);
+      Xr, Vr : Float := 0.0;
+      Dt  : constant Float := Float (Time_Ms'(100)) / 1000.0;
+   begin
+      for K in 1 .. 40 loop
+         declare
+            Z : constant Float :=
+              -2000.0 + 100.0 * Float (K) + Next_Noise (G);
+         begin
+            Update (Trk, One_At (Time_Ms (K * 100), Z));
+            if K = 1 then
+               Xr := Z;
+               Vr := 0.0;
+            else
+               declare
+                  Xp : constant Float := Xr + Vr * Dt;
+                  R  : constant Float := Z - Xp;
+               begin
+                  Xr := Xp + 0.5 * R;
+                  Vr := Vr + (0.3 / Dt) * R;
+               end;
+            end if;
+            Assert (abs (First_Active (Trk).Pos.X - Xr) < 1.0E-3
+                    and then abs (First_Active (Trk).Velocity.X - Vr) < 1.0E-3,
+                    "Ecart au filtre de reference a la frame" & K'Img);
+         end;
+      end loop;
+   end Test_Regular_Cadence_Unchanged;
+
+   --  Garde-fou DETERMINISTE, ni caracterisation statistique ni critere
+   --  d'acceptation materiel : sources entrelacees (2 a 10 ms, 3 a 33 ms)
+   --  sur 3 graines fixes. Le bruit de vitesse doit rester sous 2 fois
+   --  l'ecart-type THEORIQUE d'une source seule a 10 Hz :
+   --  sigma_v**2 = sigma**2 2 beta**2 / (T**2 alpha (4 - 2 alpha - beta))
+   --  = 105,4 mm/s pour un bruit uniforme de +/- 50 mm. Trois graines ne
+   --  permettent pas d'estimer le bruit reel : le test detecte seulement
+   --  le retour de l'ancien defaut (1 121 a 1 464 mm/s a 2 sources, 270 a
+   --  336 mm/s a 3 sources). Le bruit du LD2450 reel reste a mesurer.
+   procedure Test_Interleaved_Velocity_Guard
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Limit : constant Float := 2.0 * 105.4;
+      type Offs is array (Positive range <>) of Time_Ms;
+
+      procedure Scenario (O : Offs; Seed : Long_Long_Integer;
+                          Label : String) is
+         Trk : Tracker;
+         G   : Lcg := (S => Seed);
+         Sum : Float := 0.0;
+         N   : Natural := 0;
+         Id0 : Natural := 0;
+      begin
+         for K in 1 .. 60 loop
+            for J in O'Range loop
+               declare
+                  S : constant Time_Ms := Time_Ms (K * 100) + O (J);
+               begin
+                  Update (Trk, One_At (S, -3000.0 + Float (S)
+                                          + Next_Noise (G)));
+                  if S >= 2000 then
+                     Assert (Confirmed_Count (Trk) = 1,
+                             Label & " : une seule piste confirmee attendue");
+                     if Id0 = 0 then
+                        Id0 := First_Confirmed (Trk).Id;
+                     end if;
+                     Assert (First_Confirmed (Trk).Id = Id0,
+                             Label & " : identifiant change");
+                     Sum := Sum
+                       + (First_Confirmed (Trk).Velocity.X - 1000.0) ** 2;
+                     N := N + 1;
+                  end if;
+               end;
+            end loop;
+         end loop;
+         Assert (N >= 30, Label & " : trop peu d'echantillons");
+         Assert (Sqrt (Sum / Float (N)) <= Limit,
+                 Label & " : bruit de vitesse"
+                 & Integer'Image (Integer (Sqrt (Sum / Float (N))))
+                 & " mm/s");
+      end Scenario;
+   begin
+      for Seed in 1 .. 3 loop
+         Scenario ((0, 10), Long_Long_Integer (Seed) * 7919,
+                   "2 sources a 10 ms, graine" & Seed'Img);
+         Scenario ((0, 33, 66), Long_Long_Integer (Seed) * 7919,
+                   "3 sources a 33 ms, graine" & Seed'Img);
+      end loop;
+   end Test_Interleaved_Velocity_Guard;
 
    --  Test 5quater : fusion anti-fragmentation. Deux echos persistants
    --  a 350 mm l'un de l'autre (cible etendue scindee) ne doivent
@@ -917,6 +1160,21 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Stitching_Keeps_Id'Access,
          "Pistage : une cible perdue puis revue reprend son ID");
+      Register_Routine
+        (T, Test_Same_Stamp_Keeps_Velocity'Access,
+         "Temps : frame au meme instant, aucune vitesse inferee");
+      Register_Routine
+        (T, Test_Late_Frame_Rejected'Access,
+         "Temps : frame tardive rejetee, comptee, non revendiquee");
+      Register_Routine
+        (T, Test_Velocity_After_Gap'Access,
+         "Temps : vitesse apres une absence, ecart pris depuis l'ancre");
+      Register_Routine
+        (T, Test_Regular_Cadence_Unchanged'Access,
+         "Temps : cadence reguliere = filtre alpha-beta de reference");
+      Register_Routine
+        (T, Test_Interleaved_Velocity_Guard'Access,
+         "Temps : sources entrelacees, garde-fou bruit de vitesse");
       Register_Routine
         (T, Test_Two_Echoes_Same_Ray'Access,
          "Deux echos sur un meme rayon");

@@ -216,10 +216,45 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    confirmées, et le coasting y est marqué (gris et `*`).
 4. **Filtre alpha-beta** — **mis en œuvre.** Prédiction et coasting — une
    piste non revue roule sur son erre — puis correction alpha (0,5) et beta
-   (0,3). La prédiction avance de `v × dt` et le gain beta est divisé par
-   `dt`, si bien que la vitesse estimée ne dépend **pas** de la cadence de
-   balayage : la même cible vue à 1 ou 2 tours par seconde donne la même
-   valeur en mm/s (vérifié par un test).
+   (0,3). La prédiction avance de `v × dt`, où `dt` est l'intervalle exact
+   depuis la frame précédente.
+
+   La vitesse se corrige depuis une **ancre** : la position estimée et
+   l'heure de la dernière correction de vitesse de la piste. Elle n'est
+   corrigée que si au moins `T_v` = 70 ms se sont écoulées depuis l'ancre ;
+   l'écart entre la mesure et la position que prédisent l'ancre et la
+   vitesse est alors divisé par ce temps écoulé `E` (gain `beta / E`).
+   Diviser par l'intervalle entre deux frames successives ne convient pas
+   dès que cet intervalle cesse d'être la cadence d'une source : deux
+   sources entrelacées à 10 ms d'écart transforment le bruit de position
+   en un bruit de vitesse de l'ordre du mètre par seconde, et après une
+   absence l'écart accumulé était divisé par la seule cadence nominale.
+   Quand la piste est associée à chaque frame à des intervalles d'au moins
+   `T_v`, l'ancre est la frame précédente et le calcul redevient exactement
+   le filtre alpha-beta classique : la vitesse estimée ne dépend **pas** de
+   la cadence de balayage, la même cible vue à 1 ou 2 tours par seconde
+   donne la même valeur en mm/s (vérifié par un test).
+
+   Politique de temps :
+   - une frame **plus ancienne** que la dernière traitée est rejetée
+     entière : elle ne modifie aucune piste, `Owners` ne la revendique pas,
+     et le compteur `Late_Frames` en garde la trace. La traiter exigerait de
+     défaire des corrections déjà appliquées ;
+   - une frame au **même instant** que la précédente peut corriger les
+     positions, mais n'infère aucune vitesse : deux observations
+     simultanées ne disent rien d'un déplacement.
+
+   **`T_v` = 70 ms est une hypothèse de banc, pas une mesure** : c'est
+   `P − 2J` pour la période annoncée du LD2450 (P = 100 ms) et une gigue
+   supposée J = 15 ms, de sorte que deux frames successives d'une même
+   source déclenchent toujours la correction. Elle est à réévaluer quand la
+   période et la gigue réelles du module auront été mesurées. Ce mécanisme
+   n'a pas été éprouvé sur un LD2450 réel : les tests le vérifient sur des
+   scénarios synthétiques (même instant, frame tardive, absence, cadence
+   régulière, sources entrelacées). Restent hors de son champ une horloge
+   de capteur qui redémarre (le temps paraîtrait reculer indéfiniment), la
+   synchronisation de plusieurs capteurs, et la fenêtre d'association d'une
+   cible arrêtée après une absence.
 
    La fenêtre d'association suit la même logique : `600 mm + v × dt`. Le
    terme fixe couvre le bruit de mesure et l'étalement de la cible, le terme
@@ -1185,8 +1220,9 @@ deux usages en partageant un même tampon.
 dans le même repère, regrouper les observations d'un même instant avant
 l'appel au pistage, et retarder ou rejeter une frame arrivée en retard. Des
 appels successifs pour deux capteurs au même instant compteraient deux fois la
-confirmation M-sur-N ; une frame plus ancienne ferait reculer l'horloge du
-tracker. La synchronisation et la fusion sont une étape d'orchestration, pas
+confirmation M-sur-N ; une frame plus ancienne est rejetée entière par le
+tracker et seulement comptée (§1.4 point 4) : l'horloge ne recule pas, mais
+l'observation est perdue. La synchronisation et la fusion sont une étape d'orchestration, pas
 une propriété déjà fournie par les deux contrats de source.
 
 **Limite actuelle :** le mode `scan` et le mode `live` restent deux

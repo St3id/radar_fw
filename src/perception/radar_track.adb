@@ -19,9 +19,26 @@ package body Radar_Track is
    --  large tout de suite, ou beaucoup trop etroit ensuite.
    Base_Gate : constant Float := 600.0;
 
-   --  dt plancher (1 ms) : evite une division par zero au tout premier
-   --  tour, ou quand deux frames portent le meme horodatage.
-   Min_Dt : constant Float := 0.001;
+   --  Intervalle minimal entre deux corrections de VITESSE d'une piste.
+   --
+   --  La vitesse se corrige en divisant un ecart de position par le temps
+   --  qui l'a produit. Sur un intervalle trop court, l'ecart n'est que du
+   --  bruit de mesure et la division l'amplifie. Mesure sur l'ancien code
+   --  (plancher de 1 ms) : une seconde frame au meme instant, 100 mm a
+   --  cote, faisait passer une cible a 1 m/s a 29 m/s ; deux sources
+   --  decalees de 10 ms donnaient de -3,5 a +5,5 m/s. Sous ce seuil, seule
+   --  la position est corrigee, et l'ecart se mesure ensuite depuis
+   --  l'ancre (Vel_Anchor), sur toute la duree ecoulee.
+   --
+   --  70 ms est une HYPOTHESE DE BANC, pas une mesure : P - 2 J, avec la
+   --  cadence annoncee du LD2450 (P = 100 ms, non chronometree sur notre
+   --  chaine) et une gigue supposee de J = 15 ms par horodatage. Sous ces
+   --  hypotheses, deux frames successives d'une meme source corrigent
+   --  toujours la vitesse, comme avant, et tout intervalle plus court
+   --  (rafale de reception, second capteur decale) est ecarte. A
+   --  reevaluer des que la periode et la gigue reelles du module auront
+   --  ete mesurees.
+   Min_Velocity_Interval_Ms : constant Time_Ms := 70;
 
    --  Gains du filtre alpha-beta : part de l'ecart mesure reinjectee
    --  dans la position (Alpha) et dans la vitesse (Beta). Des valeurs
@@ -34,7 +51,8 @@ package body Radar_Track is
    --  l'autre) partirait tel quel dans la position. Proche de 0, la
    --  piste ignorerait la mesure et deriverait sur sa seule erre.
    --
-   --  Beta est DIVISE par dt a l'usage, et ce n'est pas un detail : un
+   --  Beta est DIVISE par la duree couverte par l'ecart (depuis l'ancre de
+   --  la piste, voir Min_Velocity_Interval_Ms), et ce n'est pas un detail : un
    --  meme ecart de position observe sur un intervalle court revele une
    --  erreur de vitesse plus grande que le meme ecart observe sur un
    --  intervalle long. Sans cette division, la vitesse estimee
@@ -160,10 +178,11 @@ package body Radar_Track is
    --  Update et Owners : la position que Owners croit "predite" doit etre
    --  exactement celle qu'Update predira ensuite, sinon une detection
    --  serait attribuee a une piste qu'Update ne lui associerait pas.
+   --  Nul pour une frame au meme instant : rien n'est alors predit, et
+   --  plus aucune division ne se fait par ce dt.
    function Frame_Dt (T : Tracker; F : Frame) return Float is
-     (Float'Max (Min_Dt,
-                 Float (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp
-                        else 0) / 1000.0));
+     (Float (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp else 0)
+      / 1000.0);
 
    --  Position d'une piste avancee de Dt secondes sur sa vitesse.
    function Predicted (Tk : Track; Dt : Float) return Point_3D is
@@ -240,6 +259,18 @@ package body Radar_Track is
       --  Temps ecoule depuis la frame precedente, en SECONDES.
       Dt : constant Float := Frame_Dt (T, F);
    begin
+      --  ----- 0. Frame tardive : rejetee entiere, et comptee -----
+      --  Traitee, elle ferait reculer l'horloge du pistage et fausserait
+      --  vitesses et durees de survie (mesure sur l'ancien code : vitesse
+      --  de -14,35 m/s et Last_Stamp qui recule de 50 ms). Rien n'est
+      --  vieilli par elle : elle ne prouve rien sur le present.
+      if F.Stamp < T.Last_Stamp then
+         if T.Late_Frames < Natural'Last then
+            T.Late_Frames := T.Late_Frames + 1;
+         end if;
+         return;
+      end if;
+
       --  ----- 1. Prediction : chaque piste avance de v x dt -----
       for I in T.Tracks'Range loop
          if T.Tracks (I).Active then
@@ -301,10 +332,36 @@ package body Radar_Track is
                     (X => T.Tracks (Best_I).Pos.X + Alpha * Rx,
                      Y => T.Tracks (Best_I).Pos.Y + Alpha * Ry,
                      Z => T.Tracks (Best_I).Pos.Z + Alpha * Rz);
-                  T.Tracks (Best_I).Velocity :=
-                    (X => T.Tracks (Best_I).Velocity.X + (Beta / Dt) * Rx,
-                     Y => T.Tracks (Best_I).Velocity.Y + (Beta / Dt) * Ry,
-                     Z => T.Tracks (Best_I).Velocity.Z + (Beta / Dt) * Rz);
+                  --  Vitesse : seulement si l'ancre est assez ancienne,
+                  --  et avec TOUT l'ecart accumule depuis elle. L'ecart
+                  --  courant (Rx) ne suffirait pas : les corrections de
+                  --  position intermediaires en ont deja absorbe une part.
+                  --  Quand chaque frame associe la piste a plus du seuil
+                  --  de la precedente, l'ancre est la position de la frame
+                  --  precedente et ce calcul redonne exactement l'ancien.
+                  declare
+                     Tk : Track renames T.Tracks (Best_I);
+                     E  : constant Time_Ms :=
+                       (if F.Stamp > Tk.Vel_Stamp
+                        then F.Stamp - Tk.Vel_Stamp else 0);
+                  begin
+                     if E >= Min_Velocity_Interval_Ms then
+                        declare
+                           Es : constant Float := Float (E) / 1000.0;
+                           G  : constant Float := Beta / Es;
+                           P  : constant Point_3D := Tk.Vel_Anchor;
+                           V  : constant Point_3D := Tk.Velocity;
+                           M  : Point_3D renames F.Items (Best_J).Pos;
+                        begin
+                           Tk.Velocity :=
+                             (X => V.X + G * (M.X - (P.X + V.X * Es)),
+                              Y => V.Y + G * (M.Y - (P.Y + V.Y * Es)),
+                              Z => V.Z + G * (M.Z - (P.Z + V.Z * Es)));
+                           Tk.Vel_Anchor := Tk.Pos;
+                           Tk.Vel_Stamp  := F.Stamp;
+                        end;
+                     end if;
+                  end;
                end;
 
                T.Tracks (Best_I).Missing   := 0;
@@ -361,8 +418,10 @@ package body Radar_Track is
                      Missing   => 0,
                      Last_Seen => F.Stamp,
                      Hits      => 1,
-                     Confirmed => False,
-                     Active    => True);
+                     Confirmed  => False,
+                     Active     => True,
+                     Vel_Stamp  => F.Stamp,
+                     Vel_Anchor => F.Items (J).Pos);
                   T.Next_Id := T.Next_Id + 1;
                   exit;
                end if;
@@ -416,6 +475,12 @@ package body Radar_Track is
       Result : Owner_List := No_Owner;
       Dt     : constant Float := Frame_Dt (T, F);
    begin
+      --  Une frame qu'Update rejettera n'est revendiquee par aucune piste :
+      --  Owners et Update doivent voir le meme temps.
+      if F.Stamp < T.Last_Stamp then
+         return Result;
+      end if;
+
       for J in 1 .. F.Count loop
          declare
             Best_Dist : Float := Float'Last;

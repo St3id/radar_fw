@@ -31,6 +31,13 @@ package Radar_Track is
       Hits      : Natural := 0;        --  detections recues en tout
       Confirmed : Boolean := False;    --  regle M-sur-N passee ?
       Active    : Boolean := False;    --  emplacement utilise ?
+
+      --  Ancre de la vitesse : heure et position filtree de la derniere
+      --  correction de VITESSE. L'ecart de position mesure depuis elle
+      --  couvre tout le temps ecoule, meme si des corrections de position
+      --  ont eu lieu entre-temps (voir Update).
+      Vel_Stamp  : Time_Ms  := 0;
+      Vel_Anchor : Point_3D := (0.0, 0.0, 0.0);
    end record;
 
    --  Nombre de pistes suivies simultanement.
@@ -71,6 +78,10 @@ package Radar_Track is
       --  des que le balayage est mecanique et que chaque direction est
       --  revue a un rythme different.
       Last_Stamp : Time_Ms := 0;
+
+      --  Frames anterieures a Last_Stamp, rejetees par Update (sature a
+      --  Natural'Last). Une perte doit se voir, pas disparaitre.
+      Late_Frames : Natural := 0;
    end record;
 
    --  Nombre de detections pour confirmer une piste (le "M" de M-sur-N).
@@ -107,6 +118,17 @@ package Radar_Track is
    --       la plus ancienne absorbe l'autre, pas de piste "ombre". Deux
    --       pistes confirmees proches mais de vitesses differentes sont deux
    --       objets qui se croisent : elles survivent toutes les deux.
+   --
+   --  Politique de temps :
+   --    - une frame ANTERIEURE a Last_Stamp est rejetee entiere et comptee
+   --      dans Late_Frames : rien n'est predit, associe ni vieilli. Ce
+   --      n'est pas une synchronisation de capteurs, et cela suppose une
+   --      horloge monotone ; un redemarrage d'horloge demande une remise a
+   --      zero explicite, hors de ce paquet ;
+   --    - une frame au MEME instant corrige les positions sans les predire
+   --      et n'infere aucune vitesse d'une observation simultanee ;
+   --    - la vitesse d'une piste n'est corrigee que si son ancre date d'au
+   --      moins Min_Velocity_Interval_Ms (corps du paquet).
    procedure Update (T : in out Tracker; F : Frame);
 
    --  La piste confirmee qui revendique chaque detection BRUTE de F (avant
@@ -118,7 +140,8 @@ package Radar_Track is
    --     Update (Trk, Cluster (F, Owners (Trk, F)));
    --
    --  Ne modifie pas le pistage : c'est une lecture, appelee juste avant
-   --  Update sur la meme frame.
+   --  Update sur la meme frame. Une frame qu'Update rejetterait (anterieure
+   --  a Last_Stamp) n'est revendiquee par aucune piste.
    function Owners (T : Tracker; F : Frame) return Owner_List;
 
 end Radar_Track;
