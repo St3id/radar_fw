@@ -40,6 +40,12 @@ package body Radar_Track is
    --  ete mesurees.
    Min_Velocity_Interval_Ms : constant Time_Ms := 70;
 
+   --  Au-dela, l'horloge n'est plus celle des pistes en cours. HYPOTHESES :
+   --  2 s depassent tout retard de reception attendu d'une frame tardive ;
+   --  60 s depassent toutes les durees de survie d'une piste.
+   Max_Clock_Back_Ms : constant Time_Ms := 2_000;
+   Max_Clock_Jump_Ms : constant Time_Ms := 60_000;
+
    --  Gains du filtre alpha-beta : part de l'ecart mesure reinjectee
    --  dans la position (Alpha) et dans la vitesse (Beta). Des valeurs
    --  moderees lissent le jitter d'une cible etendue sans trop retarder
@@ -184,6 +190,26 @@ package body Radar_Track is
      (Float (if F.Stamp > T.Last_Stamp then F.Stamp - T.Last_Stamp else 0)
       / 1000.0);
 
+   --  L'horloge de F a-t-elle saute par rapport a celle des pistes ?
+   --  Last_Stamp = 0 : aucune frame encore, une source peut demarrer tard.
+   function Clock_Jumped (T : Tracker; F : Frame) return Boolean is
+     (if F.Stamp < T.Last_Stamp
+      then T.Last_Stamp - F.Stamp > Max_Clock_Back_Ms
+      else T.Last_Stamp > 0
+           and then F.Stamp - T.Last_Stamp > Max_Clock_Jump_Ms);
+
+   --  V ramenee a Max_Speed si elle la depasse, direction conservee.
+   function Bounded (V : Point_3D) return Point_3D is
+      S : constant Float := Sqrt (V.X * V.X + V.Y * V.Y + V.Z * V.Z);
+   begin
+      if S <= Max_Speed then
+         return V;
+      end if;
+      return (X => V.X * Max_Speed / S,
+              Y => V.Y * Max_Speed / S,
+              Z => V.Z * Max_Speed / S);
+   end Bounded;
+
    --  Position d'une piste avancee de Dt secondes sur sa vitesse.
    function Predicted (Tk : Track; Dt : Float) return Point_3D is
      ((X => Tk.Pos.X + Tk.Velocity.X * Dt,
@@ -259,12 +285,26 @@ package body Radar_Track is
       --  Temps ecoule depuis la frame precedente, en SECONDES.
       Dt : constant Float := Frame_Dt (T, F);
    begin
-      --  ----- 0. Frame tardive : rejetee entiere, et comptee -----
+      --  ----- 0a. Saut d'horloge : les pistes repartent de zero -----
+      --  A faire avant le rejet ci-dessous : sinon un capteur redemarre
+      --  verrait toutes ses frames rejetees (cible reelle ignoree, piste
+      --  figee). Next_Id n'est pas touche : un identifiant ne ressert pas.
+      if Clock_Jumped (T, F) then
+         for Tk of T.Tracks loop
+            Tk.Active    := False;
+            Tk.Confirmed := False;
+         end loop;
+         T.Lost := (others => <>);
+         if T.Clock_Resets < Natural'Last then
+            T.Clock_Resets := T.Clock_Resets + 1;
+         end if;
+
+      --  ----- 0b. Frame tardive : rejetee entiere, et comptee -----
       --  Traitee, elle ferait reculer l'horloge du pistage et fausserait
       --  vitesses et durees de survie (mesure sur l'ancien code : vitesse
       --  de -14,35 m/s et Last_Stamp qui recule de 50 ms). Rien n'est
       --  vieilli par elle : elle ne prouve rien sur le present.
-      if F.Stamp < T.Last_Stamp then
+      elsif F.Stamp < T.Last_Stamp then
          if T.Late_Frames < Natural'Last then
             T.Late_Frames := T.Late_Frames + 1;
          end if;
@@ -353,10 +393,10 @@ package body Radar_Track is
                            V  : constant Point_3D := Tk.Velocity;
                            M  : Point_3D renames F.Items (Best_J).Pos;
                         begin
-                           Tk.Velocity :=
-                             (X => V.X + G * (M.X - (P.X + V.X * Es)),
-                              Y => V.Y + G * (M.Y - (P.Y + V.Y * Es)),
-                              Z => V.Z + G * (M.Z - (P.Z + V.Z * Es)));
+                           Tk.Velocity := Bounded
+                             ((X => V.X + G * (M.X - (P.X + V.X * Es)),
+                               Y => V.Y + G * (M.Y - (P.Y + V.Y * Es)),
+                               Z => V.Z + G * (M.Z - (P.Z + V.Z * Es))));
                            Tk.Vel_Anchor := Tk.Pos;
                            Tk.Vel_Stamp  := F.Stamp;
                         end;
@@ -477,7 +517,7 @@ package body Radar_Track is
    begin
       --  Une frame qu'Update rejettera n'est revendiquee par aucune piste :
       --  Owners et Update doivent voir le meme temps.
-      if F.Stamp < T.Last_Stamp then
+      if F.Stamp < T.Last_Stamp or else Clock_Jumped (T, F) then
          return Result;
       end if;
 

@@ -476,6 +476,67 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Late_Frame_Rejected;
 
+   --  Un capteur qui redemarre repart a 0 : le rejet des frames tardives
+   --  bloquerait le pistage jusqu'a ce que son horloge rattrape l'ancienne.
+   procedure Test_Clock_Restart
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+   begin
+      Establish (Trk);
+      Assert (Confirmed_Count (Trk) = 1, "Une piste confirmee attendue");
+      declare
+         Id0 : constant Natural := First_Confirmed (Trk).Id;
+      begin
+         Update (Trk, One_At (3000, 100.0));
+
+         --  Recul de 2,9 s : pistes effacees, frame acceptee.
+         Update (Trk, One_At (100, 100.0));
+         Assert (Trk.Clock_Resets = 1, "Le saut devrait etre compte");
+         Assert (Trk.Late_Frames = 0, "Ce n'est pas une frame tardive");
+         Assert (Trk.Last_Stamp = 100, "L'horloge devrait suivre le capteur");
+         Assert (Confirmed_Count (Trk) = 0, "L'ancienne piste devrait partir");
+
+         --  La cible reste vue : une nouvelle piste, jamais un ancien ID.
+         Update (Trk, One_At (200, 100.0));
+         Update (Trk, One_At (300, 100.0));
+         Assert (Confirmed_Count (Trk) = 1, "La cible devrait etre reprise");
+         Assert (First_Confirmed (Trk).Id > Id0,
+                 "Un identifiant ne devrait pas resservir");
+      end;
+
+      --  Avance de plus de 60 s : meme traitement.
+      Update (Trk, One_At (70_000, 100.0));
+      Assert (Trk.Clock_Resets = 2, "L'avance devrait etre comptee");
+      Assert (Confirmed_Count (Trk) = 0, "Les pistes devraient repartir");
+   end Test_Clock_Restart;
+
+   --  Une suite de mesures qui fuit a 5,9 m/s reste dans la porte a chaque
+   --  frame : sans borne, la vitesse estimee la suivrait.
+   procedure Test_Speed_Bounded
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Trk : Tracker;
+      X   : Float := 0.0;
+   begin
+      Establish (Trk);
+      for N in 1 .. 20 loop
+         X := X + 590.0;
+         Update (Trk, One_At (2000 + Time_Ms (N) * 100, X));
+      end loop;
+      Assert (Confirmed_Count (Trk) = 1, "La piste devrait suivre");
+      declare
+         V : constant Point_3D := First_Confirmed (Trk).Velocity;
+      begin
+         Assert (Sqrt (V.X * V.X + V.Y * V.Y + V.Z * V.Z) <= Max_Speed + 1.0,
+                 "La vitesse devrait rester bornee");
+         Assert (V.X > 0.9 * Max_Speed,
+                 "La borne devrait etre atteinte, pas la piste figee");
+      end;
+   end Test_Speed_Bounded;
+
    --  Test : apres 0,7 s sans detection, une cible reapparue a 0,5 m/s
    --  garde le signe de sa vitesse. Mesure sur l'ancien code : -51 mm/s
    --  (l'ecart accumule sur 0,7 s etait divise par 0,1 s). Ne dit rien de
@@ -1204,6 +1265,12 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_CFAR'Access,
          "Seuil adaptatif CFAR");
+      Register_Routine
+        (T, Test_Clock_Restart'Access,
+         "Temps : saut d'horloge, pistes remises a zero et comptees");
+      Register_Routine
+        (T, Test_Speed_Bounded'Access,
+         "Pistage : vitesse bornee a Max_Speed");
    end Register_Tests;
 
 end Radar_Pipeline_Tests;

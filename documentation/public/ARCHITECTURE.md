@@ -251,9 +251,11 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    période et la gigue réelles du module auront été mesurées. Ce mécanisme
    n'a pas été éprouvé sur un LD2450 réel : les tests le vérifient sur des
    scénarios synthétiques (même instant, frame tardive, absence, cadence
-   régulière, sources entrelacées). Restent hors de son champ une horloge
-   de capteur qui redémarre (le temps paraîtrait reculer indéfiniment), la
-   synchronisation de plusieurs capteurs, et la fenêtre d'association d'une
+   régulière, sources entrelacées, saut d'horloge). Un recul de plus de 2 s
+   (capteur redémarré) ou une avance de plus de 60 s efface les pistes et se
+   compte, ces deux seuils étant des hypothèses. La vitesse d'une piste est
+   bornée à 3 m/s, autre hypothèse non mesurée. Restent hors de son champ la
+   synchronisation de plusieurs capteurs et la fenêtre d'association d'une
    cible arrêtée après une absence.
 
    La fenêtre d'association suit la même logique : `600 mm + v × dt`. Le
@@ -423,10 +425,10 @@ un temps monotone interne sur 64 bits ; le champ 32 bits du protocole reste une
 représentation de transport, avec son origine et son comportement au rebouclage
 définis séparément. La source simulée garde son horloge virtuelle déterministe,
 ce qui préserve le rejeu identique. Chaque adaptateur réel étend son compteur de
-capture et le ramène à une époque commune. Une trame ancienne ou issue d'un
-redémarrage doit être rejetée ou provoquer une remise à zéro explicite du
-pistage ; la convertir silencieusement en `dt = 0` masque la rupture temporelle.
-Cette recommandation n'est pas encore implémentée.
+capture et le ramène à une époque commune. `Radar_Track` rejette déjà une trame
+légèrement ancienne et remet le pistage à zéro après un saut d'horloge, en les
+comptant ; le temps interne sur 64 bits et le changement d'époque ne sont pas
+encore implémentés.
 
 **Cadence de la tourelle à vérifier avant de figer le rapport.** Le croquis
 actuel place le rayon moyen de couronne à `80/2 + 4/2 = 42 mm`, le rayon dessiné

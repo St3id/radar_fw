@@ -82,7 +82,16 @@ package Radar_Track is
       --  Frames anterieures a Last_Stamp, rejetees par Update (sature a
       --  Natural'Last). Une perte doit se voir, pas disparaitre.
       Late_Frames : Natural := 0;
+
+      --  Remises a zero sur saut d'horloge (voir Update), saturees.
+      Clock_Resets : Natural := 0;
    end record;
+
+   --  Vitesse maximale d'une piste, en mm/s. HYPOTHESE, non mesuree : une
+   --  personne dans une piece depasse rarement 3 m/s. Sans borne, une
+   --  vitesse fausse elargit sa propre porte d'association (600 + v x dt)
+   --  et la piste decroche encore plus loin.
+   Max_Speed : constant Float := 3_000.0;
 
    --  Nombre de detections pour confirmer une piste (le "M" de M-sur-N).
    --
@@ -122,9 +131,12 @@ package Radar_Track is
    --  Politique de temps :
    --    - une frame ANTERIEURE a Last_Stamp est rejetee entiere et comptee
    --      dans Late_Frames : rien n'est predit, associe ni vieilli. Ce
-   --      n'est pas une synchronisation de capteurs, et cela suppose une
-   --      horloge monotone ; un redemarrage d'horloge demande une remise a
-   --      zero explicite, hors de ce paquet ;
+   --      n'est pas une synchronisation de capteurs ;
+   --    - un SAUT d'horloge (recul de plus de 2 s : capteur redemarre ;
+   --      avance de plus de 60 s) efface les pistes et se compte dans
+   --      Clock_Resets, sans reutiliser d'identifiant. Rejeter ces frames
+   --      bloquerait le pistage jusqu'a ce que l'horloge rattrape l'ancienne
+   --      valeur ;
    --    - une frame au MEME instant corrige les positions sans les predire
    --      et n'infere aucune vitesse d'une observation simultanee ;
    --    - la vitesse d'une piste n'est corrigee que si son ancre date d'au

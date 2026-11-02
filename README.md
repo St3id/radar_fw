@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **112 checks prouvés, 0 non prouvé** (prouveur CVC5) |
-| Tests | **43 tests AUnit**, rejoués à chaque commit |
+| Tests | **45 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -221,7 +221,7 @@ soit branchée.
 
 ## Tests
 
-**43 tests AUnit** répartis en quatre suites :
+**45 tests AUnit** répartis en quatre suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -234,7 +234,8 @@ soit branchée.
   pilotage de la source par l'interface,
   format de sérialisation, vitesse en mm/s indépendante de la cadence de
   balayage, cycle de vie des pistes compté en temps, horodatages du
-  pistage (même instant, frame tardive, absence, sources entrelacées) ;
+  pistage (même instant, frame tardive, absence, sources entrelacées, saut
+  d'horloge), vitesse bornée ;
 - synthèse d'ouverture en arc : focalisation et finesse conformes à la
   théorie, gain sur le faisceau réel, tolérances mécaniques, repliement
   quand l'échantillonnage est trop lâche ;
