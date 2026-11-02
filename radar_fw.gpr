@@ -6,7 +6,7 @@ project Radar_Fw is
    --  La partie temps reel (src/tasking, src/demo) appartient a
    --  radar_demo.gpr, qui lui impose le profil Ravenscar.
    for Source_Dirs use
-     ("src/app", "src/geometry", "src/processing", "src/source", "config/");
+     ("src/app", "src/geometry", "src/core", "src/perception", "config/");
    for Object_Dir use "obj/" & Radar_Fw_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";

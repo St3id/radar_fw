@@ -1,3 +1,11 @@
+--  Radar_World : la verite terrain du simulateur, c'est-a-dire ce que le
+--  radar est cense voir.
+--
+--  Ce paquet ne sait rien du radar : il decrit une scene (objets mobiles
+--  qui rebondissent, murs d'une piece) que la source simulee observera
+--  ensuite avec ses propres imperfections. Separer les deux permet de
+--  comparer ce qui est detecte a ce qui existe reellement.
+
 package Radar_World is
 
    --  Un objet reel dans le monde simule : sa position, sa vitesse, son ID.
@@ -28,7 +36,7 @@ package Radar_World is
    --  Cree une scene de depart avec quelques objets mobiles.
    function Initial_World return World;
 
-   --  Un monde SANS objet mobile : sert au mode cartographie, ou l'on
+   --  Un monde sans objet mobile : sert au mode cartographie, ou l'on
    --  scanne l'environnement statique (les murs) sans etre pollue par
    --  des objets en mouvement.
    function Empty_World return World;
@@ -47,5 +55,15 @@ package Radar_World is
    --  "infinis" (pas de sol ni de plafond) ; viser haut ou bas allonge
    --  le trajet d'un facteur 1/cos(elevation).
    function Wall_Distance (Azimuth_Deg, Elevation_Deg : Float) return Float;
+
+   --  Angle d'incidence, en degres, entre le rayon vise et la normale du
+   --  mur qu'il touche : 0 quand on regarde le mur de face, pres de 90
+   --  quand le faisceau le rase. C'est de lui que depend l'echo d'un mur
+   --  lisse (ARCHITECTURE.md, section 1.6) : sa composante speculaire ne
+   --  revient vers le radar que s'il est vu presque de face ; ailleurs, il
+   --  ne reste qu'une faible part diffuse.
+   function Wall_Incidence
+     (Azimuth_Deg, Elevation_Deg : Float) return Float
+     with Post => Wall_Incidence'Result in 0.0 .. 90.0;
 
 end Radar_World;

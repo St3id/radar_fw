@@ -1,5 +1,9 @@
 with Ada.Streams;  use Ada.Streams;
 
+--  Corps de Radar_Http. Seule la premiere ligne de la requete est
+--  analysee : ce serveur ne repond qu'a des GET sur des chemins connus,
+--  et tout le reste est ignore volontairement.
+
 package body Radar_Http is
 
    CRLF : constant String := ASCII.CR & ASCII.LF;
@@ -31,6 +35,11 @@ package body Radar_Http is
       end loop;
       while First <= Data'Last loop
          Send_Socket (Sock, Data (First .. Data'Last), Last);
+         --  Aucun octet accepte : sans cette sortie, la boucle repartirait
+         --  du meme endroit indefiniment, et le serveur avec elle.
+         if Last < First then
+            raise Socket_Error with "envoi impossible : aucun octet accepte";
+         end if;
          exit when Last >= Data'Last;
          First := Last + 1;
       end loop;
@@ -57,17 +66,120 @@ package body Radar_Http is
       Send_Str (Sock, B);
    end Send_Response;
 
-   --  Lit la requete, extrait le chemin, delegue au handler, ferme.
+   ---------------
+   -- Subscribe --
+   ---------------
+
+   --  Abonne une connexion au flux /events : en-tetes SSE, puis la
+   --  connexion reste ouverte. Kept = False si tous les emplacements sont
+   --  pris : reponse 503, et c'est l'appelant qui ferme.
+   procedure Subscribe
+     (S    : in out Server;
+      Sock : Socket_Type;
+      Kept : out Boolean)
+   is
+      --  Ecriture non bloquante : une page qui ne lit plus (onglet gele)
+      --  remplirait le tampon d'emission, et Send_Socket bloquerait alors
+      --  tout le serveur mono-thread - calcul radar compris. En non
+      --  bloquant, Broadcast recoit une erreur a la place et retire
+      --  l'abonne ; le navigateur se reconnecte tout seul.
+      Non_Blocking : Request_Type :=
+        (Name => Non_Blocking_IO, Enabled => True);
+   begin
+      Kept := False;
+      for I in S.Subs'Range loop
+         if S.Subs (I) = No_Socket then
+            --  Transfer-Encoding: chunked, et non un corps sans longueur :
+            --  sans decoupage, Chromium ouvrait bien le flux mais ne
+            --  livrait aucun message a la page (mesure sur Edge, 2026-09).
+            --  Chaque message part donc dans son propre morceau HTTP.
+            Send_Str (Sock,
+              "HTTP/1.1 200 OK" & CRLF
+              & "Content-Type: text/event-stream; charset=utf-8" & CRLF
+              & "Cache-Control: no-store" & CRLF
+              & "Transfer-Encoding: chunked" & CRLF
+              & "Connection: keep-alive" & CRLF & CRLF);
+            Control_Socket (Sock, Non_Blocking);
+            S.Subs (I) := Sock;
+            Kept := True;
+            return;
+         end if;
+      end loop;
+
+      Send_Response (Sock, "text/plain",
+                     To_Unbounded_String ("trop d'abonnes"),
+                     "503 Service Unavailable");
+   end Subscribe;
+
+   --  Longueur d'un morceau HTTP en hexadecimal, sans espace ni zero de
+   --  tete ("1A3") : le format qu'impose Transfer-Encoding: chunked.
+   --  8 chiffres suffisent a tout Natural (2**31 - 1 = 7FFFFFFF).
+   function Hex_Length (N : Natural) return String is
+      Hex_Digits : constant String := "0123456789ABCDEF";
+      Buf        : String (1 .. 8);
+      P          : Positive := Buf'Last + 1;
+      V          : Natural := N;
+   begin
+      loop
+         P := P - 1;
+         Buf (P) := Hex_Digits (V mod 16 + 1);
+         V := V / 16;
+         exit when V = 0;
+      end loop;
+      return Buf (P .. Buf'Last);
+   end Hex_Length;
+
+   ---------------
+   -- Broadcast --
+   ---------------
+
+   procedure Broadcast (S : in out Server; Data : String) is
+      --  Format SSE : "data: <message>" puis une ligne vide.
+      Msg : constant String := "data: " & Data & ASCII.LF & ASCII.LF;
+   begin
+      for I in S.Subs'Range loop
+         if S.Subs (I) /= No_Socket then
+            begin
+               --  Un morceau HTTP : longueur en hexadecimal, CRLF, le
+               --  message, CRLF.
+               Send_Str (S.Subs (I),
+                         Hex_Length (Msg'Length) & CRLF & Msg & CRLF);
+            exception
+               when Socket_Error =>
+                  --  Page fermee, ou qui ne lit plus : emplacement libere.
+                  begin
+                     Close_Socket (S.Subs (I));
+                  exception
+                     when Socket_Error => null;
+                  end;
+                  S.Subs (I) := No_Socket;
+            end;
+         end if;
+      end loop;
+   end Broadcast;
+
+   --  Lit la requete, extrait le chemin, delegue au handler, ferme - sauf
+   --  pour un abonne /events, dont la connexion doit rester ouverte.
    procedure Handle
-     (Sock    : Socket_Type;
+     (S       : in out Server;
+      Sock    : Socket_Type;
       Handler : not null access procedure
                   (Path : String; Sock : Socket_Type))
    is
       Buf  : Stream_Element_Array (1 .. 2048);
       Last : Stream_Element_Offset;
       Req  : String (1 .. 2048) := (others => ' ');
+      Keep : Boolean := False;
    begin
       Receive_Socket (Sock, Buf, Last);
+
+      --  Connexion fermee sans rien envoyer (une preconnexion abandonnee) :
+      --  il n'y a personne a qui repondre.
+      if Last < Buf'First then
+         Close_Socket (Sock);
+         return;
+      end if;
+
       for I in Buf'First .. Last loop
          Req (Natural (I)) := Character'Val (Buf (I));
       end loop;
@@ -92,12 +204,18 @@ package body Radar_Http is
             Send_Response (Sock, "text/plain",
                            To_Unbounded_String ("bad request"),
                            "400 Bad Request");
+         elsif Req (Sp1 + 1 .. Sp2 - 1) = "/events" then
+            Subscribe (S, Sock, Keep);
          else
             Handler (Req (Sp1 + 1 .. Sp2 - 1), Sock);
          end if;
       end;
 
-      Close_Socket (Sock);
+      --  Un abonne garde sa connexion : c'est Broadcast qui ecrira dessus,
+      --  et qui la fermera quand la page partira.
+      if not Keep then
+         Close_Socket (Sock);
+      end if;
    exception
       when Socket_Error =>
          --  Client parti en cours de route : on ferme et on continue.
@@ -113,7 +231,7 @@ package body Radar_Http is
    -----------------
 
    procedure Serve_Until
-     (S        : Server;
+     (S        : in out Server;
       Deadline : Time;
       Handler  : not null access procedure
                    (Path : String; Sock : Socket_Type))
@@ -138,7 +256,24 @@ package body Radar_Http is
                Addr : Sock_Addr_Type;
             begin
                Accept_Socket (S.Sock, Conn, Addr);
-               Handle (Conn, Handler);
+               --  Delai de lecture de 200 ms : un navigateur ouvre souvent
+               --  une connexion d'avance (preconnexion) sans rien y
+               --  envoyer. Sans delai, Receive_Socket l'attendait sans fin
+               --  et figeait tout le serveur mono-thread, calcul radar
+               --  compris. Invisible tant que la page sondait toutes les
+               --  250 ms (la requete suivante passait par elle) ; bloquant
+               --  des qu'elle a ecoute un flux /events (mesure).
+               Set_Socket_Option
+                 (Conn, Socket_Level, (Receive_Timeout, Timeout => 0.2));
+               --  Meme defaut cote emission : un client qui ne lit plus
+               --  (onglet gele) remplit le tampon d'emission, et un envoi
+               --  bloquant l'attendrait sans fin - /cloud.json du mode scan
+               --  pese assez pour le remplir. 1 s : un client local lit des
+               --  Mo par seconde, seul un client bloque atteint ce delai.
+               --  Les abonnes /events passent ensuite en non bloquant.
+               Set_Socket_Option
+                 (Conn, Socket_Level, (Send_Timeout, Timeout => 1.0));
+               Handle (S, Conn, Handler);
             end;
          end;
       end loop;

@@ -1,39 +1,56 @@
+--  Corps de Radar_Clutter. Arithmetique entiere uniquement, tableaux de
+--  taille fixe, aucune allocation : le code doit rester executable sur le
+--  microcontrolleur, ou aucune de ces facilites n'existe.
+
 package body Radar_Clutter is
 
    --  Quantifie une direction (angles en degres) vers les indices de la
    --  grille. L'azimut est cyclique (modulo) ; l'elevation est bornee.
+   --  Valid = False pour un angle non fini : il n'a pas de case.
+   --
+   --  Aucune boucle. La version precedente retranchait 360 tant que
+   --  l'azimut depassait 360 : au-dela d'environ 1E10, 360 passe sous la
+   --  precision d'un Float, Az - 360.0 rend Az lui-meme, et la boucle ne
+   --  finissait jamais. Un seul azimut aberrant venu d'un capteur aurait
+   --  fige le microcontroleur. Float'Remainder ramene tout nombre fini
+   --  dans [-180, 180] en une operation exacte.
    procedure To_Cell
      (Az_Deg, El_Deg : Float;
       Az_Idx         : out Natural;
-      El_Idx         : out Natural)
+      El_Idx         : out Natural;
+      Valid          : out Boolean)
    is
-      Az_Norm : Float := Az_Deg;
-      El_Raw  : Integer;
+      Az_Norm : Float;
+      El      : Float;
    begin
-      --  Azimut dans [0, 360[.
-      while Az_Norm < 0.0 loop
-         Az_Norm := Az_Norm + 360.0;
-      end loop;
-      while Az_Norm >= 360.0 loop
-         Az_Norm := Az_Norm - 360.0;
-      end loop;
+      Az_Idx := 0;
+      El_Idx := 0;
 
+      --  'Valid est faux pour NaN et les infinis, qui n'ont pas de case.
+      Valid := Az_Deg'Valid and then El_Deg'Valid;
+      if not Valid then
+         return;
+      end if;
+
+      --  Azimut dans [0, 360].
+      Az_Norm := Float'Remainder (Az_Deg, 360.0);
+      if Az_Norm < 0.0 then
+         Az_Norm := Az_Norm + 360.0;
+      end if;
+
+      --  Un arrondi peut donner tout juste 360 : le mod le replie sur 0.
       Az_Idx :=
         Natural (Float'Floor (Az_Norm * Float (Az_Cells) / 360.0 + 0.5))
         mod Az_Cells;
 
-      --  Elevation : position sur la grille El_Min .. El_Max, bornee.
-      El_Raw :=
-        Integer (Float'Floor
-          ((El_Deg - El_Min_Deg) * Float (El_Cells - 1)
+      --  Elevation bornee AVANT la conversion en entier : convertir un
+      --  angle demesure leverait Constraint_Error, et le coeur embarque
+      --  ne doit propager aucune exception.
+      El := Float'Min (El_Max_Deg, Float'Max (El_Min_Deg, El_Deg));
+      El_Idx :=
+        Natural (Float'Floor
+          ((El - El_Min_Deg) * Float (El_Cells - 1)
            / (El_Max_Deg - El_Min_Deg) + 0.5));
-      if El_Raw < 0 then
-         El_Idx := 0;
-      elsif El_Raw > El_Cells - 1 then
-         El_Idx := El_Cells - 1;
-      else
-         El_Idx := Natural (El_Raw);
-      end if;
    end To_Cell;
 
    -----------
@@ -55,8 +72,13 @@ package body Radar_Clutter is
       D              : Detection)
    is
       Az_Idx, El_Idx : Natural;
+      Valid          : Boolean;
    begin
-      To_Cell (Az_Deg, El_Deg, Az_Idx, El_Idx);
+      To_Cell (Az_Deg, El_Deg, Az_Idx, El_Idx, Valid);
+      if not Valid then
+         return;   --  direction inconnue : rien a apprendre
+      end if;
+
       for K in 1 .. D.Count loop
          declare
             Cnt : Confidence renames
@@ -97,10 +119,14 @@ package body Radar_Clutter is
       D              : Detection) return Detection
    is
       Az_Idx, El_Idx : Natural;
+      Valid          : Boolean;
       Result         : Detection := (Targets => (others => Bin_Index'First),
                                      Count   => 0);
    begin
-      To_Cell (Az_Deg, El_Deg, Az_Idx, El_Idx);
+      To_Cell (Az_Deg, El_Deg, Az_Idx, El_Idx, Valid);
+      if not Valid then
+         return Result;   --  mesure sans direction : inexploitable
+      end if;
 
       for K in 1 .. D.Count loop
          declare
@@ -111,7 +137,7 @@ package body Radar_Clutter is
             Hi         : constant Bin_Index :=
               Bin_Index'Min (Bin_Index'Last, B + Guard_Bins);
          begin
-            --  Clutter si une case CONFIRMEE existe dans la marge.
+            --  Clutter si une case confirmee existe dans la marge.
             for G in Lo .. Hi loop
                if C.Cells (Az_Idx, El_Idx) (G) >= Confirm_Level then
                   Is_Clutter := True;

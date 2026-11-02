@@ -1,9 +1,12 @@
 with Ada.Synchronous_Task_Control;
 
-package Radar_Tasks is
+--  Radar_Tasks : les deux taches de la demonstration Ravenscar.
+--
+--  Elles sont declarees au niveau du paquet (library level), comme
+--  l'exige le profil : sous Ravenscar, aucune tache ne peut naitre ou
+--  mourir en cours d'execution, ce qui rend l'ordonnancement analysable.
 
-   --  Les deux taches sont declarees ici, au niveau du paquet
-   --  (library level), comme l'exige le profil Ravenscar.
+package Radar_Tasks is
 
    task Producer;
    task Consumer;

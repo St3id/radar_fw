@@ -1,6 +1,9 @@
 with AUnit.Assertions;  use AUnit.Assertions;
 with Radar_Sweep;       use Radar_Sweep;
 
+--  Corps de la suite 1. Chaque cas construit un balayage a la main, ce
+--  qui rend la donnee d'entree entierement lisible dans le test.
+
 package body Radar_Sweep_Tests is
 
    ----------
@@ -27,7 +30,7 @@ package body Radar_Sweep_Tests is
               "Une cible devrait etre detectee");
    end Test_Peak_Detection;
 
-   --  Test 2 : du bruit faible partout ne doit PAS donner de cible.
+   --  Test 2 : du bruit faible partout ne doit pas donner de cible.
    procedure Test_No_Target (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       S : constant Sweep := (others => 10);
@@ -59,7 +62,7 @@ package body Radar_Sweep_Tests is
       end;
    end Test_Multi_Target;
 
---  Test 4 : un echo etale sur 3 cases voisines = UNE cible (regroupement).
+--  Test 4 : un echo etale sur 3 cases voisines = une cible (regroupement).
    procedure Test_Clustering (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       S : Sweep := (others => 10);

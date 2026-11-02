@@ -1,3 +1,7 @@
+--  Corps de Radar_Sweep. Les boucles portent des invariants explicites :
+--  ce sont eux qui permettent au prouveur d'etablir les postconditions
+--  fonctionnelles, et non la seule absence d'erreur d'execution.
+
 package body Radar_Sweep
   with SPARK_Mode => On
 is
@@ -45,7 +49,7 @@ is
       return Bin_Distance (Peak_Bin (S));
    end Peak_Distance;
 
-----------------
+   ----------------
    -- Detect_All --
    ----------------
 
@@ -54,17 +58,21 @@ is
                              Count   => 0);
    begin
       for I in Bin_Index loop
-         --  Si l'echo depasse le seuil ET qu'il reste de la place, on note.
+         --  Si l'echo depasse le seuil et qu'il reste de la place, on note.
          if S (I) >= Detection_Threshold and then Result.Count < Max_Targets
          then
             Result.Count := Result.Count + 1;
             Result.Targets (Result.Count) := I;
          end if;
 
-         --  Invariants : le compte reste borne, et tout ce qui a ete
-         --  enregistre jusqu'ici depasse reellement le seuil (c'est ce
-         --  second invariant qui porte la postcondition fonctionnelle).
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Invariants : chaque case parcourue ajoute au plus une cible,
+         --  et tout ce qui a ete enregistre jusqu'ici depasse reellement
+         --  le seuil (c'est ce second invariant qui porte la
+         --  postcondition fonctionnelle). "Count <= Max_Targets" ne
+         --  dirait rien : le sous-type Target_Count le garantit deja, et
+         --  le compilateur le signale ("always True") des que les
+         --  contrats s'executent (-gnata).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
          pragma Loop_Invariant
            (for all K in 1 .. Result.Count =>
               S (Result.Targets (K)) >= Detection_Threshold);
@@ -73,7 +81,7 @@ is
       return Result;
    end Detect_All;
 
-----------------------
+   ----------------------
    -- Detect_Clustered --
    ----------------------
 
@@ -106,9 +114,11 @@ is
             In_Group := False;
          end if;
 
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
-         --  Si on est dans un groupe, son sommet depasse le seuil : c'est
-         --  ce qui garantit qu'on n'enregistrera jamais une fausse alarme.
+         --  Au plus une cible enregistree par case parcourue (voir
+         --  Detect_All : la borne Max_Targets, elle, vient du type).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
+         --  Si on est dans un groupe, son sommet depasse le seuil ; le
+         --  contrat porte sur cette valeur, pas sur une cible physique.
          pragma Loop_Invariant
            (if In_Group then S (Best_Pos) >= Detection_Threshold);
          pragma Loop_Invariant
@@ -199,8 +209,8 @@ is
       Best_Amp : Amplitude := 0;
    begin
       --  Meme regroupement que Detect_Clustered, mais chaque case est
-      --  comparee a SON seuil CFAR au lieu d'un seuil global fixe.
-      --  Les cases de la distance aveugle ne sont jamais des cibles.
+      --  comparee a son seuil CFAR au lieu d'un seuil global fixe.
+      --  Les cases ignorees par le modele ne sont jamais des detections.
       for I in Bin_Index loop
          if I > Blind_Bins
            and then Natural (S (I)) >= CFAR_Threshold (S, I)
@@ -221,7 +231,9 @@ is
             In_Group := False;
          end if;
 
-         pragma Loop_Invariant (Result.Count <= Max_Targets);
+         --  Au plus une cible enregistree par case parcourue (voir
+         --  Detect_All).
+         pragma Loop_Invariant (Result.Count <= Natural (I));
          pragma Loop_Invariant
            (if In_Group
             then Natural (S (Best_Pos)) >= CFAR_Threshold (S, Best_Pos)

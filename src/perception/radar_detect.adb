@@ -2,6 +2,10 @@ with Radar_Sweep;  use Radar_Sweep;
 with Ada.Numerics.Elementary_Functions;
 use  Ada.Numerics.Elementary_Functions;
 
+--  Corps de Radar_Detect. Le regroupement est un parcours simple en
+--  O(n^2) sur au plus Max_Detections elements : a cette taille, une
+--  structure d'acceleration couterait plus cher qu'elle ne rapporte.
+
 package body Radar_Detect is
 
    -----------
@@ -10,7 +14,9 @@ package body Radar_Detect is
 
    procedure Reset (F : in out Frame) is
    begin
-      F.Count := 0;
+      F.Count     := 0;
+      F.Stamp     := 0;
+      F.Min_Range := 0.0;
    end Reset;
 
    ---------
@@ -18,17 +24,27 @@ package body Radar_Detect is
    ---------
 
    procedure Add (F : in out Frame; M : Measurement) is
-      --  Toutes les cibles du balayage, via la detection CFAR prouvee
-      --  en SPARK (seuil adaptatif au bruit local : contrat "aucune
-      --  fausse alarme par rapport au bruit ambiant").
+      --  Toutes les cases qui depassent le seuil local calcule par la
+      --  detection CFAR prouvee en SPARK. Cette preuve porte sur le code,
+      --  pas sur un taux de fausse alarme mesure ni sur une cible reelle.
       D : constant Detection := Detect_Adaptive (M.Data);
    begin
+      --  La frame porte l heure de sa DERNIERE mesure : Add etant
+      --  appele pour chaque direction du tour, c est l instant ou le
+      --  tour s acheve.
+      F.Stamp := M.Stamp;
+
+      --  Detect_Adaptive vient de s interdire les premieres cases : la
+      --  frame doit le dire, sinon le pistage croirait vide une zone
+      --  qu il n a simplement pas pu voir.
+      F.Min_Range := Profile_Min_Range;
+
       for K in 1 .. D.Count loop
          exit when F.Count = Max_Detections;
 
          declare
-            --  Distance physique de la case detectee (Bin_Distance est
-            --  la conversion prouvee, partagee avec Peak_Distance).
+            --  Distance simulee de la case detectee (Bin_Distance est
+            --  partagee avec Peak_Distance).
             Dist : constant Float := Float (Bin_Distance (D.Targets (K)));
 
             --  Position 3D : on combine la direction visee (azimut,
@@ -47,6 +63,9 @@ package body Radar_Detect is
    -------------
 
    function Cluster (F : Frame) return Frame is
+     (Cluster (F, No_Owner));
+
+   function Cluster (F : Frame; Owners : Owner_List) return Frame is
       Result : Frame;
       Used   : array (1 .. Max_Detections) of Boolean := (others => False);
 
@@ -56,6 +75,10 @@ package body Radar_Detect is
 
    begin
       Reset (Result);
+      --  Le regroupement ne change ni l heure ni ce que le capteur
+      --  voyait : les oublier ici les perdrait avant le pistage.
+      Result.Stamp     := F.Stamp;
+      Result.Min_Range := F.Min_Range;
 
       --  Pour chaque detection pas encore regroupee...
       for I in 1 .. F.Count loop
@@ -68,14 +91,24 @@ package body Radar_Detect is
                Sum_Z : Float := F.Items (I).Pos.Z;
                Sum_D : Float := F.Items (I).Distance;
                N     : Natural := 1;
+
+               --  La piste qui revendique le groupe (0 = aucune encore). On
+               --  la suit pour le GROUPE et non pour la seule graine : une
+               --  graine sans proprietaire ne doit pas servir de pont entre
+               --  les detections de deux pistes differentes.
+               Group_Owner : Natural := Owners (I);
             begin
                Used (I) := True;
 
-               --  On cherche toutes les detections proches de I.
+               --  On cherche toutes les detections proches de I, sauf
+               --  celles d'une AUTRE piste confirmee que celle du groupe.
                for J in I + 1 .. F.Count loop
                   if not Used (J)
                     and then Dist3D (F.Items (I).Pos, F.Items (J).Pos)
                              < Cluster_Radius
+                    and then (Owners (J) = 0
+                              or else Group_Owner = 0
+                              or else Owners (J) = Group_Owner)
                   then
                      Sum_X := Sum_X + F.Items (J).Pos.X;
                      Sum_Y := Sum_Y + F.Items (J).Pos.Y;
@@ -83,6 +116,9 @@ package body Radar_Detect is
                      Sum_D := Sum_D + F.Items (J).Distance;
                      N := N + 1;
                      Used (J) := True;
+                     if Group_Owner = 0 then
+                        Group_Owner := Owners (J);
+                     end if;
                   end if;
                end loop;
 
