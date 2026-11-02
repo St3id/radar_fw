@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Un run bloque ne doit pas occuper un runner indefiniment.
+    timeout-minutes: 30
 
     steps:
       # v7 et non v4 : les versions v4 tournaient sur Node.js 20, que
@@ -55,6 +57,20 @@ jobs:
       - name: Run tests
         run: alr exec -- ./bin/run_tests
 
+      # Execute reellement les trois modes deterministes de l'application
+      # (map, track, sar) : chacun doit rendre le code 0. Les modes live
+      # et scan ouvrent un serveur et ne se terminent pas : exclus.
+      - name: Run modes (map, track, sar)
+        run: |
+          alr exec -- ./bin/radar_fw map
+          alr exec -- ./bin/radar_fw
+          alr exec -- ./bin/radar_fw sar
+
+      # Contrats sans implementation ni client dans l'executable : on les
+      # compile seuls pour qu'ils ne pourrissent pas en silence.
+      - name: Compile orphan contracts
+        run: alr exec -- gprbuild -c -u -P radar_fw.gpr radar_planar_source.ads radar_target_source.ads
+
       # ===== Demonstrateur Ravenscar =====
       # Projet separe (radar_demo.gpr) : le profil Ravenscar est impose a
       # tout l'executable par ravenscar.adc. La demo tourne REELLEMENT
@@ -74,6 +90,11 @@ jobs:
       #                           meme avec des checks non prouves).
       - name: SPARK proof (main)
         run: alr exec -- gnatprove -P radar_fw.gpr --report=all --checks-as-errors=on
+
+      # Radar_Ld2450 n'est utilise que par les tests : gnatprove -P ne
+      # l'analyse pas seul. Cette seconde passe le prouve explicitement.
+      - name: SPARK proof (Radar_Ld2450)
+        run: alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on
 
       # Preuve du projet demo : l'objet protege Mailbox est en SPARK.
       # L'analyse de code concurrent exige le profil Ravenscar et
