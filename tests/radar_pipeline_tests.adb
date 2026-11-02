@@ -323,6 +323,7 @@ package body Radar_Pipeline_Tests is
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
+      Found_1, Found_2 : Boolean := False;
       Trk : Tracker;
       Now : Time_Ms := 0;
       F   : Frame;
@@ -345,16 +346,23 @@ package body Radar_Pipeline_Tests is
       for Tk of Trk.Tracks loop
          if Tk.Active and then Tk.Confirmed then
             if Tk.Id = 1 then
+               Found_1 := True;
                Assert (Tk.Pos.X < 100.0,
                        "La piste 1 ne devrait PAS avoir vole 480");
                Assert (Tk.Missing = 1,
                        "La piste 1 devrait etre en coasting");
             elsif Tk.Id = 2 then
+               Found_2 := True;
                Assert (Tk.Pos.X > 400.0 and then Tk.Pos.X < 500.0,
                        "La piste 2 devrait avoir pris la detection 480");
             end if;
          end if;
       end loop;
+
+      --  Sans ce controle, si les pistes 1 et 2 n'existaient plus, aucune
+      --  assertion ci-dessus ne s'executerait et le test passerait a vide.
+      Assert (Found_1 and then Found_2,
+              "Les pistes 1 et 2 devraient etre confirmees");
    end Test_Global_Association;
 
    --  ----- Politique de temps du pistage (P3) -----
