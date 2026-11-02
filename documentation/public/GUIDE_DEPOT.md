@@ -34,7 +34,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `tests/` | les suites de tests AUnit | oui |
 | `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`) | oui |
 | `alire.toml` | le manifeste Alire (dépendances, exécutable) | oui |
-| `radar_fw.gpr` et les 3 autres `.gpr` | les projets de compilation (voir §4) | oui |
+| `radar_fw.gpr` et les 4 autres `.gpr` | les projets de compilation (voir §4) | oui |
 | `ravenscar.adc` | impose `pragma Profile (Ravenscar)` et `No_Allocators` à la compilation de la démo | oui |
 | `core_restrictions.adc` | restrictions du cœur embarquable (`No_Allocators`, `No_Exceptions`, pas de `Ada.Text_IO` ni `Ada.Calendar`), branchées par `radar_core.gpr` | oui |
 | `.github/workflows/ci.yml` | l'intégration continue | oui |
@@ -88,6 +88,8 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_target_source.ads` | `Radar_Target_Source` | le contrat pour les frames de détections déjà calculées en 3D |
 | `radar_planar_source.ads` | `Radar_Planar_Source` | le contrat pour les rapports planaires (x, y sans altitude) d'un capteur comme le LD2450 |
 | `radar_ld2450_sim.ads/.adb` | `Radar_Ld2450_Sim` | l'émulateur du LD2450 vu de sa liaison série : octets, imperfections, défauts de liaison |
+| `radar_ld2450_log.ads/.adb` | `Radar_Ld2450_Log` | le format de fichier d'un flux série enregistré : heure de réception + octets |
+| `radar_ld2450_replay.ads/.adb` | `Radar_Ld2450_Replay` | source planaire qui relit ce fichier par le parseur et le filtre de plausibilité |
 | `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes) |
 | `radar_world.ads/.adb` | `Radar_World` | la vérité terrain : objets mobiles, murs |
 | `radar_detect.ads/.adb` | `Radar_Detect` | détections 3D d'un tour + regroupement spatial |
@@ -122,6 +124,16 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_http.ads/.adb` | `Radar_Http` : le serveur HTTP en Ada, partagé par `live` et `scan` |
 | `radar_html.ads/.adb` | `Radar_Html` : helpers de sérialisation |
 
+### `src/tools/` — l'enregistreur, hors de l'application
+
+Propre à Windows x86_64 et **non validé sur matériel** (seuls ses chemins
+d'erreur ont été exécutés). Rien d'autre dans le dépôt n'en dépend.
+
+| Fichier | Rôle |
+| ------- | ---- |
+| `radar_ld2450_record.adb` | l'outil : copie un port série vers un fichier de capture |
+| `radar_serial_win32.ads/.adb` | `Radar_Serial_Win32` : lecture du port à 256 000 bauds par l'API Windows |
+
 ### `src/demo/`
 
 | Fichier | Rôle |
@@ -137,14 +149,14 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_pipeline_tests.ads/.adb` | suite 2 : géométrie, regroupement, pistage, clutter, CFAR |
 | `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
 | `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage, émulateur) |
-| `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité) |
+| `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité, fichier de capture et rejeu) |
 | `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---
 
-## 4. Les quatre projets de compilation
+## 4. Les cinq projets de compilation
 
-Il y en a quatre, et ce n'est pas un accident : chacun compile un
+Il y en a cinq, et ce n'est pas un accident : chacun compile un
 sous-ensemble différent, pour une raison différente.
 
 | Projet | Compile | Pourquoi il existe |
@@ -153,6 +165,7 @@ sous-ensemble différent, pour une raison différente.
 | `radar_demo.gpr` | `demo` + `tasking` + `core`, sous `ravenscar.adc` | imposer le profil Ravenscar (il n'importe **pas** la config AUnit, qui violerait `No_Calendar`) |
 | `radar_core.gpr` | `core` seul, pour `arm-eabi` | le garde-fou embarqué : si le cœur cesse d'être portable, ça casse ici (R7) |
 | `radar_fw_tests.gpr` | `tests` + `radar_fw.gpr` | les tests AUnit |
+| `radar_ld2450_record.gpr` | `tools` + `core` + `perception` | l'enregistreur du flux série : le port reste hors de l'application et du cœur |
 
 Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
 `radar_fw.gpr` là.
@@ -179,6 +192,8 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
     alr exec -- gprbuild -p -P radar_demo.gpr   # la demo Ravenscar
     alr exec -- gprbuild -p -P radar_core.gpr   # le garde-fou ARM
 
+    alr exec -- gprbuild -p -P radar_ld2450_record.gpr      # l'enregistreur (Windows)
+    alr exec -- ./bin/radar_ld2450_record COM3 out/capture.ld2450 60
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
 `live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`

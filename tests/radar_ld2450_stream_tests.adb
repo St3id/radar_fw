@@ -1,15 +1,25 @@
+with Ada.Directories;
+with Ada.Streams.Stream_IO;
 with AUnit.Assertions;          use AUnit.Assertions;
 with Radar_Ld2450;              use Radar_Ld2450;
 with Radar_Ld2450_Faults;       use Radar_Ld2450_Faults;
+with Radar_Ld2450_Log;
 with Radar_Ld2450_Plausibility; use Radar_Ld2450_Plausibility;
+with Radar_Ld2450_Replay;       use Radar_Ld2450_Replay;
 with Radar_Ld2450_Sim;          use Radar_Ld2450_Sim;
 with Radar_Ld2450_Stream;       use Radar_Ld2450_Stream;
+with Radar_Planar_Source;       use Radar_Planar_Source;
+with Radar_Source;
+with Radar_World;               use Radar_World;
 
 --  Corps de la suite 5. Chaque test affirme un total ou une position exacte :
 --  un parseur qui ne livre rien doit echouer ici, pas passer faute
 --  d'assertion atteinte.
 
 package body Radar_Ld2450_Stream_Tests is
+
+   use type Radar_Ld2450_Log.Read_Status;
+   use type Radar_Source.Time_Ms;
 
    --  ----- Faire passer un flux dans le parseur -----
 
@@ -82,7 +92,7 @@ package body Radar_Ld2450_Stream_Tests is
    function Name (T : Test_Case) return AUnit.Message_String is
       pragma Unreferenced (T);
    begin
-      return AUnit.Format ("Flux LD2450 (parseur, plausibilite)");
+      return AUnit.Format ("Flux LD2450 (parseur, plausibilite, rejeu)");
    end Name;
 
    --  ----- Le parseur -----
@@ -709,6 +719,342 @@ package body Radar_Ld2450_Stream_Tests is
               "Bits inverses rejetes :" & Caught'Image & " sur 768");
    end Test_Body_Bit_Flips;
 
+   --  ----- Le fichier de capture et le rejeu -----
+
+   Test_Dir : constant String := "out";
+
+   function Test_Path (Name : String) return String is
+     (Test_Dir & "/test_ld2450_" & Name & ".bin");
+
+   procedure Remove (Path : String) is
+   begin
+      if Ada.Directories.Exists (Path) then
+         Ada.Directories.Delete_File (Path);
+      end if;
+   end Remove;
+
+   procedure Start_Log (W : in out Radar_Ld2450_Log.Writer; Path : String) is
+      Ok : Boolean;
+   begin
+      Ada.Directories.Create_Path (Test_Dir);
+      Radar_Ld2450_Log.Create (W, Path, Ok);
+      Assert (Ok, "Impossible de creer " & Path);
+   end Start_Log;
+
+   --  Ajoute des octets bruts a la fin d'un fichier : pour le fabriquer abime.
+   procedure Append_Raw (Path : String; Bytes : Byte_Array) is
+      use Ada.Streams;
+      File : Stream_IO.File_Type;
+   begin
+      Stream_IO.Open (File, Stream_IO.Append_File, Path);
+      for B of Bytes loop
+         Stream_IO.Write (File, (1 => Stream_Element (B)));
+      end loop;
+      Stream_IO.Close (File);
+   end Append_Raw;
+
+   --  Une scene qui bouge doucement, trois cibles dans le champ. Le capteur
+   --  ideal rend des valeurs exactes et plausibles.
+   function Moving_Scene return World is
+      W : World := Empty_World;
+   begin
+      W.Count := 3;
+      W.Objects (1) :=
+        (Id => 1, X => 1_000.0, Y => -500.0, Z => 0.0,
+         Vx => 5.0, Vy => 0.0, Vz => 0.0);
+      W.Objects (2) :=
+        (Id => 2, X => 2_500.0, Y => 300.0, Z => 0.0,
+         Vx => -4.0, Vy => 2.0, Vz => 0.0);
+      W.Objects (3) :=
+        (Id => 3, X => 4_000.0, Y => 0.0, Z => 0.0,
+         Vx => 3.0, Vy => -1.0, Vz => 0.0);
+      return W;
+   end Moving_Scene;
+
+   --  Test 14 : le rejeu rend les memes rapports que ce que le module a voulu
+   --  envoyer, meme decoupe en blocs qui coupent les trames en deux. Valeurs,
+   --  unite de vitesse, heure du bloc qui contient la fin de trame : tout est
+   --  compare a Intended, et non a une seconde passe du meme code.
+   procedure Test_Replay_Same_Reports
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Path    : constant String := Test_Path ("same");
+      Frames  : constant := 200;
+      Sizes   : constant array (1 .. 5) of Positive := (1, 7, 30, 45, 13);
+      All_Raw : Byte_Array (1 .. Frames * Frame_Length);
+      Expected : array (1 .. Frames) of Raw_Report;
+      Stamps   : array (1 .. Frames) of Radar_Source.Time_Ms;
+      Tail_Stamp : array (1 .. Frames) of Radar_Source.Time_Ms;
+   begin
+      declare
+         E    : Emulator := Make (Moving_Scene, Ideal_Sensor);
+         F    : Emitted_Frame;
+         Sent : Boolean;
+      begin
+         for N in 1 .. Frames loop
+            Next_Frame (E, F, Sent);
+            Assert (Sent, "Sans defaut, le module emet");
+            All_Raw ((N - 1) * Frame_Length + 1 .. N * Frame_Length) :=
+              F.Bytes;
+            Expected (N) := F.Intended;
+            Stamps (N)   := F.Stamp;
+            Assert (F.Intended.Count = 3, "Trois cibles dans le champ");
+         end loop;
+      end;
+
+      declare
+         W     : Radar_Ld2450_Log.Writer;
+         First : Positive := 1;
+         Pick  : Positive := 1;
+      begin
+         Start_Log (W, Path);
+         while First <= All_Raw'Last loop
+            declare
+               Last  : constant Positive :=
+                 Positive'Min (First + Sizes (Pick) - 1, All_Raw'Last);
+               --  Le bloc recoit l'heure de la trame de son dernier octet.
+               Owner : constant Positive := (Last - 1) / Frame_Length + 1;
+            begin
+               Radar_Ld2450_Log.Append
+                 (W, Stamps (Owner), All_Raw (First .. Last));
+               --  Toute trame qui finit dans ce bloc sort a cette heure-la.
+               for N in 1 .. Frames loop
+                  if N * Frame_Length in First .. Last then
+                     Tail_Stamp (N) := Stamps (Owner);
+                  end if;
+               end loop;
+               First := Last + 1;
+               Pick  := Pick mod Sizes'Last + 1;
+            end;
+         end loop;
+         Radar_Ld2450_Log.Close (W);
+      end;
+
+      declare
+         S         : Replay_Source;
+         Ok        : Boolean;
+         R         : Planar_Report;
+         Available : Boolean;
+      begin
+         Open (S, Path, Sensor => 4, Ok => Ok);
+         Assert (Ok and then Has_More (S), "Le fichier doit s'ouvrir");
+
+         for N in 1 .. Frames loop
+            Next_Report (S, R, Available);
+            Assert (Available, "Rapport" & N'Image & " absent");
+            Assert (R.Stamp = Tail_Stamp (N),
+                    "Rapport" & N'Image & " : mauvaise heure");
+            Assert (R.Sensor = 4, "Le rapport nomme son capteur");
+            Assert (R.Count = Expected (N).Count,
+                    "Rapport" & N'Image & " : nombre de cibles");
+            for I in 1 .. R.Count loop
+               Assert
+                 (R.Items (I).X_Mm = Float (Expected (N).Targets (I).X_Mm)
+                    and then
+                  R.Items (I).Y_Mm = Float (Expected (N).Targets (I).Y_Mm)
+                    and then
+                  R.Items (I).Speed_Mm_S =
+                    10.0 * Float (Expected (N).Targets (I).Speed_Cm_S),
+                  "Rapport" & N'Image & " cible" & I'Image & " differente");
+            end loop;
+         end loop;
+
+         Next_Report (S, R, Available);
+         Assert (not Available and then not Has_More (S),
+                 "Apres 200 rapports : fin du fichier");
+         Assert (Stop_Reason (S) = Radar_Ld2450_Log.End_Of_Log,
+                 "Arret propre attendu");
+         Assert (Silences (S) = 0, "Aucun silence dans ce flux");
+         Assert (Frames_Delivered (Stream (S)) = Frames
+                   and then Bytes_Discarded (Stream (S)) = 0,
+                 "Le parseur a tout livre, rien ecarte");
+         Assert (Accepted (Checks (S)) = 3 * Frames,
+                 "Le filtre a tout accepte");
+      end;
+      Remove (Path);
+   end Test_Replay_Same_Reports;
+
+   --  Test 15 : silence et fin ne se confondent pas. Un trou dans les heures
+   --  donne Available = False et Has_More = True, une seule fois ; un module
+   --  devenu muet (blocs vides) aussi ; seule la fin du fichier met Has_More
+   --  a False.
+   procedure Test_Replay_Silence_Or_End
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Path : constant String := Test_Path ("silence");
+      Last_Stamp : Radar_Source.Time_Ms := 0;
+      Sent_Count : Natural := 0;
+   begin
+      declare
+         W    : Radar_Ld2450_Log.Writer;
+         E    : Emulator := Make (Moving_Scene, Ideal_Sensor);
+         F    : Emitted_Frame;
+         Sent : Boolean;
+      begin
+         Start_Log (W, Path);
+         for N in 1 .. 30 loop
+            if N = 11 then
+               Force_Silence (E, 1_000);
+            end if;
+            Next_Frame (E, F, Sent);
+            if Sent then
+               Radar_Ld2450_Log.Append (W, F.Stamp, F.Bytes);
+               Last_Stamp := F.Stamp;
+               Sent_Count := Sent_Count + 1;
+            end if;
+         end loop;
+         --  Le module se tait : l'enregistreur ecrit des blocs vides.
+         Radar_Ld2450_Log.Append
+           (W, Last_Stamp + 200, (1 .. 0 => 0));
+         Radar_Ld2450_Log.Append
+           (W, Last_Stamp + 1_000, (1 .. 0 => 0));
+         Radar_Ld2450_Log.Append
+           (W, Last_Stamp + 2_000, (1 .. 0 => 0));
+         Radar_Ld2450_Log.Close (W);
+      end;
+      Assert (Sent_Count = 20, "Dix periodes de silence");
+
+      declare
+         S         : Replay_Source;
+         Ok        : Boolean;
+         R         : Planar_Report;
+         Available : Boolean;
+         Reports   : Natural := 0;
+         Holes     : Natural := 0;
+         Finals    : Natural := 0;
+      begin
+         Open (S, Path, Ok => Ok);
+         Assert (Ok, "Le fichier doit s'ouvrir");
+         while Has_More (S) loop
+            Next_Report (S, R, Available);
+            if Available then
+               Reports := Reports + 1;
+            elsif Has_More (S) then
+               Holes := Holes + 1;
+               Assert (Reports = 10 or else Reports = 20,
+                       "Silence au mauvais endroit, apres"
+                       & Reports'Image & " rapports");
+            else
+               Finals := Finals + 1;
+            end if;
+            Assert (Holes + Reports + Finals <= 23, "Lecture sans fin");
+         end loop;
+         Assert (Reports = 20, "Tous les rapports, malgre les silences");
+         Assert (Holes = 2 and then Silences (S) = 2,
+                 "Deux silences : le trou et le module muet");
+         Assert (Finals = 1, "Une seule fin");
+         Assert (Stop_Reason (S) = Radar_Ld2450_Log.End_Of_Log,
+                 "Fin propre");
+
+         Next_Report (S, R, Available);
+         Assert (not Available and then not Has_More (S),
+                 "Apres la fin, plus rien");
+      end;
+      Remove (Path);
+   end Test_Replay_Silence_Or_End;
+
+   --  Test 16 : des fichiers abimes ne levent aucune exception. Absent,
+   --  mauvais en-tete, coupe en plein bloc, longueur ou heure hors format,
+   --  heures qui reculent : chaque cas dit pourquoi il s'arrete, et ce qui
+   --  precede reste livre.
+   procedure Test_Replay_Bad_Files
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Path : constant String := Test_Path ("bad");
+
+      procedure Good_Start is
+         W : Radar_Ld2450_Log.Writer;
+      begin
+         Start_Log (W, Path);
+         Radar_Ld2450_Log.Append (W, 100, Frame_Of (1));
+         Radar_Ld2450_Log.Close (W);
+      end Good_Start;
+
+      procedure Expect_Stop
+        (Why : Radar_Ld2450_Log.Read_Status; What : String)
+      is
+         S         : Replay_Source;
+         Ok        : Boolean;
+         R         : Planar_Report;
+         Available : Boolean;
+      begin
+         Open (S, Path, Ok => Ok);
+         Assert (Ok, What & " : l'en-tete est bon");
+         Next_Report (S, R, Available);
+         Assert (Available and then R.Count = 1 and then R.Stamp = 100,
+                 What & " : la trame intacte doit sortir");
+         Next_Report (S, R, Available);
+         Assert (not Available and then not Has_More (S),
+                 What & " : la lecture doit s'arreter");
+         Assert (Stop_Reason (S) = Why, What & " : mauvais motif d'arret");
+      end Expect_Stop;
+   begin
+      declare
+         S         : Replay_Source;
+         Ok        : Boolean;
+         R         : Planar_Report;
+         Available : Boolean;
+      begin
+         Remove (Path);
+         Open (S, Path, Ok => Ok);
+         Assert (not Ok and then not Has_More (S), "Fichier absent");
+         Next_Report (S, R, Available);
+         Assert (not Available, "Fichier absent : rien a livrer");
+
+         Ada.Directories.Create_Path (Test_Dir);
+         declare
+            use Ada.Streams;
+            File : Stream_IO.File_Type;
+         begin
+            Stream_IO.Create (File, Stream_IO.Out_File, Path);
+            Stream_IO.Write (File, (1 .. 12 => 16#41#));
+            Stream_IO.Close (File);
+         end;
+         Open (S, Path, Ok => Ok);
+         Assert (not Ok and then not Has_More (S), "Mauvais en-tete");
+      end;
+
+      Good_Start;
+      Append_Raw (Path, (16#C8#, 0, 0));
+      Expect_Stop (Radar_Ld2450_Log.Truncated, "Coupe dans l'entete de bloc");
+
+      Good_Start;
+      Append_Raw (Path, (16#C8#, 0, 0, 0, 30, 0, 16#AA#, 16#FF#));
+      Expect_Stop (Radar_Ld2450_Log.Truncated, "Coupe dans le bloc");
+
+      Good_Start;
+      Append_Raw (Path, (16#C8#, 0, 0, 0, 16#01#, 16#10#));
+      Expect_Stop (Radar_Ld2450_Log.Malformed, "Longueur de 4 097 octets");
+
+      Good_Start;
+      Append_Raw (Path, (0, 0, 0, 16#80#, 1, 0, 16#AA#));
+      Expect_Stop (Radar_Ld2450_Log.Malformed, "Heure au-dela de 2 ** 31 - 1");
+
+      --  Des heures qui reculent : pas d'exception, et dt = 0 pour le filtre.
+      declare
+         W         : Radar_Ld2450_Log.Writer;
+         S         : Replay_Source;
+         Ok        : Boolean;
+         R         : Planar_Report;
+         Available : Boolean;
+      begin
+         Start_Log (W, Path);
+         Radar_Ld2450_Log.Append (W, 250, Frame_Of (1));
+         Radar_Ld2450_Log.Append (W, 100, Frame_Of (1));
+         Radar_Ld2450_Log.Close (W);
+         Open (S, Path, Ok => Ok);
+         Next_Report (S, R, Available);
+         Assert (Available and then R.Stamp = 250, "Premiere heure");
+         Next_Report (S, R, Available);
+         Assert (Available and then R.Stamp = 100 and then R.Count = 1,
+                 "L'heure recule : le rapport sort, avec son heure");
+      end;
+      Remove (Path);
+   end Test_Replay_Bad_Files;
+
    --------------------
    -- Register_Tests --
    --------------------
@@ -756,6 +1102,15 @@ package body Radar_Ld2450_Stream_Tests is
       Register_Routine
         (T, Test_Body_Bit_Flips'Access,
          "Plausibilite : 768 bits inverses, limite du format mesuree");
+      Register_Routine
+        (T, Test_Replay_Same_Reports'Access,
+         "Rejeu : memes rapports que Intended, blocs coupant les trames");
+      Register_Routine
+        (T, Test_Replay_Silence_Or_End'Access,
+         "Rejeu : silence et fin de fichier distingues");
+      Register_Routine
+        (T, Test_Replay_Bad_Files'Access,
+         "Rejeu : fichiers abimes, sans exception, motif d'arret");
    end Register_Tests;
 
 end Radar_Ld2450_Stream_Tests;

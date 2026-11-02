@@ -1057,6 +1057,31 @@ seuils. Les 191 autres passent : bits de poids faible, déplacements dans la
 porte, ou un emplacement vide resté vide. Ce total mesure ces seuils sur ces
 quatre trames, pas un taux de détection sur un module réel.
 
+**Rejouer une capture.** `Radar_Ld2450_Log` définit un fichier qui garde les
+octets tels qu'ils sont arrivés, parasites compris, avec leur heure de
+réception : 8 octets `RFWLD2S1`, puis des blocs (heure en ms sur 4 octets,
+longueur `L` sur 2 octets, `L` octets), en petit-boutiste. Un bloc vide dit que
+la liaison était ouverte et que rien n'est arrivé. `Radar_Ld2450_Replay`
+relit ce fichier par le même parseur et le même filtre, et implémente
+`Radar_Planar_Source` : `x`, `y` et la vitesse, rien de plus, sans altitude. Le
+contrat distingue déjà la fin du silence : `Available = False` avec
+`Has_More = True` signale, une fois, un trou de plus de 300 ms (hypothèse) ;
+avec `Has_More = False`, c'est la fin du fichier. Un fichier coupé net ou
+hors format ne lève pas d'exception : la lecture s'arrête et dit pourquoi.
+L'heure d'un rapport est celle de la **réception** du bloc qui contient la fin
+de la trame ; le contrat demande l'heure de capture, dont l'écart (1,2 ms de
+ligne, plus la latence de l'adaptateur USB, inconnue) reste à mesurer.
+
+**L'enregistreur n'est pas validé.** `radar_ld2450_record` copie un port série
+vers ce fichier. `GNAT.Serial_Communications` ne convient pas : son type
+`Data_Rate` est une énumération fermée qui passe de `B230400` à `B460800`, sans
+256 000 bauds, le débit par défaut du module. L'outil appelle donc directement
+l'API Windows (`src/tools/radar_serial_win32`), ce qui le limite à Windows
+x86_64 ; il reste hors de `src/core` et de l'application. **Aucun module
+n'existe encore : seuls ses chemins d'erreur ont été exécutés.** La lecture du
+port, l'acceptation de 256 000 bauds par le pilote de l'adaptateur et les
+délais sont à vérifier au premier branchement. Il ne transmet rien au module.
+
 **La vitesse est en cm/s**, pas en mm/s : elle se multiplie par 10 avant
 d'entrer dans le pistage, qui travaille en mm/s. Une implémentation tierce la
 divise par 1000 comme des mm/s, et l'affiche dix fois trop petite.

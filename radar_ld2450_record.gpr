@@ -1,0 +1,24 @@
+with "config/radar_fw_config.gpr";
+
+--  L'outil d'enregistrement du flux serie du LD2450 : un executable a part,
+--  pour que le port serie reste hors de l'application (radar_fw.gpr) et du
+--  coeur embarquable (radar_core.gpr). Propre a Windows x86_64 ; sous Linux,
+--  la CI le compile (-c) sans edition de liens. Non valide sur materiel :
+--  voir l'en-tete de src/tools/radar_serial_win32.ads.
+project Radar_Ld2450_Record is
+
+   for Source_Dirs use ("src/tools", "src/core", "src/perception", "config/");
+   for Object_Dir use "obj/record";
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("radar_ld2450_record.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Radar_Fw_Config.Ada_Compiler_Switches;
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+end Radar_Ld2450_Record;

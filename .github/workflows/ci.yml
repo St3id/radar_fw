@@ -71,6 +71,12 @@ jobs:
       - name: Compile orphan contracts
         run: alr exec -- gprbuild -c -u -P radar_fw.gpr radar_planar_source.ads radar_target_source.ads
 
+      # L'enregistreur appelle l'API Windows : ce runner Linux le compile
+      # (-c) sans edition de liens, pour qu'il ne pourrisse pas en silence.
+      # Compiler ne prouve rien de son fonctionnement sur un vrai port.
+      - name: Compile recorder (compile only on Linux)
+        run: alr exec -- gprbuild -c -p -P radar_ld2450_record.gpr
+
       # ===== Demonstrateur Ravenscar =====
       # Projet separe (radar_demo.gpr) : le profil Ravenscar est impose a
       # tout l'executable par ravenscar.adc. La demo tourne REELLEMENT

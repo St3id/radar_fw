@@ -21,7 +21,7 @@ dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **252 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé et contrats du parseur LD2450, pas qualité de détection ni validité sur un module réel |
-| Tests | **58 tests AUnit**, rejoués à chaque commit |
+| Tests | **61 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -35,7 +35,8 @@ qui livrent des positions 3D déjà calculées ont un contrat distinct,
 `Radar_Target_Source`. Aucun adaptateur matériel ne l'utilise encore. Un
 capteur qui ne donne que x/y, comme le LD2450 décrit ici, entre par un
 troisième contrat, `Radar_Planar_Source`, et attend un pistage planaire ;
-on ne lui invente pas une altitude.
+on ne lui invente pas une altitude. Sa seule source concrète relit un fichier
+d'octets enregistrés, et n'a encore jamais relu une capture réelle.
 
     alr run                          # track : rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
@@ -94,8 +95,9 @@ Au-dessus vient la perception 3D :
    des capteurs planaires comme le LD2450, dont le format de trame est codé
    et prouvé (`Radar_Ld2450`, dans le cœur embarquable) et que simule un
    émulateur de liaison série (`Radar_Ld2450_Sim`). Le parseur de flux
-   (`Radar_Ld2450_Stream`, prouvé) et le filtre de plausibilité existent ;
-   la source concrète et le pistage planaire restent à faire ;
+   (`Radar_Ld2450_Stream`, prouvé) et le filtre de plausibilité existent, et
+   `Radar_Ld2450_Replay` livre des rapports planaires depuis un fichier
+   enregistré. Le pistage planaire reste à faire ;
 2. `Radar_Detect` — chaque mesure passe par la détection prouvée puis
    devient un point 3D ; deux objets alignés sur un même rayon donnent
    bien deux détections ;
@@ -159,6 +161,10 @@ Acquis :
       Éprouvé sur flux abîmés et sur l'émulateur, **jamais sur un module réel**.
 - [x] **Plausibilité des cibles**, séparée du parseur : seuils nommés et
       commentés comme hypothèses à remesurer, un compteur par motif de rejet.
+- [x] **Capture et rejeu** : un fichier garde les octets reçus et leur heure de
+      réception ; `Radar_Ld2450_Replay` le relit par le même parseur et
+      distingue un module muet de la fin du fichier. Essayé sur des fichiers
+      générés, **jamais sur une capture réelle**.
 - [x] Serveur HTTP écrit en Ada (`GNAT.Sockets`), partagé par `live` et
       `scan`.
 - [x] Intégration continue sur toutes les branches : build, tests, démo
@@ -167,9 +173,11 @@ Acquis :
 
 Reste à faire :
 
-- [ ] Source concrète du contrat planaire et enregistrement d'un flux réel.
-- [ ] Validation sur un module réel : le parseur et les seuils de plausibilité
-      n'ont jamais vu de vraie trame.
+- [ ] Validation sur un module réel. L'enregistreur `radar_ld2450_record` est
+      écrit pour Windows, mais **seuls ses chemins d'erreur ont été exécutés** :
+      la lecture du port et 256 000 bauds restent à essayer. Le parseur, les
+      seuils de plausibilité, l'heure de réception, le côté du `x` positif et
+      le sens de la vitesse n'ont jamais vu de vraie trame.
 - [ ] Pistage 2D du LD2450 (le format, le parseur, le type de rapport planaire
       et l'émulateur existent). Garder le type 3D pour les mesures qui ont
       réellement une altitude ; fusionner ensuite avec horloges et poses
@@ -270,7 +278,7 @@ du code, du temps d'exécution ni du comportement sur la carte.
 
 ## Tests
 
-**58 tests AUnit** répartis en cinq suites :
+**61 tests AUnit** répartis en cinq suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut,
@@ -297,7 +305,8 @@ du code, du temps d'exécution ni du comportement sur la carte.
   60 octets ou une perte de 1 à 29, bit faux dans l'en-tête ou la fin,
   troncature, réponses de commande, un million d'octets aléatoires, trames
   noyées dans le bruit, émulateur avec défauts ; plausibilité : cible vide,
-  un compteur par motif, porte de saut, 768 bits inversés.
+  un compteur par motif, porte de saut, 768 bits inversés ; rejeu d'un
+  fichier généré, silence et fin distingués, fichiers abîmés.
 
 Compiler puis lancer les suites :
 
@@ -313,13 +322,20 @@ Compiler puis lancer les suites :
     alr exec -- ./bin/radar_fw scan  # carto progressive -> meme adresse
     alr exec -- ./bin/radar_fw sar   # synthese d'ouverture simulee (texte)
 
+L'enregistreur est un outil à part, propre à Windows et **non validé sur
+matériel** (seuls ses chemins d'erreur ont été exécutés) :
+
+    alr exec -- gprbuild -p -P radar_ld2450_record.gpr
+    alr exec -- ./bin/radar_ld2450_record COM3 out/capture.ld2450 60
+
 ## Intégration continue
 
 Le workflow GitHub Actions (`.github/workflows/ci.yml`) se déclenche à
 chaque push, sur **toutes les branches** : compilation, tests AUnit,
 exécution du démonstrateur Ravenscar, preuves SPARK des deux projets —
 **bloquantes**, grâce à `--checks-as-errors=on` — et cross-compilation du
-cœur pour la cible ARM.
+cœur pour la cible ARM. L'enregistreur y est compilé sans édition de liens :
+le runner est sous Linux, l'outil appelle l'API Windows.
 
 ## Documentation
 
@@ -328,7 +344,7 @@ cœur pour la cible ARM.
   l'architecture matérielle visée et la spécification du protocole de
   télémétrie.
 - `documentation/public/GUIDE_DEPOT.md` — la carte du dépôt : où trouver
-  quel fichier, et pourquoi il existe quatre projets de compilation.
+  quel fichier, et pourquoi il existe cinq projets de compilation.
 
 ## Outils
 
