@@ -602,13 +602,14 @@ d'émetteurs, mais offrent moins de marge angulaire. Ce calcul ne décrit pas la
 sensibilité réelle aux bords du faisceau. [Étude d'interférence FMCW](https://doi.org/10.1049/joe.2019.0167).
 
 Le nombre de capteurs a aussi une borne électronique : le STM32G474 dispose de
-USART1 à USART3, UART4 et UART5, plus LPUART1. Dans le routage candidat, LPUART1
-sert au pont ESP32 et les cinq autres voies peuvent recevoir chacune un LD2450.
-Quatre radars laissent donc une voie UART pour l'A121 si son firmware utilise
-ce transport ; cinq consomment les cinq voies capteur. Une sixième entrée radar
-exigerait un concentrateur ou une autre architecture. Ce décompte porte sur les
-périphériques du microcontrôleur, pas sur les broches effectivement exposées :
-leur multiplexage et leur présence sur la carte WeAct restent à vérifier.
+USART1 à USART3, UART4 et UART5, plus LPUART1. Sur la carte NUCLEO-G474RE,
+LPUART1 est relié au port série virtuel de la sonde ST-LINK et sert la liaison
+vers le PC ; les cinq autres voies peuvent recevoir chacune un LD2450. Quatre
+radars laissent donc une voie pour le driver du moteur d'azimut, l'A121 ayant
+sa propre liaison USB ; cinq consomment les cinq voies. Une entrée de plus
+exigerait un concentrateur ou une autre architecture. Le manuel de la carte
+confirme que ces broches sont sorties sur ses connecteurs ; leur multiplexage
+reste à valider.
 [Fiche STM32G474](https://www.st.com/resource/en/datasheet/stm32g474qb.pdf).
 
 Le diagnostic physique reste donc **analytique**, faute de modules montés et
@@ -635,11 +636,11 @@ des hypothèses tant que ces essais ne sont pas faits.
                | UART 256000 bauds (3 fils : TX, RX, GND) + alim 5 V
                v
        +-------+--------+         +------------------+
-       | STM32G474      |  UART2  | pont telemetrie  |   WiFi (TCP)
-       | Ada/SPARK      +-------->+ ESP32 (possede)  + - - - - - - -> PC
-       | Ravenscar      |         +------------------+   autre piece OK
-       | pistage, MTI,  |
-       | clutter, CFAR  |  ou bien : UART -> USB-UART -> cable USB -> PC
+       | STM32G474      |  USB (port serie virtuel de la sonde ST-LINK)
+       | Ada/SPARK      +---------------------------------------------> PC
+       | Ravenscar      |
+       | E/S, parseur,  |
+       | horodatage     |  option : UART -> pont ESP32 -> WiFi (TCP) -> PC
        +-------+--------+
                | GPIO (plus tard : drivers ULN2003)
                v
@@ -741,16 +742,16 @@ une maquette CAO.
 
 | Lien | Portée | Ce que ça demande | Verdict |
 | ---- | ------ | ----------------- | ------- |
-| UART + câble USB | 1–2 m (PC à côté) | un adaptateur USB-UART | **par là qu'on commence** : zéro inconnue, debug facile |
-| **UART → ESP32 → WiFi** | la pièce et ses voisines (un seul émetteur, à mesurer) | un ESP32 en pont « bête », en point d'accès | **la cible** : le PC rejoint le réseau créé par l'ESP32, le serveur de veille reçoit du TCP au lieu du simulateur |
+| UART + câble USB | 1–2 m (PC à côté) | le port série virtuel de la carte de développement | **le choix retenu** : zéro inconnue, debug facile |
+| **UART → ESP32 → WiFi** | la pièce et ses voisines (un seul émetteur, à mesurer) | un ESP32 en pont « bête », en point d'accès | **option**, si le sans-fil devient nécessaire : le PC rejoint le réseau créé par l'ESP32, le serveur de veille reçoit du TCP au lieu du simulateur |
 | BLE | ~10 m | plus de travail, moins de débit | pas utile ici |
 
 Le point d'architecture qui compte : l'ESP32 reste un **pont transparent**
-(UART entrant → TCP sortant, zéro logique radar). Toute l'intelligence reste
-dans le STM32 en Ada, et le pont reste un composant standard de l'industrie
+(UART entrant → TCP sortant, zéro logique radar). Le traitement reste en Ada,
+sur le STM32 et le PC, et le pont reste un composant standard de l'industrie
 (« gateway »).
 
-L'ESP32 fonctionne en **point d'accès** : il crée son propre réseau, sur
+Dans cette option, l'ESP32 fonctionne en **point d'accès** : il crée son propre réseau, sur
 lequel son adresse est fixe (192.168.4.1, valeur par défaut de ce mode) et
 son port TCP fixé par le firmware. Aucun réseau existant n'est nécessaire,
 aucun identifiant de réseau tiers n'entre dans le firmware, et le serveur
