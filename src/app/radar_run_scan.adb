@@ -4,12 +4,14 @@ with Ada.Text_IO;            use Ada.Text_IO;
 with GNAT.Sockets;           use GNAT.Sockets;
 
 with Radar_Cloud;            use Radar_Cloud;
+with Radar_Dwell;
 with Radar_Geometry;         use Radar_Geometry;
 with Radar_Html;             use Radar_Html;
 with Radar_Http;             use Radar_Http;
 with Radar_Sim_Source;       use Radar_Sim_Source;
 with Radar_Source;           use Radar_Source;
 with Radar_Sweep;            use Radar_Sweep;
+with Radar_Turret_Sim;
 
 --  Ce programme melange Ada et HTML/JS : lignes longues assumees.
 pragma Style_Checks ("M300");
@@ -23,7 +25,10 @@ pragma Style_Checks ("M300");
 --  Scan termine, le serveur continue de servir le nuage : il reste
 --  explorable (deplacement ZQSD, clic sur un point pour ses details),
 --  comme le fichier du mode "map".
-procedure Radar_Run_Scan is
+--
+--  Avec Dwell, la passe detaillee suit le plan de Radar_Dwell : meme nombre de
+--  mesures, resserrees sur les objets simules de la scene.
+procedure Radar_Run_Scan (Dwell : Boolean := False) is
 
    Port    : constant := 8080;
    Quick_Step_Ms  : constant := 25;
@@ -40,8 +45,26 @@ procedure Radar_Run_Scan is
 
    Quick_Src : Source'Class :=
      Make_Room_Scan (Quick_Azimuth_Steps, Quick_Elevation_Steps);
-   Detail_Src : Source'Class :=
-     Make_Room_Scan (Detail_Azimuth_Steps, Detail_Elevation_Steps);
+
+   --  Le plan et sa realisation par le moteur, pour la passe adaptative.
+   Plan_Cues  : Radar_Dwell.Cue_List;
+   Plan_Count : Radar_Dwell.Cue_Count := 0;
+   Plan       : Radar_Dwell.Sector_Times :=
+     (others => Radar_Dwell.Nominal_Sector_Us);
+
+   function Make_Detail return Source'Class is
+   begin
+      if not Dwell then
+         return Make_Room_Scan (Detail_Azimuth_Steps, Detail_Elevation_Steps);
+      end if;
+      Scene_Cues (Plan_Cues, Plan_Count);
+      Radar_Dwell.Build (Plan_Cues, Plan_Count, Plan);
+      return Make_Planned_Scan
+        (Radar_Turret_Sim.Realise (Plan),
+         Detail_Azimuth_Steps, Detail_Elevation_Steps);
+   end Make_Detail;
+
+   Detail_Src : Source'Class := Make_Detail;
    Quick_Total : constant Positive := Per_Turn (Quick_Src);
    Detail_Total : constant Positive := Per_Turn (Detail_Src);
    Total : constant Positive := Quick_Total + Detail_Total;
@@ -154,6 +177,9 @@ procedure Radar_Run_Scan is
       L (".opts button{grid-column:1/-1;padding:6px;border:1px solid #355244;background:#101b16;color:#b9d8cc;cursor:pointer}</style></head><body>");
       L ("<div id='info'><b>radar_fw - carte progressive</b>");
       L ("<div style='color:#ffd08a;font-weight:700'>SIMULATION : scene simulee, aucune mesure reelle.</div>");
+      if Dwell then
+         L ("<div style='color:#ffd08a'>Balayage adaptatif : reperes pris sur la position vraie simulee.</div>");
+      end if;
       L ("<div id='status'>connexion...</div><div id='sel'></div>");
       L ("<div class='hint'>Vue rapide en gris, detail ajoute en vert.<br>Glisser : tourner &middot; molette : zoom<br>ZQSD/WASD : se deplacer &middot; R/F : monter/descendre<br>Clic sur un point : details</div>");
       L ("<div class='opts'><label><input id='grid-toggle' type='checkbox' checked> Grille</label>");
@@ -331,6 +357,13 @@ begin
 
    Put_Line ("Mode SCAN : carte rapide puis detaillee sur http://localhost:"
              & Img (Port) & " (Ctrl+C pour arreter).");
+   if Dwell then
+      Put_Line ("Balayage adaptatif : " & Img (Plan_Count)
+                & " cibles, passe de "
+                & F_Img (Radar_Turret_Sim.Pass_Seconds
+                           (Radar_Turret_Sim.Realise (Plan)) * 1_000.0)
+                & " ms avec rampes (simulation).");
+   end if;
 
    Next_Step := Clock;
    loop

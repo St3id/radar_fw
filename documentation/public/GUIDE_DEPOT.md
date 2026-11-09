@@ -38,6 +38,8 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `ravenscar.adc` | impose `pragma Profile (Ravenscar)` et `No_Allocators` à la compilation de la démo | oui |
 | `core_restrictions.adc` | restrictions du cœur embarquable (`No_Allocators`, `No_Exceptions`, pas de `Ada.Text_IO` ni `Ada.Calendar`), branchées par `radar_core.gpr` | oui |
 | `.github/workflows/ci.yml` | l'intégration continue | oui |
+| `scripts/verifier.sh` | la vérification complète en une commande : `obj/` neuf, étapes en série, totaux comparés aux valeurs attendues | oui |
+| `.gitattributes` | impose les fins de ligne LF, y compris sous Windows | oui |
 | `.gitignore`, `.markdownlint.json`, `.vscode/settings.json` | configuration | oui |
 | `out/` | **généré** : les visualiseurs HTML des modes `map` et `track` | non |
 | `obj/` `bin/` `alire/` `config/` `share/` | **généré** : sortie de build Alire/GNAT | non |
@@ -69,10 +71,11 @@ C'est exactement le contenu que compile `radar_core.gpr` pour la cible ARM
 | `radar_ld2450.ads/.adb` | `Radar_Ld2450` | format des trames du LD2450 : codage à bit de signe, encodeur | oui |
 | `radar_ld2450_stream.ads/.adb` | `Radar_Ld2450_Stream` | parseur de flux : fenêtre glissante, resynchronisation, compteurs | oui |
 | `radar_ld2450_plausibility.ads/.adb` | `Radar_Ld2450_Plausibility` | plausibilité des cibles : seuils nommés (hypothèses), compteur par motif | oui |
+| `radar_dwell.ads/.adb` | `Radar_Dwell` | plan de balayage adaptatif : temps de passe réparti à parts égales entre les cibles | oui |
 
 Les unités en `SPARK_Mode => On` du dépôt sont `Radar_Sweep`,
-`Radar_Ld2450`, `Radar_Ld2450_Stream`, `Radar_Ld2450_Plausibility` et
-`Radar_Buffer` (`src/tasking/`). Vérifiable d'une commande :
+`Radar_Ld2450`, `Radar_Ld2450_Stream`, `Radar_Ld2450_Plausibility`,
+`Radar_Dwell` et `Radar_Buffer` (`src/tasking/`). Vérifiable d'une commande :
 `grep -rn "SPARK_Mode" src/`
 
 ### `src/perception/` — voir et suivre : des données brutes aux pistes
@@ -90,7 +93,8 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_ld2450_sim.ads/.adb` | `Radar_Ld2450_Sim` | l'émulateur du LD2450 vu de sa liaison série : octets, imperfections, défauts de liaison |
 | `radar_ld2450_log.ads/.adb` | `Radar_Ld2450_Log` | le format de fichier d'un flux série enregistré : heure de réception + octets |
 | `radar_ld2450_replay.ads/.adb` | `Radar_Ld2450_Replay` | source planaire qui relit ce fichier par le parseur et le filtre de plausibilité |
-| `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes) |
+| `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes), en grille régulière ou selon un plan de balayage |
+| `radar_turret_sim.ads/.adb` | `Radar_Turret_Sim` | le modèle du moteur : ce que les rampes font d'un plan de `Radar_Dwell` |
 | `radar_world.ads/.adb` | `Radar_World` | la vérité terrain : objets mobiles, murs |
 | `radar_detect.ads/.adb` | `Radar_Detect` | détections 3D d'un tour + regroupement spatial |
 | `radar_track.ads/.adb` | `Radar_Track` | le pistage : association, alpha-beta, M-sur-N, fusion |
@@ -150,6 +154,7 @@ d'erreur ont été exécutés). Rien d'autre dans le dépôt n'en dépend.
 | `radar_sar_tests.ads/.adb` | suite 3 : synthèse d'ouverture en arc (finesse, tolérances, repliement) |
 | `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage, émulateur) |
 | `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité, fichier de capture et rejeu) |
+| `radar_dwell_tests.ads/.adb` | suite 6 : balayage adaptatif (parts égales, rampes, gain en mesures et en échos) |
 | `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---
@@ -174,11 +179,14 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
 
 ## 5. Les commandes
 
+    bash scripts/verifier.sh           # tout verifier, depuis un obj/ neuf
+
     alr build                          # compiler l'application
     alr run                            # mode track  -> out/radar_tracking_3d.html
     alr exec -- ./bin/radar_fw map     # mode map    -> out/radar_3d.html
     alr exec -- ./bin/radar_fw live    # mode live   -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan    # mode scan   -> http://localhost:8080
+    alr exec -- ./bin/radar_fw scan --dwell  # idem, balayage adaptatif
     alr exec -- ./bin/radar_fw sar     # mode sar    -> resultats dans la console
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr   # compiler les tests

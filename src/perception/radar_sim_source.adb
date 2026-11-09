@@ -182,7 +182,9 @@ package body Radar_Sim_Source is
          Ghosting     => (others => False),
          Clock        => 0,
          Ms_Per_Step  => Default_Ms_Per_Step,
-         Scene        => Initial_World);
+         Scene        => Initial_World,
+         Planned      => False,
+         Schedule     => (others => 0.0));
    begin
       Roll_Echoes (S);   --  amplitudes du premier tour
       return S;
@@ -227,8 +229,87 @@ package body Radar_Sim_Source is
               Ghosting     => (others => False),
               Clock        => 0,
               Ms_Per_Step  => Default_Ms_Per_Step,
-              Scene        => Empty_World);   --  pas d'objet mobile
+              Scene        => Empty_World,    --  pas d'objet mobile
+              Planned      => False,
+              Schedule     => (others => 0.0));
    end Make_Room_Scan;
+
+   --  La passe commence 30 degres avant l'azimut 0 : c'est la moitie du
+   --  depassement de 60 degres qui garde tout azimut dans le faisceau.
+   Pass_Start_Deg : constant Float :=
+     Float (Radar_Dwell.Pass_Degrees - 360) / 2.0;
+
+   ----------------
+   -- Scene_Cues --
+   ----------------
+
+   procedure Scene_Cues
+     (Cues  : out Radar_Dwell.Cue_List;
+      Count : out Radar_Dwell.Cue_Count)
+   is
+      Scene : constant World := Initial_World;
+   begin
+      Cues  := (others => Radar_Dwell.Sector'First);
+      Count := Natural'Min (Scene.Count, Radar_Dwell.Max_Cues);
+      for I in 1 .. Count loop
+         declare
+            O  : constant Object := Scene.Objects (I);
+            Az : Float := To_Polar ((O.X, O.Y, O.Z)).Azimuth;
+         begin
+            if Az < 0.0 then
+               Az := Az + 360.0;
+            end if;
+            Cues (I) := Radar_Dwell.Sector_Of
+              (Natural'Min (Radar_Dwell.Pass_Degrees - 1,
+                            Natural (Float'Floor (Az + Pass_Start_Deg))));
+         end;
+      end loop;
+   end Scene_Cues;
+
+   -----------------------
+   -- Make_Planned_Scan --
+   -----------------------
+
+   function Make_Planned_Scan
+     (Times    : Radar_Turret_Sim.Realised_Times;
+      Az_Steps : Grid_Steps := 180;
+      El_Steps : Grid_Steps := 24) return Simulated_Source
+   is
+      Pass : constant Float := Radar_Turret_Sim.Pass_Seconds (Times);
+      S    : Simulated_Source :=
+        (Az_Step      => 0,
+         El_Step      => 0,
+         Current_Turn => 0,
+         Max_Turns    => 1,
+         Az_Steps     => Az_Steps,
+         El_Steps     => El_Steps,
+         See_Room     => True,
+         Echoes       => (others => (others => 0)),
+         Ghosting     => (others => False),
+         Clock        => 0,
+         Ms_Per_Step  => Default_Ms_Per_Step,
+         Scene        => Initial_World,
+         Planned      => True,
+         Schedule     => (others => 0.0));
+   begin
+      for Column in 1 .. Az_Steps loop
+         declare
+            Az : Float :=
+              Radar_Turret_Sim.Angle_At
+                (Times, Pass * Float (Column - 1) / Float (Az_Steps))
+              - Pass_Start_Deg;
+         begin
+            if Az < 0.0 then
+               Az := Az + 360.0;
+            elsif Az >= 360.0 then
+               Az := Az - 360.0;
+            end if;
+            S.Schedule (Column) := Az;
+         end;
+      end loop;
+      Roll_Echoes (S);
+      return S;
+   end Make_Planned_Scan;
 
    ----------
    -- Next --
@@ -251,7 +332,8 @@ package body Radar_Sim_Source is
       declare
          --  Direction visee : azimut et elevation.
          Az : constant Float :=
-           Float (Self.Az_Step) * 360.0 / Float (Self.Az_Steps);
+           (if Self.Planned then Self.Schedule (Self.Az_Step + 1)
+            else Float (Self.Az_Step) * 360.0 / Float (Self.Az_Steps));
          El : constant Float :=
            El_Min + Float (Self.El_Step)
                     * (El_Max - El_Min) / Float (Self.El_Steps - 1);
