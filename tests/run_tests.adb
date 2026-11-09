@@ -9,6 +9,7 @@ with Radar_Sar_Tests;
 with Radar_Ld2450_Tests;
 with Radar_Ld2450_Stream_Tests;
 with Radar_Dwell_Tests;
+with Radar_Engine_Tests;
 
 --  Lanceur des tests : construit la suite complete et rend un code de
 --  sortie non nul si un seul cas echoue (assertion fausse ou exception
@@ -31,6 +32,7 @@ procedure Run_Tests is
       S.Add_Test (new Radar_Ld2450_Tests.Test_Case);
       S.Add_Test (new Radar_Ld2450_Stream_Tests.Test_Case);
       S.Add_Test (new Radar_Dwell_Tests.Test_Case);
+      S.Add_Test (new Radar_Engine_Tests.Test_Case);
       return S;
    end Suite;
 

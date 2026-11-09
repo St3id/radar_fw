@@ -19,7 +19,7 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
-| Tests | **71 tests AUnit**, rejoués à chaque commit |
+| Tests | **74 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -264,7 +264,7 @@ carte, cette compilation ne dit rien.
 
 ## Tests
 
-**71 tests AUnit** répartis en six suites :
+**74 tests AUnit** répartis en sept suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes d'un moteur
@@ -289,7 +289,9 @@ carte, cette compilation ne dit rien.
   de 1 à 29, bit faux dans l'en-tête ou la fin, troncature, réponses de commande, un
   million d'octets aléatoires, trames noyées dans le bruit, émulateur avec défauts ;
   plausibilité : cible vide, un compteur par motif, porte de saut, 768 bits inversés ;
-  rejeu d'un fichier généré, silence et fin distingués, fichiers abîmés.
+  rejeu d'un fichier généré, silence et fin distingués, fichiers abîmés ;
+- moteur de la console, sans fenêtre : une trame attend son heure, chaque trame passe une
+  fois, un silence n'est pas la fin.
 
 Compiler puis lancer les suites :
 

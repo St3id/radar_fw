@@ -125,6 +125,7 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_run_live.adb` | mode `live` — serveur temps réel |
 | `radar_run_scan.adb` | mode `scan` — serveur, cartographie progressive |
 | `radar_run_sar.adb` | mode `sar` — synthèse d'ouverture simulée, résultats en texte |
+| `radar_engine.ads/.adb` | `Radar_Engine` : avance une source planaire à l'heure de ses trames, sans fenêtre ni socket |
 | `radar_http.ads/.adb` | `Radar_Http` : le serveur HTTP en Ada, partagé par `live` et `scan` |
 | `radar_html.ads/.adb` | `Radar_Html` : helpers de sérialisation |
 
@@ -155,6 +156,7 @@ d'erreur ont été exécutés). Rien d'autre dans le dépôt n'en dépend.
 | `radar_ld2450_tests.ads/.adb` | suite 4 : module LD2450 (trames du manuel octet pour octet, codage, émulateur) |
 | `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité, fichier de capture et rejeu) |
 | `radar_dwell_tests.ads/.adb` | suite 6 : balayage adaptatif (parts égales, rampes, gain en mesures et en échos) |
+| `radar_engine_tests.ads/.adb` | suite 7 : moteur de la console (heure des trames, silences, fin), sans fenêtre |
 | `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---
