@@ -22,3 +22,10 @@ id_rsa*
 
 # Artefact du serveur de langage Ada
 /.als-alire
+
+# Crate de la console (GtkAda) : memes dossiers generes
+/console/obj/
+/console/bin/
+/console/alire/
+/console/config/
+/console/dist/

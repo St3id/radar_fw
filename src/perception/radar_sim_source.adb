@@ -55,6 +55,11 @@ package body Radar_Sim_Source is
    --  d'une execution a l'autre (CI, comparaisons, mise au point).
    Gen : Ada.Numerics.Float_Random.Generator;
 
+   procedure Restart_Random is
+   begin
+      Ada.Numerics.Float_Random.Reset (Gen, 42);
+   end Restart_Random;
+
    --  Re-tire les amplitudes de tous les reflecteurs pour un tour.
    procedure Roll_Echoes (Self : in out Simulated_Source) is
    begin

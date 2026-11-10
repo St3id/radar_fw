@@ -1,9 +1,20 @@
 package body Radar_Engine is
 
-   procedure Start (E : out Engine) is
+   procedure Start
+     (E      : out Engine;
+      Params : Radar_Track_2D.Parameters :=
+        Radar_Track_2D.Default_Parameters) is
    begin
-      E := (Snap => (State => Running, others => <>), others => <>);
+      E := (Snap   => (State => Running, others => <>),
+            Params => Params,
+            others => <>);
    end Start;
+
+   procedure Set_Params
+     (E : in out Engine; Params : Radar_Track_2D.Parameters) is
+   begin
+      E.Params := Params;
+   end Set_Params;
 
    procedure Step
      (E      : in out Engine;
@@ -35,10 +46,15 @@ package body Radar_Engine is
          E.Snap.Last_Report  := E.Pending;
          E.Snap.Has_Report   := True;
          E.Snap.Frames_Shown := E.Snap.Frames_Shown + 1;
+         E.Snap.Shown_At     := Now;
          E.Has_Pending       := False;
+         Radar_Track_2D.Update (E.Snap.Tracker, E.Pending, E.Params);
       end if;
    end Step;
 
    function Last (E : Engine) return Snapshot is (E.Snap);
+
+   function Age_Ms (E : Engine; Now : Time_Ms) return Time_Ms is
+     (if Now > E.Snap.Shown_At then Now - E.Snap.Shown_At else 0);
 
 end Radar_Engine;

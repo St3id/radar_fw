@@ -1,3 +1,4 @@
+with Radar_Ld2450;
 with Radar_Ld2450_Log;
 with Radar_Ld2450_Plausibility;
 with Radar_Ld2450_Stream;
@@ -35,6 +36,13 @@ package Radar_Ld2450_Replay is
 
    type Replay_Source is new Radar_Planar_Source.Planar_Source with private;
 
+   --  Des unites du module (cm/s) a celles du contrat 2D (mm/s). Public :
+   --  l'emulateur branche en direct passe par la meme conversion.
+   function To_Report
+     (Raw    : Radar_Ld2450.Raw_Report;
+      Stamp  : Radar_Source.Time_Ms;
+      Sensor : Positive) return Radar_Planar_Source.Planar_Report;
+
    --  Ok = False si le fichier n'est pas lisible ou n'est pas au format :
    --  la source n'a alors rien a livrer (Has_More = False).
    procedure Open
@@ -59,6 +67,8 @@ package Radar_Ld2450_Replay is
    function Checks
      (Self : Replay_Source) return Radar_Ld2450_Plausibility.Validator;
    function Silences (Self : Replay_Source) return Natural;
+   function Origin
+     (Self : Replay_Source) return Radar_Ld2450_Log.Capture_Origin;
    function Stop_Reason
      (Self : Replay_Source) return Radar_Ld2450_Log.Read_Status;
 
@@ -79,7 +89,9 @@ private
       Stopped       : Radar_Ld2450_Log.Read_Status :=
         Radar_Ld2450_Log.Chunk_Ok;
       Sensor        : Positive := 1;
-      Parser        : Radar_Ld2450_Stream.Parser;
+      From          : Radar_Ld2450_Log.Capture_Origin :=
+        Radar_Ld2450_Log.Origin_Unknown;
+      Parser       : Radar_Ld2450_Stream.Parser;
       Filter        : Radar_Ld2450_Plausibility.Validator;
    end record;
 

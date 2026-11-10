@@ -94,7 +94,8 @@ begin
          return;
       end if;
 
-      Radar_Ld2450_Log.Create (Log, Path, Ok);
+      Radar_Ld2450_Log.Create
+        (Log, Path, Radar_Ld2450_Log.Origin_Hardware, Ok);
       if not Ok then
          Put_Line (Standard_Error, "Fichier " & Path & " non cree");
          Radar_Serial_Win32.Close (Port);

@@ -91,6 +91,8 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_target_source.ads` | `Radar_Target_Source` | le contrat pour les frames de détections déjà calculées en 3D |
 | `radar_planar_source.ads` | `Radar_Planar_Source` | le contrat pour les rapports planaires (x, y sans altitude) d'un capteur comme le LD2450 |
 | `radar_ld2450_sim.ads/.adb` | `Radar_Ld2450_Sim` | l'émulateur du LD2450 vu de sa liaison série : octets, imperfections, défauts de liaison |
+| `radar_ld2450_sim_source.ads/.adb` | `Radar_Ld2450_Sim_Source` | l'émulateur branché en direct par le parseur et le filtre, enregistrement marqué émulé |
+| `radar_track_2d.ads/.adb` | `Radar_Track_2D` | le pistage dans le plan du capteur, sans altitude inventée |
 | `radar_ld2450_log.ads/.adb` | `Radar_Ld2450_Log` | le format de fichier d'un flux série enregistré : heure de réception + octets |
 | `radar_ld2450_replay.ads/.adb` | `Radar_Ld2450_Replay` | source planaire qui relit ce fichier par le parseur et le filtre de plausibilité |
 | `radar_sim_source.ads/.adb` | `Radar_Sim_Source` | la source simulée (bruit, fading simplifié, fantômes), en grille régulière ou selon un plan de balayage |
@@ -125,7 +127,12 @@ l'instant simulée (ARCHITECTURE §2.9).
 | `radar_run_live.adb` | mode `live` — serveur temps réel |
 | `radar_run_scan.adb` | mode `scan` — serveur, cartographie progressive |
 | `radar_run_sar.adb` | mode `sar` — synthèse d'ouverture simulée, résultats en texte |
-| `radar_engine.ads/.adb` | `Radar_Engine` : avance une source planaire à l'heure de ses trames, sans fenêtre ni socket |
+| `radar_engine.ads/.adb` | `Radar_Engine` : avance une source planaire à l'heure de ses trames et tient son pistage 2D, sans fenêtre ni socket |
+| `radar_modes.ads/.adb` | `Radar_Modes` : combinaisons source / activité permises, et ce que l'écran peut affirmer de l'origine des données |
+| `radar_settings.ads/.adb` | `Radar_Settings` : réglages bornés de la console, fichier clé=valeur |
+| `radar_view.ads/.adb` | `Radar_View` : projection à l'écran, plan et 3D, sélection au clic |
+| `radar_map_engine.ads/.adb` | `Radar_Map_Engine` : cartographie progressive, une colonne par pas |
+| `radar_watch_3d.ads/.adb` | `Radar_Watch_3D` : veille sur profils simulés, découpée en petits pas, recalibration |
 | `radar_http.ads/.adb` | `Radar_Http` : le serveur HTTP en Ada, partagé par `live` et `scan` |
 | `radar_html.ads/.adb` | `Radar_Html` : helpers de sérialisation |
 
@@ -138,6 +145,19 @@ d'erreur ont été exécutés). Rien d'autre dans le dépôt n'en dépend.
 | ------- | ---- |
 | `radar_ld2450_record.adb` | l'outil : copie un port série vers un fichier de capture |
 | `radar_serial_win32.ads/.adb` | `Radar_Serial_Win32` : lecture du port à 256 000 bauds par l'API Windows |
+
+### `console/` — l'application native GtkAda
+
+Une crate Alire à part : GTK n'entre ni dans `radar_fw.gpr`, ni dans le cœur, ni dans la
+CI Ubuntu. La fenêtre affiche et transmet ; les décisions restent dans `src/`.
+
+| Fichier | Rôle |
+| ------- | ---- |
+| `alire.toml`, `radar_console.gpr` | la crate et son projet, `radar_fw` en dépendance locale |
+| `src/console_ui.ads/.adb` | la fenêtre : bandeau, vues, parcours source / activité, dessin Cairo |
+| `src/console_serial.ads/.adb` | le LD2450 en direct : tâche de lecture, tampon borné. **Non validé sur matériel** |
+| `src/console_sar.ads/.adb` | l'analyse SAR en tâche de fond, texte capturé |
+| `empaqueter.sh` | fabrique `console/dist/`, lançable sans Alire ni MSYS2 |
 
 ### `src/demo/`
 
@@ -157,6 +177,7 @@ d'erreur ont été exécutés). Rien d'autre dans le dépôt n'en dépend.
 | `radar_ld2450_stream_tests.ads/.adb` | suite 5 : flux LD2450 (parseur sur flux abîmés, plausibilité, fichier de capture et rejeu) |
 | `radar_dwell_tests.ads/.adb` | suite 6 : balayage adaptatif (parts égales, rampes, gain en mesures et en échos) |
 | `radar_engine_tests.ads/.adb` | suite 7 : moteur de la console (heure des trames, silences, fin), sans fenêtre |
+| `radar_console_tests.ads/.adb` | suite 8 : ce qui sert la console sans GTK (origine des captures, pistage 2D, réglages, vues) |
 | `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---
@@ -175,7 +196,8 @@ sous-ensemble différent, pour une raison différente.
 | `radar_ld2450_record.gpr` | `tools` + `core` + `perception` | l'enregistreur du flux série : le port reste hors de l'application et du cœur |
 
 Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
-`radar_fw.gpr` là.
+`radar_fw.gpr` là. La console a son propre projet, `console/radar_console.gpr`, hors de
+ces cinq : voir §3.
 
 ---
 
@@ -204,6 +226,8 @@ Ils restent à la racine : c'est la convention Alire, `alr` s'attend à trouver
 
     alr exec -- gprbuild -p -P radar_ld2450_record.gpr      # l'enregistreur (Windows)
     alr exec -- ./bin/radar_ld2450_record COM3 out/capture.ld2450 60
+
+    bash console/empaqueter.sh         # console/dist/radar_console.exe
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
 `live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`

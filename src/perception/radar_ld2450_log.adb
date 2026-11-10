@@ -11,15 +11,21 @@ package body Radar_Ld2450_Log is
    -- Create --
    ------------
 
-   procedure Create (W : in out Writer; Path : String; Ok : out Boolean) is
-      Head : Stream_Element_Array (1 .. Magic'Length);
+   procedure Create
+     (W      : in out Writer;
+      Path   : String;
+      Origin : Capture_Origin;
+      Ok     : out Boolean)
+   is
+      Head : Stream_Element_Array (1 .. Magic'Length + 1);
    begin
       Stream_IO.Create (W.File, Stream_IO.Out_File, Path);
-      for I in Head'Range loop
+      for I in 1 .. Stream_Element_Offset (Magic'Length) loop
          Head (I) :=
            Stream_Element
              (Character'Pos (Magic (Magic'First + Integer (I) - 1)));
       end loop;
+      Head (Head'Last) := (if Origin = Origin_Emulated then 1 else 2);
       Stream_IO.Write (W.File, Head);
       Ok := True;
    exception
@@ -75,15 +81,29 @@ package body Radar_Ld2450_Log is
      (Path    : String;
       Content : out Byte_Vectors.Vector;
       Next    : out Positive;
+      Origin  : out Capture_Origin;
       Ok      : out Boolean)
    is
       File  : Stream_IO.File_Type;
       Block : Stream_Element_Array (1 .. 4_096);
       Last  : Stream_Element_Offset;
+
+      function Starts_With (Head : String) return Boolean is
+      begin
+         for I in Head'Range loop
+            if Integer (Content.Element (I - Head'First + 1))
+                 /= Character'Pos (Head (I))
+            then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Starts_With;
    begin
       Content.Clear;
-      Next := Magic'Length + 1;
-      Ok   := False;
+      Next   := Magic'Length + 1;
+      Origin := Origin_Unknown;
+      Ok     := False;
 
       Stream_IO.Open (File, Stream_IO.In_File, Path);
       loop
@@ -98,14 +118,18 @@ package body Radar_Ld2450_Log is
       if Natural (Content.Length) < Magic'Length then
          return;
       end if;
-      for I in Magic'Range loop
-         if Integer (Content.Element (I - Magic'First + 1))
-              /= Character'Pos (Magic (I))
-         then
-            return;
-         end if;
-      end loop;
-      Ok := True;
+      if Starts_With (Magic_V1) then
+         Ok := True;
+      elsif Starts_With (Magic)
+        and then Natural (Content.Length) > Magic'Length
+        and then Integer (Content.Element (Magic'Length + 1)) in 1 .. 2
+      then
+         Origin :=
+           (if Integer (Content.Element (Magic'Length + 1)) = 1
+            then Origin_Emulated else Origin_Hardware);
+         Next := Magic'Length + 2;
+         Ok   := True;
+      end if;
    exception
       when Ada.IO_Exceptions.Name_Error
          | Ada.IO_Exceptions.Use_Error

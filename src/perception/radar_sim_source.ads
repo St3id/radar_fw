@@ -48,6 +48,10 @@ package Radar_Sim_Source is
      (Az_Steps : Grid_Steps := 180;
       El_Steps : Grid_Steps := 24) return Simulated_Source;
 
+   --  Le generateur du paquet est global : sans cet appel, relancer une
+   --  activite dans le meme processus ne rejouerait pas la meme suite.
+   procedure Restart_Random;
+
    --  Les reperes de Radar_Dwell tires de la position VRAIE des objets de la
    --  scene : la simulation se passe d'un capteur de veille, qu'un systeme
    --  reel devra fournir (pistes LD2450 ou passe precedente).

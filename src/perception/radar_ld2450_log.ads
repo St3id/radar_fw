@@ -12,7 +12,8 @@ with Radar_Source;
 --
 --  Format, tous les entiers en petit-boutiste :
 --
---     8 octets   "RFWLD2S1" (identifie le format et sa version)
+--     8 octets   "RFWLD2S2" (identifie le format et sa version)
+--     1 octet    d'ou viennent les octets : 1 emulateur, 2 materiel
 --     puis des blocs, jusqu'a la fin du fichier :
 --        4 octets   heure de reception, en ms depuis le debut (0 .. 2**31-1)
 --        2 octets   nombre d'octets du bloc, L (0 .. 4 096)
@@ -26,11 +27,18 @@ with Radar_Source;
 --  le module : elle inclut la latence de l'adaptateur USB-serie, non
 --  mesuree, et plusieurs trames arrivees ensemble partagent la meme heure.
 --
+--  L'octet d'origine existe pour l'affichage : sans lui, un fichier emule
+--  rejoue ressemble a une vraie capture. "RFWLD2S1" (sans cet octet) reste
+--  lisible, et son origine est inconnue : on ne devine pas.
+--
 --  Hors de src/core : fichiers et conteneurs n'existent pas sur la carte.
 
 package Radar_Ld2450_Log is
 
-   Magic : constant String := "RFWLD2S1";
+   Magic    : constant String := "RFWLD2S2";
+   Magic_V1 : constant String := "RFWLD2S1";
+
+   type Capture_Origin is (Origin_Unknown, Origin_Emulated, Origin_Hardware);
 
    Max_Chunk_Bytes : constant := 4_096;
 
@@ -39,7 +47,12 @@ package Radar_Ld2450_Log is
    type Writer is limited private;
 
    --  Ok = False si le fichier ne peut pas etre cree.
-   procedure Create (W : in out Writer; Path : String; Ok : out Boolean);
+   procedure Create
+     (W      : in out Writer;
+      Path   : String;
+      Origin : Capture_Origin;
+      Ok     : out Boolean)
+     with Pre => Origin /= Origin_Unknown;
 
    --  Ajoute un bloc et force son ecriture : une capture interrompue perd
    --  au plus le bloc en cours. Peut lever les exceptions de Stream_IO
@@ -68,12 +81,13 @@ package Radar_Ld2450_Log is
       Malformed);      --  heure ou longueur hors du format
 
    --  Charge tout le fichier en memoire. Ok = False si le fichier n'existe
-   --  pas, ne peut pas etre lu, ou ne commence pas par Magic. Next rend alors
-   --  la position du premier bloc.
+   --  pas, ne peut pas etre lu, ou ne commence par aucun en-tete connu. Next
+   --  rend alors la position du premier bloc.
    procedure Load
      (Path    : String;
       Content : out Byte_Vectors.Vector;
       Next    : out Positive;
+      Origin  : out Capture_Origin;
       Ok      : out Boolean);
 
    --  Lit l'entete de bloc a la position Next. Si Status = Chunk_Ok, le bloc

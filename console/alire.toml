@@ -1,0 +1,19 @@
+name = "radar_console"
+description = "Console native GtkAda du radar_fw : piloter, regler, visualiser"
+version = "0.1.0-dev"
+
+authors = ["Boles Lucas"]
+maintainers = ["Boles Lucas <199652347+St3id@users.noreply.github.com>"]
+maintainers-logins = ["St3id"]
+licenses = "MIT"
+
+executables = ["radar_console"]
+
+[[depends-on]]
+gtkada = "^26.0.0"
+
+[[depends-on]]
+radar_fw = "*"
+
+[[pins]]
+radar_fw = { path = ".." }

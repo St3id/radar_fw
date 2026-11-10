@@ -1087,9 +1087,12 @@ quatre trames, pas un taux de détection sur un module réel.
 
 **Rejouer une capture.** `Radar_Ld2450_Log` définit un fichier qui garde les
 octets tels qu'ils sont arrivés, parasites compris, avec leur heure de
-réception : 8 octets `RFWLD2S1`, puis des blocs (heure en ms sur 4 octets,
-longueur `L` sur 2 octets, `L` octets), en petit-boutiste. Un bloc vide dit que
-la liaison était ouverte et que rien n'est arrivé. `Radar_Ld2450_Replay`
+réception : 8 octets `RFWLD2S2`, un octet d'origine (1 émulateur, 2 matériel),
+puis des blocs (heure en ms sur 4 octets, longueur `L` sur 2 octets, `L`
+octets), en petit-boutiste. L'origine existe pour l'affichage : sans elle, un
+fichier émulé rejoué ressemble à une vraie capture. Un ancien fichier
+`RFWLD2S1`, sans cet octet, reste lisible et son origine reste inconnue. Un bloc
+vide dit que la liaison était ouverte et que rien n'est arrivé. `Radar_Ld2450_Replay`
 relit ce fichier par le même parseur et le même filtre, et implémente
 `Radar_Planar_Source` : `x`, `y` et la vitesse, rien de plus, sans altitude. Le
 contrat distingue déjà la fin du silence : `Available = False` avec

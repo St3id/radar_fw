@@ -1,5 +1,6 @@
 with Radar_Planar_Source; use Radar_Planar_Source;
 with Radar_Source;        use Radar_Source;
+with Radar_Track_2D;
 
 --  Radar_Engine : ce qui fait avancer les donnees, sans fenetre ni socket.
 --  Une interface appelle Step et lit Last ; un test fait pareil, sans GTK.
@@ -16,11 +17,20 @@ package Radar_Engine with SPARK_Mode => Off is
       Last_Report  : Planar_Report;
       Has_Report   : Boolean := False;
       Frames_Shown : Natural := 0;
+      Shown_At     : Time_Ms := 0;
+      Tracker      : Radar_Track_2D.Tracker;
    end record;
 
    type Engine is private;
 
-   procedure Start (E : out Engine);
+   procedure Start
+     (E      : out Engine;
+      Params : Radar_Track_2D.Parameters :=
+        Radar_Track_2D.Default_Parameters);
+
+   --  Prend effet a la trame suivante, sans perdre les pistes.
+   procedure Set_Params
+     (E : in out Engine; Params : Radar_Track_2D.Parameters);
 
    --  Now vient de l'appelant, et sur la meme base de temps que les Stamp :
    --  un rejeu suit l'heure de la capture, un test deroule 10 s d'un coup.
@@ -35,12 +45,16 @@ package Radar_Engine with SPARK_Mode => Off is
 
    function Last (E : Engine) return Snapshot;
 
+   --  Temps ecoule depuis la derniere trame montree, sur la base de Now.
+   function Age_Ms (E : Engine; Now : Time_Ms) return Time_Ms;
+
 private
 
    type Engine is record
       Snap        : Snapshot;
       Pending     : Planar_Report;
       Has_Pending : Boolean := False;
+      Params      : Radar_Track_2D.Parameters;
    end record;
 
 end Radar_Engine;

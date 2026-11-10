@@ -737,7 +737,7 @@ package body Radar_Ld2450_Stream_Tests is
       Ok : Boolean;
    begin
       Ada.Directories.Create_Path (Test_Dir);
-      Radar_Ld2450_Log.Create (W, Path, Ok);
+      Radar_Ld2450_Log.Create (W, Path, Radar_Ld2450_Log.Origin_Emulated, Ok);
       Assert (Ok, "Impossible de creer " & Path);
    end Start_Log;
 

@@ -1,13 +1,9 @@
-with Radar_Ld2450;
-
 package body Radar_Ld2450_Replay is
 
    use Radar_Ld2450;
    use type Radar_Ld2450_Log.Read_Status;
    use type Radar_Source.Time_Ms;
 
-   --  Passe d'un rapport du module, dans ses unites, a un rapport du
-   --  contrat 2D : la vitesse passe des cm/s du module aux mm/s du projet.
    function To_Report
      (Raw    : Raw_Report;
       Stamp  : Radar_Source.Time_Ms;
@@ -52,7 +48,7 @@ package body Radar_Ld2450_Replay is
    begin
       Self := Fresh;
       Self.Sensor := Sensor;
-      Radar_Ld2450_Log.Load (Path, Self.Content, First_Block, Ok);
+      Radar_Ld2450_Log.Load (Path, Self.Content, First_Block, Self.From, Ok);
       Self.Next_Block := First_Block;
       Self.Finished   := not Ok;
       if not Ok then
@@ -182,6 +178,10 @@ package body Radar_Ld2450_Replay is
 
    function Silences (Self : Replay_Source) return Natural is
      (Self.Silence_Count);
+
+   function Origin
+     (Self : Replay_Source) return Radar_Ld2450_Log.Capture_Origin is
+     (Self.From);
 
    -----------------
    -- Stop_Reason --

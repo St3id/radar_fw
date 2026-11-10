@@ -1,0 +1,36 @@
+with "config/radar_console_config.gpr";
+with "gtkada.gpr";
+with "radar_fw.gpr";
+
+project Radar_Console is
+
+   --  Une crate a part : GTK reste hors de radar_fw.gpr, du coeur et de la
+   --  CI Ubuntu. Le port serie vient de src/tools, propre a Windows.
+   for Source_Dirs use ("src/", "../src/tools", "config/");
+   for Excluded_Source_Files use ("radar_ld2450_record.adb");
+   for Object_Dir use "obj/" & Radar_Console_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("radar_console.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        Radar_Console_Config.Ada_Compiler_Switches;
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");
+   end Binder;
+
+   package Linker is
+      --  En tete : les bibliotheques C de la toolchain GNAT doivent passer
+      --  avant celles de MSYS2 qu'amene GTK. Sinon l'exe compile, puis meurt
+      --  au demarrage, pile debordee dans _onexit (C00000FD), sans un mot.
+      --  -mwindows : pas de fenetre noire derriere l'interface.
+      for Default_Switches ("Ada") use
+        ("-L" & external ("GNAT_NATIVE_ALIRE_PREFIX", "")
+         & "/lib/gcc/x86_64-w64-mingw32/15.2.0",
+         "-mwindows");
+   end Linker;
+
+end Radar_Console;

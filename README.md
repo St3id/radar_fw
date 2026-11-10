@@ -19,7 +19,7 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
-| Tests | **74 tests AUnit**, rejoués à chaque commit |
+| Tests | **86 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -27,7 +27,18 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 
 ## Ce que fait le programme
 
-Cinq modes, tous sur simulation :
+`console/` contient une application native GtkAda qui regroupe tout ça dans une fenêtre :
+on choisit une source (capteur LD2450, fichier de capture, simulation LD2450, simulation
+3D), une activité (veille, cartographie, analyse SAR), puis Démarrer. Le pistage dans le
+plan du LD2450 tourne sur l'émulateur et sur les captures. Le port série est **non validé
+sur matériel** : seul le port absent a été exécuté. Une donnée émulée reste marquée
+SIMULÉ, y compris quand on rejoue son fichier.
+
+Pour fabriquer un dossier qui se lance sans Alire ni MSYS2 (65 Mo) :
+
+    bash console/empaqueter.sh    # puis console/dist/radar_console.exe
+
+Sans fenêtre, cinq modes en ligne de commande, tous sur simulation :
 
     alr run                          # track : rejeu du pistage (defaut)
     alr exec -- ./bin/radar_fw map   # cartographie -> out/radar_3d.html
@@ -264,7 +275,7 @@ carte, cette compilation ne dit rien.
 
 ## Tests
 
-**74 tests AUnit** répartis en sept suites :
+**86 tests AUnit** répartis en huit suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes d'un moteur
@@ -291,7 +302,10 @@ carte, cette compilation ne dit rien.
   plausibilité : cible vide, un compteur par motif, porte de saut, 768 bits inversés ;
   rejeu d'un fichier généré, silence et fin distingués, fichiers abîmés ;
 - moteur de la console, sans fenêtre : une trame attend son heure, chaque trame passe une
-  fois, un silence n'est pas la fin.
+  fois, un silence n'est pas la fin ;
+- console sans GTK : origine des captures, ce que l'écran peut affirmer, capture émulée
+  rejouée en entier, pistage 2D (confirmation, vitesse, extrapolation, temps), réglages
+  bornés, géométrie d'écran et clic, cartographie pas à pas, recalibration sans relance.
 
 Compiler puis lancer les suites :
 
