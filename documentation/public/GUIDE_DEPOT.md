@@ -211,7 +211,7 @@ ces cinq : voir §3.
     alr exec -- ./bin/radar_fw live    # mode live   -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan    # mode scan   -> http://localhost:8080
     alr exec -- ./bin/radar_fw scan --dwell  # idem, balayage adaptatif
-    alr exec -- ./bin/radar_fw sar     # mode sar    -> resultats dans la console
+    alr exec -- ./bin/radar_fw sar     # mode sar    -> resultats dans le terminal
 
     alr exec -- gprbuild -p -P radar_fw_tests.gpr   # compiler les tests
     alr exec -- ./bin/run_tests                     # les lancer
@@ -232,7 +232,7 @@ ces cinq : voir §3.
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
 `live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`
-n'écrit rien : il affiche ses mesures dans la console.
+n'écrit rien : il affiche ses mesures dans le terminal.
 
 ---
 

@@ -316,9 +316,10 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    ce qu'il voulait envoyer comme vérité : distance oblique, champ de ±60°,
    portée selon l'angle, trois cibles au plus, jitter, pertes, fantômes et
    défauts de liaison (octet abîmé, silence, redémarrage). Il remplace le
-   port série, pas le décodeur : le parseur de trames et le pistage planaire
-   restent à écrire, et seront éprouvés contre cet émulateur **et** contre
-   les trames du manuel (§2.6).
+   port série, pas le décodeur : le parseur de trames (`Radar_Ld2450_Stream`)
+   et le pistage planaire (`Radar_Track_2D`) sont éprouvés contre cet
+   émulateur **et** contre les trames du manuel (§2.6), jamais encore contre
+   un module réel.
 8. **Cartographie progressive** — **mise en œuvre en deux résolutions.** Le
    mode `scan` commence par une couverture globale de 60 × 8 directions, puis
    ajoute une passe détaillée de 180 × 24. Dans la démo, une colonne prend
@@ -348,8 +349,8 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
   physique, ni l'espacement d'échantillons garanti par l'A121.
 - Les deux familles d'entrée sont séparées : `Radar_Source` transporte les
   profils ; `Radar_Target_Source` transporte des frames déjà calculées en
-  3D. Le LD2450 ne fournit qu'une position planaire dans le contrat étudié :
-  il lui manque encore un rapport 2D et un pistage 2D explicites.
+  3D. Le LD2450 ne fournit qu'une position planaire : il a son rapport 2D
+  (`Radar_Planar_Source`) et son pistage 2D (`Radar_Track_2D`).
 - « Pas de FFT lourde sur le MCU, le PC fait le rendu » : c'est aussi le
   partage des rôles des projets amateurs aboutis (Forstén).
 
@@ -399,8 +400,8 @@ traitement de profils sur simulation, puis remplacer le producteur A121 sans
 réécrire le pipeline. `Radar_Target_Source` est la frontière séparée pour
 les rapports déjà calculés, à condition qu'ils soient honnêtement
 représentables en 3D. Le LD2450 reste une source planaire : son type
-d'observation 2D existe (`Radar_Planar_Source`), mais avant de l'utiliser pour
-le suivi rapide, il faut encore un filtre de piste 2D. Poser `z = 0` dans
+d'observation 2D (`Radar_Planar_Source`) alimente un filtre de piste 2D
+(`Radar_Track_2D`), pas le pistage 3D. Poser `z = 0` dans
 `Frame` ferait passer une convention
 de dessin pour une mesure d'altitude. Chaque flux matériel devra avoir un
 équivalent simulé avec le même sens physique ; la fusion se fera ensuite dans
@@ -1300,8 +1301,8 @@ une carte dense des murs ; le profil A121 donne la matière pour cartographier,
 mais son axe mécanique ne peut pas suivre une personne avec une cadence
 comparable. Les réunir dans un faux format `Sweep` ferait perdre les
 différences de dimension, de vitesse et de confiance. Les positions LD2450
-sont planaires et ont leur propre contrat (`Radar_Planar_Source`) : leur
-suivi rapide demande encore un filtre de piste 2D, sans altitude inventée.
+sont planaires et ont leur propre contrat (`Radar_Planar_Source`) et leur
+propre filtre de piste 2D (`Radar_Track_2D`), sans altitude inventée.
 Une couronne de modules peut couvrir plus
 large, mais le chevauchement en 24 GHz et la fusion des repères restent à
 mesurer avant de figer leur nombre.
@@ -1331,10 +1332,11 @@ une propriété déjà fournie par les deux contrats de source.
 **Limite actuelle :** le mode `scan` et le mode `live` restent deux
 démonstrations séparées, sans capteurs réels ni ordonnanceur commun. Le mode
 `live`, fondé sur des profils, simule un tour toutes les 840 ms et met à jour
-les pistes à la fin du tour ; il ne démontre donc pas un suivi rapide matériel. La
-prochaine intégration doit raccorder le flux planaire à un filtre 2D, garder
-`Radar_Target_Source` pour les rapports réellement 3D, puis faire tourner le
-suivi prioritaire et le scan de détail en parallèle.
+les pistes à la fin du tour ; il ne démontre donc pas un suivi rapide matériel. Le
+flux planaire est raccordé à son filtre 2D dans la console (`Radar_Engine`, une
+trame par appel, à l'heure de la trame), pas encore dans `radar_fw live`. Restent
+à garder `Radar_Target_Source` pour les rapports réellement 3D, puis à faire
+tourner le suivi prioritaire et le scan de détail en parallèle.
 
 **Afficher vite, sans saccade.** La fluidité d'une vue 3D dans le navigateur
 tient moins à l'outil qu'à quelques règles, que les visualiseurs de nuages de

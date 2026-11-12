@@ -3,8 +3,8 @@
 [![Build, Test & Prove](https://github.com/St3id/radar_fw/actions/workflows/ci.yml/badge.svg)](https://github.com/St3id/radar_fw/actions/workflows/ci.yml)
 
 Une chaîne de traitement radar 3D en Ada et SPARK. Elle détecte, suit plusieurs
-cibles et affiche le résultat en 3D dans le navigateur. La détection est prouvée
-formellement.
+cibles et affiche le résultat en 3D, dans une console native GtkAda ou dans des
+pages HTML. La détection est prouvée formellement.
 
 Aucun capteur n'est branché pour l'instant : tout tourne sur une source simulée,
 derrière l'interface où viendra le vrai capteur. Le cœur cross-compile déjà pour
@@ -95,15 +95,17 @@ Les données entrent par un contrat qui dépend de ce que sort le capteur :
   remplacera la simulation sans réécrire le traitement.
 - `Radar_Target_Source` pour des positions 3D déjà calculées. Aucun adaptateur
   matériel ne l'utilise encore.
-- `Radar_Planar_Source` pour un capteur qui ne donne que x/y, comme le LD2450. Il
-  attend un pistage planaire, encore à faire : on ne lui invente pas d'altitude.
+- `Radar_Planar_Source` pour un capteur qui ne donne que x/y, comme le LD2450.
+  `Radar_Track_2D` le piste dans le plan, sans altitude inventée ; seule la console
+  s'en sert, `radar_fw live` reste sur les balayages.
 
 Côté LD2450, le format de trame est codé et prouvé dans le cœur embarquable
 (`Radar_Ld2450`) et un émulateur simule la liaison série (`Radar_Ld2450_Sim`). Le
 parseur de flux (`Radar_Ld2450_Stream`, prouvé) et le filtre de plausibilité
-existent. `Radar_Ld2450_Replay` livre des rapports planaires depuis un fichier
-d'octets enregistrés : c'est la seule source concrète de ce contrat, et elle n'a
-encore jamais relu une capture réelle.
+existent. Trois sources livrent des rapports planaires : `Radar_Ld2450_Replay`
+depuis un fichier d'octets enregistrés, `Radar_Ld2450_Sim_Source` depuis l'émulateur
+en direct, et `Console_Serial` depuis le port série. Aucune n'a encore vu de capture
+réelle.
 
 Ensuite vient la perception 3D :
 
@@ -180,9 +182,10 @@ Reste à faire :
       du port et 256 000 bauds restent à essayer. Le parseur, les seuils de
       plausibilité, l'heure de réception, le côté du `x` positif et le sens de la
       vitesse n'ont jamais vu de vraie trame.
-- [ ] Pistage 2D du LD2450 (le format, le parseur, le type de rapport planaire et
-      l'émulateur existent). Le type 3D reste réservé aux mesures qui ont vraiment une
-      altitude. La fusion viendra après, avec horloges et poses calibrées.
+- [ ] Pistage 2D du LD2450 dans `radar_fw live` : il tourne dans la console, sur
+      l'émulateur et les captures, ses seuils restent des hypothèses. Le type 3D reste
+      réservé aux mesures qui ont vraiment une altitude. La fusion viendra après,
+      avec horloges et poses calibrées.
 - [ ] Raffinement des seuls secteurs utiles après la passe rapide : `scan` refait
       encore toute la grille en détail.
 - [ ] Driver capteur en Ada sur STM32 (matériel requis).
