@@ -28,6 +28,13 @@ cp -r "$M/share/icons/hicolor" "$D"/share/icons/ 2>/dev/null || true
 cp -r "$M/lib/gdk-pixbuf-2.0/2.10.0" "$D"/lib/gdk-pixbuf-2.0/
 rm -f "$D"/lib/gdk-pixbuf-2.0/2.10.0/loaders/*.dll.a
 
+# Cache d'icones refait ici, apres la copie : GTK l'ignore des qu'un dossier
+# du theme est plus recent que lui, et relit alors les 825 fichiers. 3,8 s
+# au demarrage (mesure du 2026-11-12) ; deja le cas dans le MSYS2 d'Alire.
+for theme in "$D"/share/icons/*/; do
+   "$M/bin/gtk-update-icon-cache.exe" -f -t -q "$theme"
+done
+
 # Les DLL, de proche en proche : objdump ne liste que les dependances directes,
 # et les modules charges a l'execution (lecteur SVG) ont les leurs.
 a_voir=("$D"/radar_console.exe "$D"/lib/gdk-pixbuf-2.0/2.10.0/loaders/*.dll)
