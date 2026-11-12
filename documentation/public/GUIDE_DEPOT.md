@@ -157,7 +157,7 @@ CI Ubuntu. La fenêtre affiche et transmet ; les décisions restent dans `src/`.
 | `src/console_ui.ads/.adb` | la fenêtre : bandeau, vues, parcours source / activité, dessin Cairo |
 | `src/console_serial.ads/.adb` | le LD2450 en direct : tâche de lecture, tampon borné. **Non validé sur matériel** |
 | `src/console_sar.ads/.adb` | l'analyse SAR en tâche de fond, texte capturé |
-| `empaqueter.sh` | fabrique `console/dist/`, lançable sans Alire ni MSYS2 |
+| `empaqueter.sh` | fabrique `out/radar_console/`, lançable sans Alire ni MSYS2 |
 
 ### `src/demo/`
 
@@ -227,7 +227,8 @@ ces cinq : voir §3.
     alr exec -- gprbuild -p -P radar_ld2450_record.gpr      # l'enregistreur (Windows)
     alr exec -- ./bin/radar_ld2450_record COM3 out/capture.ld2450 60
 
-    bash console/empaqueter.sh         # console/dist/radar_console.exe
+    cd console && alr run              # la console GtkAda
+    bash console/empaqueter.sh         # out/radar_console/radar_console.exe
 
 Pour `map` et `track`, ouvrir ensuite le fichier généré dans `out/`. Pour
 `live` et `scan`, ouvrir l'URL pendant que le programme tourne. `sar`

@@ -34,9 +34,11 @@ plan du LD2450 tourne sur l'émulateur et sur les captures. Le port série est *
 sur matériel** : seul le port absent a été exécuté. Une donnée émulée reste marquée
 SIMULÉ, y compris quand on rejoue son fichier.
 
+    cd console && alr run
+
 Pour fabriquer un dossier qui se lance sans Alire ni MSYS2 (65 Mo) :
 
-    bash console/empaqueter.sh    # puis console/dist/radar_console.exe
+    bash console/empaqueter.sh    # puis out/radar_console/radar_console.exe
 
 Sans fenêtre, cinq modes en ligne de commande, tous sur simulation :
 

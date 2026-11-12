@@ -682,7 +682,11 @@ package body Console_Ui is
       end if;
 
       Collect_Tracks;
-      Area.Queue_Draw;
+      --  Carte finie : rien ne bouge plus, sauf a la souris, qui redessine
+      --  elle-meme. Inutile de repeindre 4 500 points 33 fois par seconde.
+      if Mode /= Run_Map or else Map.Stage /= Radar_Map_Engine.Complete then
+         Area.Queue_Draw;
+      end if;
       if Tick_Count mod 6 = 0 then
          Update_Status;
          Update_Tracks_Panel;
