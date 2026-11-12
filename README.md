@@ -19,7 +19,7 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
-| Tests | **86 tests AUnit**, rejoués à chaque commit |
+| Tests | **87 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -277,7 +277,7 @@ carte, cette compilation ne dit rien.
 
 ## Tests
 
-**86 tests AUnit** répartis en huit suites :
+**87 tests AUnit** répartis en huit suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes d'un moteur
@@ -286,7 +286,8 @@ carte, cette compilation ne dit rien.
   regroupement spatial, cycle de vie du pistage (filtre, M-sur-N, coasting, mort des
   tentatives, traversée de la zone aveugle, croisement de deux cibles, recollage d'une
   piste perdue), deux échos sur un même rayon, murs (distance, incidence, écho spéculaire
-  ou diffus), clutter adaptatif (tout angle fini accepté, sans boucle ni exception),
+  ou diffus), clutter adaptatif (tout angle fini accepté, sans boucle ni exception,
+  marge d'une cellule en azimut),
   pilotage de la source par l'interface, format de sérialisation, vitesse en mm/s
   indépendante de la cadence de balayage, cycle de vie des pistes compté en temps,
   horodatages du pistage (même instant, frame tardive, absence, sources entrelacées, saut

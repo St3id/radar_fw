@@ -37,6 +37,14 @@ package Radar_Clutter is
    --  consideree comme du clutter (l'echo d'un mur "bave" un peu).
    Guard_Bins : constant := 2;
 
+   --  Meme marge en azimut, en cellules de chaque cote. Sur la tourelle,
+   --  le jeu de courroie et les micro-pas font qu'une mesure ne retombe
+   --  pas forcement dans la cellule de l'apprentissage : au bord d'un mur,
+   --  la voisine n'a pas de decor appris et sortirait une fausse cible.
+   --  1 cellule = 3 deg, soit ~21 cm a 4 m masques a cote d'un mur appris.
+   --  En simulation les azimuts tombent pile, la marge n'y change rien.
+   Az_Guard_Cells : constant := 1;
+
    --  Nombre d'observations pour qu'une case devienne du clutter.
    Confirm_Level : constant := 2;
 

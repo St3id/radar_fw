@@ -1049,6 +1049,38 @@ package body Radar_Pipeline_Tests is
               "Un azimut de 1E30 devrait designer une case stable");
    end Test_Clutter_Any_Angle;
 
+   --  Test 8ter : marge en azimut. Cellules de 3 deg : 9 -> 3, 12 -> 4,
+   --  15 -> 5. La voisine est couverte, celle d'apres non, y compris au
+   --  passage 0/360. La marge reste en azimut : une autre elevation passe.
+   procedure Test_Clutter_Az_Guard
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      C   : Clutter_Map;
+      One : constant Detection :=
+        (Targets => (1 => 100, others => Bin_Index'First), Count => 1);
+   begin
+      Clear (C);
+      Learn (C, 9.0, 0.0, One);
+      Learn (C, 9.0, 0.0, One);
+      Assert (Filter (C, 12.0, 0.0, One).Count = 0,
+              "La cellule d'azimut voisine devrait etre couverte");
+      Assert (Filter (C, 6.0, 0.0, One).Count = 0,
+              "La voisine de l'autre cote aussi");
+      Assert (Filter (C, 15.0, 0.0, One).Count = 1,
+              "A deux cellules, l'echo devrait passer");
+      Assert (Filter (C, 9.0, 10.0, One).Count = 1,
+              "Une autre elevation devrait passer : pas de marge en El");
+
+      Clear (C);
+      Learn (C, 0.0, 0.0, One);
+      Learn (C, 0.0, 0.0, One);
+      Assert (Filter (C, 357.0, 0.0, One).Count = 0,
+              "357 deg (cellule 119) devrait voir le decor de 0 deg");
+      Assert (Filter (C, 354.0, 0.0, One).Count = 1,
+              "354 deg (cellule 118) est a deux cellules : doit passer");
+   end Test_Clutter_Az_Guard;
+
    --  Test 9 : CFAR. Un pic net au-dessus du bruit local est detecte ;
    --  un champ uniformement fort n'est pas une cible (chaque case vaut
    --  son bruit voisin) - un seuil fixe est incapable de faire ca.
@@ -1262,6 +1294,9 @@ package body Radar_Pipeline_Tests is
       Register_Routine
         (T, Test_Clutter_Any_Angle'Access,
          "Clutter : tout angle fini, sans boucle ni exception");
+      Register_Routine
+        (T, Test_Clutter_Az_Guard'Access,
+         "Clutter : marge d'une cellule en azimut, 0/360 compris");
       Register_Routine
         (T, Test_CFAR'Access,
          "Seuil adaptatif CFAR");

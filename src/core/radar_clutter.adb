@@ -137,13 +137,23 @@ package body Radar_Clutter is
             Hi         : constant Bin_Index :=
               Bin_Index'Min (Bin_Index'Last, B + Guard_Bins);
          begin
-            --  Clutter si une case confirmee existe dans la marge.
-            for G in Lo .. Hi loop
-               if C.Cells (Az_Idx, El_Idx) (G) >= Confirm_Level then
-                  Is_Clutter := True;
-                  exit;
-               end if;
-            end loop;
+            --  Clutter si une case confirmee existe dans la marge, en
+            --  distance et en azimut. Az_Cells ajoute avant le mod : sinon
+            --  la cellule 0 chercherait sa voisine en -1 au lieu de 119.
+            Scan :
+            for DA in -Az_Guard_Cells .. Az_Guard_Cells loop
+               declare
+                  A : constant Natural :=
+                    (Az_Idx + Az_Cells + DA) mod Az_Cells;
+               begin
+                  for G in Lo .. Hi loop
+                     if C.Cells (A, El_Idx) (G) >= Confirm_Level then
+                        Is_Clutter := True;
+                        exit Scan;
+                     end if;
+                  end loop;
+               end;
+            end loop Scan;
 
             if not Is_Clutter then
                Result.Count := Result.Count + 1;
