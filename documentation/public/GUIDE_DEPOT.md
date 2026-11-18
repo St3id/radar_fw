@@ -32,7 +32,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `documentation/public/` | la documentation technique | oui |
 | `src/` | le code Ada, rangé par domaine | oui |
 | `tests/` | les suites de tests AUnit | oui |
-| `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`) | oui |
+| `docs/` | **le site publié** sur GitHub Pages (`docs/index.html`), et `docs/README.md` qui dit comment le régénérer | oui |
 | `alire.toml` | le manifeste Alire (dépendances, exécutable) | oui |
 | `radar_fw.gpr` et les 4 autres `.gpr` | les projets de compilation (voir §4) | oui |
 | `ravenscar.adc` | impose `pragma Profile (Ravenscar)` et `No_Allocators` à la compilation de la démo | oui |
@@ -41,7 +41,7 @@ Carte du dépôt `radar_fw`, à ouvrir quand on cherche un fichier.
 | `scripts/verifier.sh` | la vérification complète en une commande : `obj/` neuf, étapes en série, totaux comparés aux valeurs attendues | oui |
 | `.gitattributes` | impose les fins de ligne LF, y compris sous Windows | oui |
 | `.gitignore`, `.markdownlint.json`, `.vscode/settings.json` | configuration | oui |
-| `out/` | **généré** : les visualiseurs HTML des modes `map` et `track` | non |
+| `out/` | **généré** : les visualiseurs HTML des modes `map` et `track`, les journaux de `scripts/verifier.sh` (`out/verifier/`), la console empaquetée (`out/radar_console/`) | non |
 | `obj/` `bin/` `alire/` `config/` `share/` | **généré** : sortie de build Alire/GNAT | non |
 
 **Les deux dossiers qui se ressemblent :**
@@ -154,6 +154,7 @@ CI Ubuntu. La fenêtre affiche et transmet ; les décisions restent dans `src/`.
 | Fichier | Rôle |
 | ------- | ---- |
 | `alire.toml`, `radar_console.gpr` | la crate et son projet, `radar_fw` en dépendance locale |
+| `src/radar_console.adb` | le point d'entrée de la console (le main de la crate) |
 | `src/console_ui.ads/.adb` | la fenêtre : bandeau, vues, parcours source / activité, dessin Cairo |
 | `src/console_serial.ads/.adb` | le LD2450 en direct : tâche de lecture, tampon borné. **Non validé sur matériel** |
 | `src/console_sar.ads/.adb` | l'analyse SAR en tâche de fond, texte capturé |

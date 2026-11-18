@@ -179,7 +179,7 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
 (« realisme point N »). Ne pas renuméroter.
 
 1. **Cibles étendues et fading** — **modèle simplifié dans le simulateur.**
-   Chaque objet est simulé par 4 réflecteurs (± 150 mm), dont le niveau est
+   Chaque objet est simulé par 4 réflecteurs décalés de 120 mm au plus, dont le niveau est
    tiré uniformément à chaque tour (graine fixe, donc reproductible), avec 15 %
    d'extinction par réflecteur et 10 % d'évanouissement profond par objet.
    Cela imite des variations d'écho, mais ce n'est pas une loi statistique
@@ -213,8 +213,8 @@ Numérotation **stable** : plusieurs commentaires du code source y renvoient
    encore été éprouvés à ce régime. Le bruit simulé et les amplitudes doivent
    être recalés sur les données du profil choisi.
 3. **Cycle de vie M-sur-N** — **mis en œuvre.** Une piste tentative reste
-   invisible avant 3 détections, et une tentative non revue meurt en
-   2 tours ; l'affichage, en veille comme en rejeu, ne montre que les pistes
+   invisible avant 3 détections, et une tentative non revue meurt après
+   900 ms sans écho (2 tours à 840 ms, 9 trames LD2450 à 10 Hz) ; l'affichage, en veille comme en rejeu, ne montre que les pistes
    confirmées, et le coasting y est marqué (gris et `*`).
 4. **Filtre alpha-beta** — **mis en œuvre.** Prédiction et coasting — une
    piste non revue roule sur son erre — puis correction alpha (0,5) et beta
@@ -392,7 +392,7 @@ tout branchement direct :
 | ------- | ------------------------------------ | ---------------------------------- |
 | `Radar_Sweep.Sweep` | 256 valeurs d'amplitude 0..4095, plage linéaire fixe de 20 m | A121 : profil et plage sélectionnés, pas de distance, points IQ complexes ; conversion et calibration explicites |
 | `Radar_Source.Measurement` | azimut, élévation, heure, un seul `Sweep` ; pas d'identifiant ni de pose capteur | capteur, horodatage de capture et extrinsèques par module ; angle mesuré par index/encodeur pour le scanner |
-| LD2450 | format de trame codé (`Radar_Ld2450`) et contrat 2D (`Radar_Planar_Source`) ; pas encore de décodeur série | décodage série vers des rapports 2D horodatés ; ne pas fabriquer un `Sweep` ni une altitude |
+| LD2450 | format de trame codé (`Radar_Ld2450`) et contrat 2D (`Radar_Planar_Source`) ; parseur de flux et filtre de plausibilité prouvés (`Radar_Ld2450_Stream`, `Radar_Ld2450_Plausibility`), jamais essayés sur un module réel | décodage série vers des rapports 2D horodatés ; ne pas fabriquer un `Sweep` ni une altitude |
 | A121/XM125 | aucun pilote matériel dans le dépôt | choisir le firmware XM125 ou le chemin A121 qui expose les données requises, puis mapper plage/étape/IQ/calibration |
 
 Le principe de `Radar_Source` reste central : développer et éprouver le
@@ -884,13 +884,15 @@ la tour le permet, puissance d'émission réduite (une pièce ne demande pas
 **5. L'intégrité des trames : l'immunité passe aussi par le logiciel.** Une
 trame LD2450 n'a pas de somme de contrôle : en-tête `AA FF 03 00`,
 24 octets de cibles, fin `55 CC`. Un octet corrompu entre les deux passe
-inaperçu et peut déplacer une cible de plusieurs mètres. Le décodeur Ada
-devra donc vérifier la plausibilité de chaque cible : `y` positif (devant le
+inaperçu et peut déplacer une cible de plusieurs mètres. Le filtre
+`Radar_Ld2450_Plausibility` vérifie donc la plausibilité de chaque cible : `y` positif (devant le
 capteur), distance dans la portée, vitesse bornée, champ de résolution
 constant (le manuel le dit fixe ; il vaut 360 dans les trois exemples de sa
 FAQ, 320 dans celui du §2.6 : la valeur se relève sur le module réel). Le
 fenêtrage d'association du pistage rejette ensuite les sauts restants.
-Trames rejetées et erreurs d'USART seront comptées et publiées. Un module
+Chaque rejet est compté par motif (devant le capteur, portée, vitesse,
+résolution, saut) ; les erreurs d'USART ne le sont pas encore, et aucun
+compteur n'est encore publié. Un module
 qui se tait ou redémarre (baisse de tension, décharge électrostatique)
 devra être détecté et reconfiguré si besoin : le mode multi-cible est une
 commande de l'hôte, dont la persistance après redémarrage reste à vérifier.
