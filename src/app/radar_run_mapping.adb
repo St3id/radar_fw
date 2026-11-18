@@ -116,11 +116,12 @@ begin
 
    --  Nuage de points (monde Z vers le haut -> Three.js Y vers le haut),
    --  colore par hauteur pour la lisibilite (sombre en bas, clair en haut).
+   --  (x, z, -y) et pas (x, z, y) : echanger deux axes donne un miroir.
    Put_Line (Out_F, "const geo=new THREE.BufferGeometry();");
    Put_Line (Out_F, "const pos=[],col=[];let zmin=1e9,zmax=-1e9;");
    Put_Line (Out_F, "PTS.forEach(p=>{if(p[2]<zmin)zmin=p[2];if(p[2]>zmax)zmax=p[2];});");
    Put_Line (Out_F, "const c0=new THREE.Color(0x14523c),c1=new THREE.Color(0x8ef5c8);");
-   Put_Line (Out_F, "PTS.forEach(p=>{pos.push(p[0],p[2],p[1]);const t=(p[2]-zmin)/Math.max(1,zmax-zmin);const c=c0.clone().lerp(c1,t);col.push(c.r,c.g,c.b);});");
+   Put_Line (Out_F, "PTS.forEach(p=>{pos.push(p[0],p[2],-p[1]);const t=(p[2]-zmin)/Math.max(1,zmax-zmin);const c=c0.clone().lerp(c1,t);col.push(c.r,c.g,c.b);});");
    Put_Line (Out_F, "geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));");
    Put_Line (Out_F, "geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));");
    Put_Line (Out_F, "const mat=new THREE.PointsMaterial({vertexColors:true,size:45});");
@@ -175,7 +176,7 @@ begin
    Put_Line (Out_F, " const hits=ray.intersectObject(cloud);");
    Put_Line (Out_F, " if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
    Put_Line (Out_F, " const i=hits[0].index,p=PTS[i];");
-   Put_Line (Out_F, " selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
+   Put_Line (Out_F, " selM.visible=true;selM.position.set(p[0],p[2],-p[1]);");
    --  Distance et angles arrivent calcules du cote Ada : la page n'en
    --  recalcule aucun (R1).
    Put_Line (Out_F, " const d=p[3],az=p[4],el=p[5];");

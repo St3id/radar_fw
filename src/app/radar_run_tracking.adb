@@ -86,8 +86,11 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "scene.add(radar);");
       --  Groupe redessine a chaque tour (cibles, fleches, labels, trainees).
       Put_Line (Out_F, "const dyn=new THREE.Group();scene.add(dyn);");
-      --  Monde (Z vers le haut) -> Three.js (Y vers le haut) : on echange Y/Z.
-      Put_Line (Out_F, "function v3(p){return new THREE.Vector3(p.x,p.z,p.y);}");
+      --  Monde (Z vers le haut) -> Three.js (Y vers le haut) : (x, z, -y).
+      --  Pas un simple echange Y/Z : ca, c'est un miroir (determinant -1),
+      --  la gauche du radar passait a droite. Le +Z de Three.js pointe vers
+      --  celui qui regarde, d'ou le -y.
+      Put_Line (Out_F, "function v3(p){return new THREE.Vector3(p.x,p.z,-p.y);}");
       Put_Line (Out_F, "function distOf(p){return Math.round(Math.sqrt(p.x*p.x+p.y*p.y+p.z*p.z));}");
       --  Label texte = petit canvas transforme en sprite (reste autonome).
       Put_Line (Out_F, "function makeLabel(t){");
@@ -114,7 +117,7 @@ procedure Radar_Run_Tracking is
       Put_Line (Out_F, "  const s=new THREE.Mesh(new THREE.SphereGeometry(70,16,16),new THREE.MeshBasicMaterial({color:0x34e29b}));");
       Put_Line (Out_F, "  s.position.copy(p);dyn.add(s);");
       --  Fleche = direction du vecteur vitesse percu, longueur proportionnelle.
-      Put_Line (Out_F, "  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),speed=vel.length();");
+      Put_Line (Out_F, "  const vel=new THREE.Vector3(tk.vx,tk.vz,-tk.vy),speed=vel.length();");
       Put_Line (Out_F, "  if(showVectors.checked&&speed>1){const len=Math.min(2500,speed*5);dyn.add(new THREE.ArrowHelper(vel.clone().normalize(),p,len,0xffd23b,len*0.3,len*0.2));}");
       --  Label : identifiant + distance au radar (a la position affichee).
       Put_Line (Out_F, "  if(showLabels.checked){const lab=makeLabel('#'+tk.id+'  '+distOf(ip)+'mm');lab.position.copy(p).add(new THREE.Vector3(0,200,0));dyn.add(lab);}");

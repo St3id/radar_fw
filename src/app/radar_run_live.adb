@@ -176,12 +176,14 @@ procedure Radar_Run_Live is
       --  Decor statique : charge une fois (il ne change pas).
       L (" let cloudObject=null;fetch('/cloud.json').then(r=>r.json()).then(c=>{");
       L (" const g=new THREE.BufferGeometry(),pos=[];");
-      L (" c.points.forEach(p=>pos.push(p[0],p[2],p[1]));");
+      L (" c.points.forEach(p=>pos.push(p[0],p[2],-p[1]));");
       L (" g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));");
       L (" cloudObject=new THREE.Points(g,new THREE.PointsMaterial({color:0x1f7a5a,size:35}));scene.add(cloudObject);");
       L (" cloudObject.visible=showCloud.checked;});");
       L ("const dyn=new THREE.Group();scene.add(dyn);");
-      L ("function v3(p){return new THREE.Vector3(p.x,p.z,p.y);}");
+      --  Monde Z-haut -> Three.js Y-haut : (x, z, -y), ici, pour le decor
+      --  et la vitesse aussi. Un echange Y/Z seul serait un miroir.
+      L ("function v3(p){return new THREE.Vector3(p.x,p.z,-p.y);}");
       --  Une reserve d'objets PAR PISTE, reutilises d'un etat a l'autre.
       --  La version precedente detruisait et recreait tout a chaque etat :
       --  sphere, fleche, trainee, et surtout un canvas et une texture
@@ -230,7 +232,7 @@ procedure Radar_Run_Live is
       L ("  const o=objFor(tk.id);seen[tk.id]=1;");
       L ("  const p=v3(tk);");
       L ("  o.ball.position.copy(p);o.ball.material=tk.id===selectedId?M_SELECTED:(tk.coast?M_COAST:M_ON);");
-      L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,tk.vy),sp=vel.length();");
+      L ("  const vel=new THREE.Vector3(tk.vx,tk.vz,-tk.vy),sp=vel.length();");
       L ("  if(sp>1){const len=Math.min(2500,sp*5);o.arrow.position.copy(p);o.arrow.setDirection(vel.normalize());o.arrow.setLength(len,len*0.3,len*0.2);o.hasVelocity=true;}else{o.hasVelocity=false;}o.arrow.visible=showVectors.checked&&o.hasVelocity;");
       L ("  const d=Math.round(Math.sqrt(tk.x*tk.x+tk.y*tk.y+tk.z*tk.z));");
       --  Les vitesses arrivent en mm/s : la page divise par 1000 pour

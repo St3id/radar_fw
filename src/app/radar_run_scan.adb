@@ -207,9 +207,10 @@ procedure Radar_Run_Scan (Dwell : Boolean := False) is
       L ("geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setDrawRange(0,0);");
       L ("const ptsMat=new THREE.PointsMaterial({vertexColors:true,size:45});");
       L ("const ptsObj=new THREE.Points(geo,ptsMat);scene.add(ptsObj);");
+      --  (x, z, -y) : Z-haut du monde vers Y-haut de Three.js sans miroir.
       L ("function appendPoints(batch){");
       L (" for(const p of batch){if(PTS.length>=MAX_PTS)break;const i=PTS.length;PTS.push(p);");
-      L ("  pos.set([p[0],p[2],p[1]],i*3);const c=p[6]?fine:quick;col.set([c.r,c.g,c.b],i*3);}");
+      L ("  pos.set([p[0],p[2],-p[1]],i*3);const c=p[6]?fine:quick;col.set([c.r,c.g,c.b],i*3);}");
       L (" geo.attributes.position.needsUpdate=true;geo.attributes.color.needsUpdate=true;geo.setDrawRange(0,PTS.length);}");
       --  Sondage leger : l'API ne renvoie que les nouveaux points.
       L ("const timer=setInterval(tick,250);");
@@ -255,7 +256,7 @@ procedure Radar_Run_Scan (Dwell : Boolean := False) is
       L (" const hits=ray.intersectObject(ptsObj);");
       L (" if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}");
       L (" const i=hits[0].index,p=PTS[i];");
-      L (" selM.visible=true;selM.position.set(p[0],p[2],p[1]);");
+      L (" selM.visible=true;selM.position.set(p[0],p[2],-p[1]);");
       --  Distance et angles arrivent calcules du cote Ada : la page n'en
       --  recalcule aucun (R1).
       L (" const d=p[3],az=p[4],el=p[5];");
