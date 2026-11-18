@@ -19,7 +19,7 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
 | Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
-| Tests | **87 tests AUnit**, rejoués à chaque commit |
+| Tests | **88 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -280,7 +280,7 @@ carte, cette compilation ne dit rien.
 
 ## Tests
 
-**87 tests AUnit** répartis en huit suites :
+**88 tests AUnit** répartis en huit suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes d'un moteur
@@ -310,8 +310,9 @@ carte, cette compilation ne dit rien.
 - moteur de la console, sans fenêtre : une trame attend son heure, chaque trame passe une
   fois, un silence n'est pas la fin ;
 - console sans GTK : origine des captures, ce que l'écran peut affirmer, capture émulée
-  rejouée en entier, pistage 2D (confirmation, vitesse, extrapolation, temps), réglages
-  bornés, géométrie d'écran et clic, cartographie pas à pas, recalibration sans relance.
+  rejouée en entier, pistage 2D (confirmation, vitesse, deux modules entrelacés,
+  extrapolation, temps), réglages bornés, géométrie d'écran et clic, cartographie pas à
+  pas, recalibration sans relance.
 
 Compiler puis lancer les suites :
 

@@ -216,6 +216,23 @@ package body Radar_Console_Tests is
       Assert (abs (K.Tracks (1).Y_Mm - 5_000.0) < 150.0, "position suivie");
    end Test_Velocity;
 
+   --  Deux modules entrelaces : un rapport toutes les 50 ms, donc une
+   --  correction de vitesse sur deux (seuil de 70 ms). Diviser l'ecart du
+   --  seul dernier rapport par 100 ms sous-corrigeait : ~800 mm/s apres
+   --  15 rapports. Avec l'ecart pris depuis l'ancre, ~950 (essai MATLAB Q01).
+   procedure Test_Interleaved (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      K : T2.Tracker;
+   begin
+      for I in 1 .. 15 loop
+         T2.Update (K, One_Target (500.0, 1_000.0 + 50.0 * Float (I),
+                                   Time_Ms (I) * 50));
+      end loop;
+      Assert (K.Tracks (1).Vy_Mm_S > 900.0,
+              "vitesse a 50 ms : >900 mm/s attendus, lu"
+              & Integer'Image (Integer (K.Tracks (1).Vy_Mm_S)));
+   end Test_Interleaved;
+
    --  Sans echo : la piste roule, marquee, puis meurt apres son delai.
    procedure Test_Coast (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
@@ -437,6 +454,8 @@ package body Radar_Console_Tests is
         (T, Test_Capture_Replay'Access, "Capture emulee rejouee entiere");
       Register_Routine (T, Test_Confirmation'Access, "Pistage 2D : confirmation");
       Register_Routine (T, Test_Velocity'Access, "Pistage 2D : vitesse en mm/s");
+      Register_Routine (T, Test_Interleaved'Access,
+                        "Pistage 2D : sources entrelacees a 50 ms");
       Register_Routine (T, Test_Coast'Access, "Pistage 2D : coasting et mort");
       Register_Routine (T, Test_Two_Targets'Access, "Pistage 2D : deux cibles");
       Register_Routine (T, Test_Time_Policy'Access, "Pistage 2D : temps");

@@ -21,6 +21,8 @@ package Radar_Track_2D is
       Vy_Mm_S   : Float   := 0.0;
       Last_Seen : Time_Ms := 0;
       Vel_Stamp : Time_Ms := 0;     --  derniere correction de vitesse
+      Anchor_X_Mm : Float := 0.0;   --  position filtree a Vel_Stamp
+      Anchor_Y_Mm : Float := 0.0;
       Hits      : Natural := 0;
       Confirmed : Boolean := False;
       Coasting  : Boolean := False; --  non vue a la derniere trame

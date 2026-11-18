@@ -48,16 +48,26 @@ package body Radar_Track_2D is
       Rx       : constant Float := D.X_Mm - K.X_Mm;
       Ry       : constant Float := D.Y_Mm - K.Y_Mm;
       Interval : constant Time_Ms := S - K.Vel_Stamp;
+      Velocity_Updated : constant Boolean :=
+        Interval >= Min_Velocity_Interval_Ms;
    begin
-      if Interval >= Min_Velocity_Interval_Ms then
+      if Velocity_Updated then
          --  Deuxieme observation : pas encore de vitesse, on la tire de
          --  l'ecart brut. Ensuite, correction lente pour lisser le bruit.
+         --  L'ecart se prend depuis l'ancre, pas depuis la prediction : si
+         --  une trame a ete sautee (rapports a 50 ms), Rx n'en garde que la
+         --  moitie, Alpha ayant deja mange le reste, alors que Dt couvre
+         --  tout. Meme calcul qu'en 3D ; a 100 ms, ca redonne Rx / Dt.
          declare
             Dt   : constant Float := Float (Interval) / 1_000.0;
             Gain : constant Float := (if K.Hits = 1 then 1.0 else Beta);
+            Ex   : constant Float :=
+              D.X_Mm - (K.Anchor_X_Mm + K.Vx_Mm_S * Dt);
+            Ey   : constant Float :=
+              D.Y_Mm - (K.Anchor_Y_Mm + K.Vy_Mm_S * Dt);
          begin
-            K.Vx_Mm_S := K.Vx_Mm_S + Gain * Rx / Dt;
-            K.Vy_Mm_S := K.Vy_Mm_S + Gain * Ry / Dt;
+            K.Vx_Mm_S := K.Vx_Mm_S + Gain * Ex / Dt;
+            K.Vy_Mm_S := K.Vy_Mm_S + Gain * Ey / Dt;
          end;
          Bound_Speed (K, P.Max_Speed_Mm_S);
          K.Vel_Stamp := S;
@@ -65,6 +75,10 @@ package body Radar_Track_2D is
 
       K.X_Mm := K.X_Mm + Alpha * Rx;
       K.Y_Mm := K.Y_Mm + Alpha * Ry;
+      if Velocity_Updated then
+         K.Anchor_X_Mm := K.X_Mm;
+         K.Anchor_Y_Mm := K.Y_Mm;
+      end if;
       K.Last_Seen := S;
       K.Hits      := K.Hits + 1;
       K.Coasting  := False;
@@ -84,6 +98,8 @@ package body Radar_Track_2D is
                   Y_Mm      => D.Y_Mm,
                   Last_Seen => S,
                   Vel_Stamp => S,
+                  Anchor_X_Mm => D.X_Mm,
+                  Anchor_Y_Mm => D.Y_Mm,
                   Hits      => 1,
                   Active    => True,
                   others    => <>);
