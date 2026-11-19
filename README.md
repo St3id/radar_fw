@@ -18,7 +18,7 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | | |
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
-| Vérification formelle | **414 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
+| Vérification formelle | **417 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
 | Tests | **93 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
@@ -193,9 +193,9 @@ Reste à faire :
 
 ## Vérification formelle
 
-Le code en `SPARK_Mode` est prouvé avec SPARK (prouveurs CVC5 et Z3) : **414 checks,
-0 non prouvé** pour le projet principal, dont 154 contrôles d'exécution, 67
-assertions, 77 contrats fonctionnels, 49 de terminaison et 7 d'initialisation.
+Le code en `SPARK_Mode` est prouvé avec SPARK (prouveurs CVC5 et Z3) : **417 checks,
+0 non prouvé** pour le projet principal, dont 187 contrôles d'exécution, 91
+assertions, 78 contrats fonctionnels, 52 de terminaison et 9 d'initialisation.
 
 Ce que ça établit :
 
@@ -227,18 +227,18 @@ Ce que ça établit :
 
 L'objet protégé `Mailbox` est analysé à part, dans le contexte Ravenscar (projet
 `radar_demo.gpr`) : absence d'erreur d'exécution et de flot, sans propriété
-fonctionnelle. Il ne compte pas dans les 414 checks.
+fonctionnelle. Il ne compte pas dans les 417 checks.
 
 Reproduire les quatre preuves, sur un répertoire `obj/` neuf :
 
-    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 247 checks
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 274 au total (247 + 27)
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 414 au total (274 + 140)
+    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 250 checks
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 277 au total (250 + 27)
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 417 au total (277 + 140)
     alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on                       # 89 checks
 
 Il faut les trois premières parce que `gnatprove -P` ne regarde que ce qu'utilise
-l'exécutable (247 checks). `Radar_Ld2450` est hors de cette fermeture, d'où la
-seconde (274), et le parseur avec sa plausibilité aussi, d'où la troisième (414). Ces
+l'exécutable (250 checks). `Radar_Ld2450` est hors de cette fermeture, d'où la
+seconde (277), et le parseur avec sa plausibilité aussi, d'où la troisième (417). Ces
 unités et `Radar_Dwell` se prouvent au niveau 1 (réglage de `radar_fw.gpr`, fichier
 par fichier) : CVC5 seul ne relie pas certains quantificateurs, Z3 y arrive. Le projet
 de démonstration compte 89 checks. Les deux projets partagent des unités du cœur, ce

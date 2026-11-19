@@ -155,9 +155,23 @@ package body Radar_Detect is
               or else not Before (F.Items (Order (J)),
                                   F.Items (Order (J - 1)));
 
-            Swap          := Order (J);
-            Order (J)     := Order (J - 1);
-            Order (J - 1) := Swap;
+            declare
+               --  Photo de Order avant l'echange, pour la preuve seulement.
+               Pre_Swap : constant Index_List := Order with Ghost;
+            begin
+               Swap          := Order (J);
+               Order (J)     := Order (J - 1);
+               Order (J - 1) := Swap;
+               --  L'invariant "pas de doublon" demande de voir le nouveau
+               --  tableau comme l'ancien lu a travers la permutation
+               --  J <-> J-1. Laisse seul, le prouveur la cherche : 4 s ici,
+               --  au-dela du delai du runner GitHub (CI de 46ce636). Ecrite
+               --  ici, il n'a plus qu'a substituer.
+               pragma Assert
+                 (for all K in 1 .. F.Count =>
+                    Order (K) = Pre_Swap
+                      (if K = J then J - 1 elsif K = J - 1 then J else K));
+            end;
             J := J - 1;
          end loop;
 
