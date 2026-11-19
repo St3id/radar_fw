@@ -26,7 +26,7 @@ const geo=new THREE.BufferGeometry();
 const pos=[],col=[];let zmin=1e9,zmax=-1e9;
 PTS.forEach(p=>{if(p[2]<zmin)zmin=p[2];if(p[2]>zmax)zmax=p[2];});
 const c0=new THREE.Color(0x14523c),c1=new THREE.Color(0x8ef5c8);
-PTS.forEach(p=>{pos.push(p[0],p[2],p[1]);const t=(p[2]-zmin)/Math.max(1,zmax-zmin);const c=c0.clone().lerp(c1,t);col.push(c.r,c.g,c.b);});
+PTS.forEach(p=>{pos.push(p[0],p[2],-p[1]);const t=(p[2]-zmin)/Math.max(1,zmax-zmin);const c=c0.clone().lerp(c1,t);col.push(c.r,c.g,c.b);});
 geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
 geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
 const mat=new THREE.PointsMaterial({vertexColors:true,size:45});
@@ -68,7 +68,7 @@ function pick(e){
  const hits=ray.intersectObject(cloud);
  if(!hits.length){selM.visible=false;selDiv.innerHTML='';return;}
  const i=hits[0].index,p=PTS[i];
- selM.visible=true;selM.position.set(p[0],p[2],p[1]);
+ selM.visible=true;selM.position.set(p[0],p[2],-p[1]);
  const d=p[3],az=p[4],el=p[5];
  selDiv.innerHTML='Point #'+i+'<br>x '+Math.round(p[0])+'  y '+Math.round(p[1])+'  z '+Math.round(p[2])+' mm'+
   '<br>distance '+Math.round(d)+' mm<br>azimut '+az.toFixed(1)+' deg &middot; elevation '+el.toFixed(1)+' deg';}
