@@ -473,7 +473,11 @@ transmission, câblage et mesure. Le rapport et le type d'entraînement ne peuve
 être choisis sérieusement qu'après avoir posé le temps de scan accepté, la
 masse/inertie du plateau et l'erreur angulaire tolérée.
 
-**Choix retenu : aller-retour continu sans collecteur.** Deux exigences
+**Repli : aller-retour continu sans collecteur.** La cible est une tête à
+rotation sans fin qui porte le capteur, l'élévation, la batterie et le
+calculateur, et relaie des données datées en Wi-Fi. Ce qui suit vaut pour le
+repli, encore documenté parce que ses contraintes (921 600 bauds, temps de
+balayage) bornent le système. Deux exigences
 sont posées : un balayage rapide, et une position exacte de la tête. Il en
 découle :
 
