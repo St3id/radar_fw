@@ -28,6 +28,10 @@ project Radar_Fw is
       for Proof_Switches ("radar_ld2450_stream.adb") use ("--level=1");
       for Proof_Switches ("radar_ld2450_plausibility.adb") use ("--level=1");
       for Proof_Switches ("radar_dwell.adb") use ("--level=1");
+      --  Le tri de Radar_Detect.Scan_Order : au niveau 0, sur un obj/ neuf,
+      --  meme J <= I et les index ne passent pas, noyes sous les flottants
+      --  de Before. Au niveau 1, tout passe.
+      for Proof_Switches ("radar_detect.adb") use ("--level=1");
    end Prove;
 
    package Install is

@@ -118,6 +118,123 @@ package body Radar_Pipeline_Tests is
       end;
    end Test_Cluster;
 
+   --  Une detection au point (X, Y, Z), avec la distance qui va avec.
+   function Echo (X, Y, Z : Float) return Detection_3D is
+     ((Pos => (X, Y, Z), Distance => Sqrt (X * X + Y * Y + Z * Z)));
+
+   --  Meme regroupement a l'ordre des groupes pres : chaque cible de l'un
+   --  a sa jumelle dans l'autre, a 0.01 mm. Dans les deux sens, sinon deux
+   --  cibles de A pourraient pointer la meme de B.
+   function Same_Clusters (A, B : Frame) return Boolean is
+      function Found (P : Detection_3D; In_F : Frame) return Boolean is
+      begin
+         for K in 1 .. In_F.Count loop
+            if abs (In_F.Items (K).Pos.X - P.Pos.X) < 0.01
+              and then abs (In_F.Items (K).Pos.Y - P.Pos.Y) < 0.01
+              and then abs (In_F.Items (K).Pos.Z - P.Pos.Z) < 0.01
+              and then abs (In_F.Items (K).Distance - P.Distance) < 0.01
+            then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Found;
+   begin
+      if A.Count /= B.Count then
+         return False;
+      end if;
+      for K in 1 .. A.Count loop
+         if not Found (A.Items (K), B) or else not Found (B.Items (K), A) then
+            return False;
+         end if;
+      end loop;
+      return True;
+   end Same_Clusters;
+
+   --  Trois echos alignes a 500 mm, a 3 m de face : A et B se touchent,
+   --  B et C aussi, mais A et C sont a 1000 mm. Avec la graine prise dans
+   --  l'ordre d'arrivee, A-B-C donnait {A,B} {C} et B-A-C un seul groupe
+   --  (dette 38). Les 6 ordres doivent sortir la meme chose. B est le plus
+   --  proche du capteur : c'est lui la graine, et il prend les deux autres.
+   procedure Test_Cluster_Order_Independent
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      type Trio is array (1 .. 3) of Positive;
+      type Trio_List is array (1 .. 6) of Trio;
+      Orders : constant Trio_List :=
+        ((1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1));
+      Points : constant array (1 .. 3) of Detection_3D :=
+        (Echo (-500.0, 3000.0, 0.0),
+         Echo (0.0, 3000.0, 0.0),
+         Echo (500.0, 3000.0, 0.0));
+
+      function Clustered (O : Trio) return Frame is
+         F : Frame;
+      begin
+         Reset (F);
+         F.Count := 3;
+         for K in O'Range loop
+            F.Items (K) := Points (O (K));
+         end loop;
+         return Cluster (F);
+      end Clustered;
+
+      Ref : constant Frame := Clustered (Orders (1));
+   begin
+      Assert (Ref.Count = 1,
+              "A-B-C devrait donner un seul groupe, obtenu"
+              & Ref.Count'Image);
+      Assert (abs (Ref.Items (1).Pos.X) < 0.01
+              and then abs (Ref.Items (1).Pos.Y - 3000.0) < 0.01,
+              "Le groupe devrait etre centre sur B (0, 3000)");
+      for N in Orders'Range loop
+         Assert (Same_Clusters (Clustered (Orders (N)), Ref),
+                 "L'ordre" & N'Image & " change le regroupement");
+      end loop;
+   end Test_Cluster_Order_Independent;
+
+   --  Une frame plus chargee, lue a l'endroit puis a l'envers, avec les
+   --  proprietaires retournes en meme temps : ils sont indexes sur l'ordre
+   --  d'origine, un tri qui les oublierait les decalerait. A et C sont a
+   --  deux pistes differentes, D et E aussi : ils ne doivent jamais
+   --  fusionner, quelle que soit la graine.
+   procedure Test_Cluster_Reversed
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      F, R   : Frame;
+      O, R_O : Owner_List := No_Owner;
+   begin
+      Reset (F);
+      F.Count := 6;
+      F.Items (1) := Echo (-500.0, 3000.0, 0.0);    --  A, piste 1
+      F.Items (2) := Echo (0.0, 3000.0, 0.0);       --  B, libre
+      F.Items (3) := Echo (500.0, 3000.0, 0.0);     --  C, piste 2
+      F.Items (4) := Echo (2000.0, 1000.0, 500.0);  --  D, piste 3
+      F.Items (5) := Echo (2000.0, 1500.0, 500.0);  --  E, piste 4
+      F.Items (6) := Echo (-2500.0, 2000.0, -300.0);
+      O (1) := 1;
+      O (3) := 2;
+      O (4) := 3;
+      O (5) := 4;
+
+      Reset (R);
+      R.Count := F.Count;
+      for K in 1 .. F.Count loop
+         R.Items (K) := F.Items (F.Count + 1 - K);
+         R_O (K)     := O (F.Count + 1 - K);
+      end loop;
+
+      Assert (Same_Clusters (Cluster (F), Cluster (R)),
+              "Sans pistes, la frame a l'envers se regroupe autrement");
+      Assert (Same_Clusters (Cluster (F, O), Cluster (R, R_O)),
+              "Avec pistes, la frame a l'envers se regroupe autrement");
+      Assert (Cluster (F, O).Count = 5,
+              "A/C et D/E sont a des pistes differentes : 5 groupes"
+              & " attendus, obtenu" & Cluster (F, O).Count'Image);
+   end Test_Cluster_Reversed;
+
    --  La premiere piste active du tracker (pour les tests).
    function First_Active (Trk : Tracker) return Track is
    begin
@@ -1243,6 +1360,12 @@ package body Radar_Pipeline_Tests is
         (T, Test_Zenith'Access, "Point au zenith (bornage Arcsin)");
       Register_Routine
         (T, Test_Cluster'Access, "Regroupement de detections 3D");
+      Register_Routine
+        (T, Test_Cluster_Order_Independent'Access,
+         "Regroupement : les 6 ordres de trois echos a 500 mm");
+      Register_Routine
+        (T, Test_Cluster_Reversed'Access,
+         "Regroupement : frame a l'endroit et a l'envers, pistes comprises");
       Register_Routine
         (T, Test_Track_Filter'Access,
          "Pistage : filtre alpha-beta, M-sur-N, coasting");

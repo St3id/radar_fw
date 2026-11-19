@@ -179,6 +179,7 @@ CI Ubuntu. La fenêtre affiche et transmet ; les décisions restent dans `src/`.
 | `radar_dwell_tests.ads/.adb` | suite 6 : balayage adaptatif (parts égales, rampes, gain en mesures et en échos) |
 | `radar_engine_tests.ads/.adb` | suite 7 : moteur de la console (heure des trames, silences, fin), sans fenêtre |
 | `radar_console_tests.ads/.adb` | suite 8 : ce qui sert la console sans GTK (origine des captures, pistage 2D, réglages, vues) |
+| `radar_target_source_tests.ads/.adb` | suite 9 : source de détections 3D factice lue par l'interface `Radar_Target_Source` |
 | `radar_ld2450_faults.ads/.adb` | les trames du manuel et le générateur de flux abîmés, côté tests seulement |
 
 ---

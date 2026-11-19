@@ -29,11 +29,10 @@ project Radar_Core is
         ("-Os",       --  optimiser la taille (norme en embarque)
          "-g",
          "-gnatwa",
-         --  Le runtime light interdit la propagation d'exceptions ;
-         --  GNAT signalerait chaque check susceptible d'appeler le
-         --  Last_Chance_Handler. Or la preuve SPARK demontre justement
-         --  que ces checks ne peuvent pas echouer : on coupe ce bruit.
-         "-gnatw.X",
+         --  Pas de -gnatw.X : il ne masquait plus rien. Attention, zero
+         --  warning ici ne veut pas dire zero check a risque : No_Exceptions
+         --  (core_restrictions.adc) fait que GNAT ne genere AUCUN check sur
+         --  la cible. Ce qui n'est pas prouve SPARK n'est donc pas protege.
          "-gnatVa",
          --  Memes controles de style que le projet principal.
          "-gnaty3aAbBcefhiIklmnOprStux");

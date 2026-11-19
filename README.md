@@ -18,8 +18,8 @@ cartographiée par la détection prouvée, à explorer dans le navigateur.
 | | |
 | --- | --- |
 | Langage | Ada, compilé en norme 2012 (aucun `-gnat2022`) ; `SPARK_Mode` sur le cœur de traitement |
-| Vérification formelle | **354 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
-| Tests | **88 tests AUnit**, rejoués à chaque commit |
+| Vérification formelle | **414 checks prouvés, 0 non prouvé** (prouveurs CVC5 et Z3) : absence d'erreur d'exécution, cohérence au seuil calculé, contrats du parseur LD2450 et du plan de balayage. Rien sur la qualité de détection ni sur un module réel |
+| Tests | **93 tests AUnit**, rejoués à chaque commit |
 | Modes d'exploitation | 5 : `track`, `map`, `live`, `scan`, `sar` |
 | Concurrence | profil **Ravenscar** imposé à la compilation |
 | Cible embarquée | ARM Cortex-M4F, runtime `light` (STM32G474 visé) |
@@ -193,7 +193,7 @@ Reste à faire :
 
 ## Vérification formelle
 
-Le code en `SPARK_Mode` est prouvé avec SPARK (prouveurs CVC5 et Z3) : **354 checks,
+Le code en `SPARK_Mode` est prouvé avec SPARK (prouveurs CVC5 et Z3) : **414 checks,
 0 non prouvé** pour le projet principal, dont 154 contrôles d'exécution, 67
 assertions, 77 contrats fonctionnels, 49 de terminaison et 7 d'initialisation.
 
@@ -227,18 +227,18 @@ Ce que ça établit :
 
 L'objet protégé `Mailbox` est analysé à part, dans le contexte Ravenscar (projet
 `radar_demo.gpr`) : absence d'erreur d'exécution et de flot, sans propriété
-fonctionnelle. Il ne compte pas dans les 354 checks.
+fonctionnelle. Il ne compte pas dans les 414 checks.
 
 Reproduire les quatre preuves, sur un répertoire `obj/` neuf :
 
-    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 187 checks
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 214 au total (187 + 27)
-    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 354 au total (214 + 140)
+    alr exec -- gnatprove -P radar_fw.gpr   --report=all --checks-as-errors=on                       # 247 checks
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450.adb --report=all --checks-as-errors=on     # 274 au total (247 + 27)
+    alr exec -- gnatprove -P radar_fw.gpr -u radar_ld2450_stream.adb radar_ld2450_plausibility.adb --report=all --checks-as-errors=on   # 414 au total (274 + 140)
     alr exec -- gnatprove -P radar_demo.gpr --report=all --checks-as-errors=on                       # 89 checks
 
 Il faut les trois premières parce que `gnatprove -P` ne regarde que ce qu'utilise
-l'exécutable (187 checks). `Radar_Ld2450` est hors de cette fermeture, d'où la
-seconde (214), et le parseur avec sa plausibilité aussi, d'où la troisième (354). Ces
+l'exécutable (247 checks). `Radar_Ld2450` est hors de cette fermeture, d'où la
+seconde (274), et le parseur avec sa plausibilité aussi, d'où la troisième (414). Ces
 unités et `Radar_Dwell` se prouvent au niveau 1 (réglage de `radar_fw.gpr`, fichier
 par fichier) : CVC5 seul ne relie pas certains quantificateurs, Z3 y arrive. Le projet
 de démonstration compte 89 checks. Les deux projets partagent des unités du cœur, ce
@@ -280,13 +280,14 @@ carte, cette compilation ne dit rien.
 
 ## Tests
 
-**88 tests AUnit** répartis en huit suites :
+**93 tests AUnit** répartis en neuf suites :
 
 - traitement du balayage : pic, seuil, multi-cibles, regroupement ;
 - balayage adaptatif : parts égales, fenêtres recouvertes ou coupées, rampes d'un moteur
   simulé, gain en mesures et en échos sur les objets ;
 - pipeline 3D : CFAR, aller-retour géométrique, normalisation d'azimut, zénith,
-  regroupement spatial, cycle de vie du pistage (filtre, M-sur-N, coasting, mort des
+  regroupement spatial indépendant de l'ordre des détections,
+  cycle de vie du pistage (filtre, M-sur-N, coasting, mort des
   tentatives, traversée de la zone aveugle, croisement de deux cibles, recollage d'une
   piste perdue), deux échos sur un même rayon, murs (distance, incidence, écho spéculaire
   ou diffus), clutter adaptatif (tout angle fini accepté, sans boucle ni exception,
@@ -312,7 +313,9 @@ carte, cette compilation ne dit rien.
 - console sans GTK : origine des captures, ce que l'écran peut affirmer, capture émulée
   rejouée en entier, pistage 2D (confirmation, vitesse, deux modules entrelacés,
   extrapolation, temps), réglages bornés, géométrie d'écran et clic, cartographie pas à
-  pas, recalibration sans relance.
+  pas, recalibration sans relance ;
+- source de détections 3D factice, vue par l'interface : ordre et heures des frames, fin
+  de flux, source vide.
 
 Compiler puis lancer les suites :
 
