@@ -47,6 +47,7 @@ with Gtk.Text_View;
 with Gtk.Toggle_Button;
 with Gtk.Widget;                use Gtk.Widget;
 with Gtk.Window;
+with Gtkada.Types;
 with Pango.Layout;
 
 with Console_Sar;
@@ -101,6 +102,7 @@ package body Console_Ui is
    Virtual_Ms : Long_Float := 0.0;
    Tick_Count : Natural := 0;
    Sar_Path   : Unbounded_String;
+   Sar_Start  : RT.Time := RT.Clock;
    Last_Frames : Natural := 0;
    Last_Fresh  : RT.Time := RT.Clock;
 
@@ -139,6 +141,7 @@ package body Console_Ui is
    Win         : Gtk.Window.Gtk_Window;
    Area        : Gtk.Drawing_Area.Gtk_Drawing_Area;
    Center      : Gtk.Stack.Gtk_Stack;
+   Views       : Gtk.Stack.Gtk_Stack;
    Sar_Buffer  : Gtk.Text_Buffer.Gtk_Text_Buffer;
    Lbl_Source, Lbl_Link, Lbl_Frames, Lbl_Plaus, Lbl_Alert, Lbl_Msg,
    Lbl_Tracks, Lbl_Detail, Lbl_Learn : Gtk.Label.Gtk_Label;
@@ -150,7 +153,8 @@ package body Console_Ui is
      : Gtk.Check_Button.Gtk_Check_Button;
    Spin_Confirm, Spin_Coast, Spin_Speed, Spin_Replay, Spin_Learn, Spin_Age,
    Spin_Calib, Spin_Az, Spin_El : Gtk.Spin_Button.Gtk_Spin_Button;
-   Diag_Buffer, Journal : Gtk.Text_Buffer.Gtk_Text_Buffer;
+   Journal     : Gtk.Text_Buffer.Gtk_Text_Buffer;
+   Lbl_Diag    : Gtk.Label.Gtk_Label;
    Updating_Spins : Boolean := False;
 
    --  ----- Petits outils -----
@@ -396,10 +400,41 @@ package body Console_Ui is
             & Img (Natural (Map.Cloud.Count)) & " points");
          Lbl_Plaus.Set_Text ("PLAUSIBILITÉ  sans objet");
       else
-         Lbl_Frames.Set_Text ("CALCUL  en cours");
+         --  Temps ecoule plutot qu'une duree promise : en profil de
+         --  developpement (-Og, -gnatVa) le calcul prend 25 a 40 s, pas 12.
+         Lbl_Frames.Set_Text
+           ("CALCUL  en cours, "
+            & Img (Integer (RT.To_Duration (RT.Clock - Sar_Start))) & " s");
          Lbl_Plaus.Set_Text ("PLAUSIBILITÉ  sans objet");
       end if;
    end Update_Status;
+
+   procedure Show_Detail (T : View_Track) is
+   begin
+      Lbl_Detail.Set_Text
+        ("Piste #" & Img (T.Id) & ASCII.LF
+         & "x " & Fixed_1 (T.X / 1_000.0) & " m, y "
+         & Fixed_1 (T.Y / 1_000.0) & " m" & ASCII.LF
+         & "vx " & Fixed_1 (T.Vx / 1_000.0) & " m/s, vy "
+         & Fixed_1 (T.Vy / 1_000.0) & " m/s");
+   end Show_Detail;
+
+   --  Le detail suit la piste choisie : ecrit au seul clic, il restait fige
+   --  sur la position du clic pendant que la piste continuait sa route.
+   procedure Refresh_Detail is
+   begin
+      if Selected_Id = 0 then
+         return;
+      end if;
+      for I in 1 .. Shown_Count loop
+         if Shown (I).Id = Selected_Id then
+            Show_Detail (Shown (I));
+            return;
+         end if;
+      end loop;
+      Selected_Id := 0;
+      Lbl_Detail.Set_Text ("");
+   end Refresh_Detail;
 
    procedure Update_Tracks_Panel is
       Text : Unbounded_String;
@@ -407,6 +442,7 @@ package body Console_Ui is
       if Shown_Count = 0 then
          Text := To_Unbounded_String ("Aucune piste confirmée");
       end if;
+      Refresh_Detail;
       for I in 1 .. Shown_Count loop
          declare
             T    : View_Track renames Shown (I);
@@ -425,6 +461,15 @@ package body Console_Ui is
       Lbl_Tracks.Set_Text (To_String (Text));
    end Update_Tracks_Panel;
 
+   --  'Image donnait REJECT_NOT_IN_FRONT a l'ecran.
+   function Reject_Label (R : Plaus.Reject_Reason) return String is
+     (case R is
+         when Plaus.Reject_Not_In_Front   => "pas devant le capteur",
+         when Plaus.Reject_Out_Of_Range   => "hors de portée",
+         when Plaus.Reject_Too_Fast       => "trop rapide",
+         when Plaus.Reject_Bad_Resolution => "résolution invalide",
+         when Plaus.Reject_Jump           => "saut de position");
+
    procedure Update_Diagnostic is
       Text : Unbounded_String;
       procedure Add (Name, Value : String) is
@@ -432,6 +477,10 @@ package body Console_Ui is
          Append (Text, Name & " : " & Value & ASCII.LF);
       end Add;
    begin
+      --  Vue cachee : 25 lignes refaites 5 fois par seconde pour rien.
+      if Views.Get_Visible_Child_Name /= "diagnostic" then
+         return;
+      end if;
       Add ("Temps d'image (dernier)", Fixed_1 (Draw_Last_Ms) & " ms");
       Add ("Temps d'image (pire)", Fixed_1 (Draw_Max_Ms) & " ms");
       if Is_Planar then
@@ -452,7 +501,7 @@ package body Console_Ui is
             Add ("Cibles acceptées", Img (Natural (Plaus.Accepted (V))));
             Add ("Emplacements vides", Img (Natural (Plaus.Absent (V))));
             for R in Plaus.Reject_Reason loop
-               Add ("Rejet " & Plaus.Reject_Reason'Image (R),
+               Add ("Rejet : " & Reject_Label (R),
                     Img (Natural (Plaus.Rejected (V, R))));
             end loop;
             Add ("Trames en retard", Img (K.Late_Frames));
@@ -474,13 +523,14 @@ package body Console_Ui is
          Add ("Remises à zéro d'horloge", Img (Watch_3D.Trk.Clock_Resets));
          Add ("Points du décor", Img (Natural (Watch_3D.Decor.Count)));
       end if;
-      Diag_Buffer.Set_Text (To_String (Text));
+      Lbl_Diag.Set_Text (To_String (Text));
    end Update_Diagnostic;
 
    procedure Set_Running_Buttons is
       Is_On : constant Boolean := Mode /= None;
    begin
-      Start_Btn.Set_Sensitive (not Is_On);
+      Start_Btn.Set_Sensitive
+        (not Is_On and then Allowed (Current_Source, Current_Activity));
       Stop_Btn.Set_Sensitive (Is_On);
       Rec_Btn.Set_Sensitive (Mode in Run_Live | Run_Serial);
       Recal_Btn.Set_Sensitive (Mode = Run_Watch_3D);
@@ -534,6 +584,9 @@ package body Console_Ui is
       Draw_Max_Ms := 0.0;
       Finished_Note := False;
       Trails := (others => <>);
+      --  Un SAR fini laisse son texte au centre : seul Stop_Session remettait
+      --  la scene, et le SAR s'arrete sans lui.
+      Center.Set_Visible_Child_Name ("scene");
 
       if A = Mapping then
          Radar_Map_Engine.Start
@@ -542,7 +595,9 @@ package body Console_Ui is
       elsif A = Sar_Analysis then
          Sar_Path := To_Unbounded_String (Data_Dir & "/analyse_sar.txt");
          Console_Sar.Start (To_String (Sar_Path));
-         Sar_Buffer.Set_Text ("Analyse SAR simulée en cours (environ 12 s).");
+         Sar_Start := RT.Clock;
+         Sar_Buffer.Set_Text
+           ("Analyse SAR simulée en cours : le temps écoulé est en haut.");
          Center.Set_Visible_Child_Name ("texte");
          Mode := Run_Sar;
       else
@@ -707,6 +762,19 @@ package body Console_Ui is
       Cairo.New_Path (Cr);
    end Text_At;
 
+   --  Centre sur la largeur mesuree : l'ancien decalage fixe (-150, -180 px)
+   --  tombait a cote des qu'on changeait le texte ou la taille de police.
+   procedure Text_Centered
+     (Cr : Cairo.Cairo_Context; X, Y : Float; S : String)
+   is
+      C : constant Gtkada.Types.Chars_Ptr := Gtkada.Types.New_String (S);
+      E : aliased Cairo.Cairo_Text_Extents;
+   begin
+      Cairo.Text_Extents (Cr, C, E'Access);
+      Gtkada.Types.g_free (C);
+      Text_At (Cr, X - Float (E.Width / 2.0 + E.X_Bearing), Y, S);
+   end Text_Centered;
+
    function On (C : Gtk.Check_Button.Gtk_Check_Button) return Boolean is
      (C.Get_Active);
 
@@ -725,7 +793,9 @@ package body Console_Ui is
          Cairo.Arc (Cr, Gdouble (O.X), Gdouble (O.Y),
                     Gdouble (Float (R) * 1_000.0 * K), 0.0, 2.0 * Pi);
          Cairo.Stroke (Cr);
-         Text_At (Cr, O.X + 4.0, O.Y - Float (R) * 1_000.0 * K - 2.0,
+         --  Sous le cercle, pas au-dessus : en veille 3D le dernier cercle
+         --  frole le haut de la zone et son etiquette y etait coupee.
+         Text_At (Cr, O.X + 4.0, O.Y - Float (R) * 1_000.0 * K + 13.0,
                   Img (R) & " m");
       end loop;
 
@@ -948,8 +1018,8 @@ package body Console_Ui is
          Draw_Plan (Cr, W, H);
       else
          Cairo.Set_Source_Rgb (Cr, 0.62, 0.66, 0.64);
-         Text_At (Cr, W / 2.0 - 150.0, H / 2.0,
-                  "Aucune source : choisir, puis Démarrer");
+         Text_Centered (Cr, W / 2.0, H / 2.0,
+                        "Aucune source : choisir, puis Démarrer");
       end if;
 
       if Mode /= None
@@ -957,7 +1027,7 @@ package body Console_Ui is
       then
          Cairo.Set_Source_Rgba (Cr, 0.95, 0.75, 0.30, 0.16);
          Cairo.Set_Font_Size (Cr, 92.0);
-         Text_At (Cr, W / 2.0 - 180.0, H / 2.0 + 30.0, "SIMULÉ");
+         Text_Centered (Cr, W / 2.0, H / 2.0 + 30.0, "SIMULÉ");
       end if;
 
       Draw_Last_Ms := Float (RT.To_Duration (RT.Clock - T0)) * 1_000.0;
@@ -1022,16 +1092,7 @@ package body Console_Ui is
             if Hit = 0 then
                Lbl_Detail.Set_Text ("");
             else
-               declare
-                  T : View_Track renames Shown (Hit);
-               begin
-                  Lbl_Detail.Set_Text
-                    ("Piste #" & Img (T.Id) & ASCII.LF
-                     & "x " & Fixed_1 (T.X / 1_000.0) & " m, y "
-                     & Fixed_1 (T.Y / 1_000.0) & " m" & ASCII.LF
-                     & "vx " & Fixed_1 (T.Vx / 1_000.0) & " m/s, vy "
-                     & Fixed_1 (T.Vy / 1_000.0) & " m/s");
-               end;
+               Show_Detail (Shown (Hit));
             end if;
          end;
       end if;
@@ -1110,8 +1171,9 @@ package body Console_Ui is
       pragma Unreferenced (Self);
    begin
       Stop_Session;
-      Say ("Arrêté.");
+      --  Avant Say : Update_Choice_Hint reecrit la meme etiquette.
       Update_Choice_Hint;
+      Say ("Arrêté.");
    end On_Stop;
 
    procedure On_Recal (Self : access Gtk.Button.Gtk_Button_Record'Class) is
@@ -1261,7 +1323,13 @@ package body Console_Ui is
    Css : constant String :=
      "* { font-family: 'Segoe UI', sans-serif; font-size: 10pt; }" &
      ".etat { font-family: Consolas, monospace; padding: 2px 10px; }" &
-     ".note { color: #9aa5a0; }";
+     ".note { color: #9aa5a0; }" &
+     --  Sinon le * ci-dessus ecrase la chasse fixe de Set_Monospace.
+     ".monospace { font-family: Consolas, monospace; }" &
+     --  Liste plutot que menu : en menu, GTK pose l'element actif sur le
+     --  bouton, deborde en bas d'ecran et y peint une fleche de defilement
+     --  geante par-dessus les choix.
+     "combobox { -GtkComboBox-appears-as-list: 1; }";
 
    procedure Make_Label
      (L : out Gtk.Label.Gtk_Label; Text : String; Width : Gint := -1;
@@ -1362,7 +1430,8 @@ package body Console_Ui is
    end Build_Settings;
 
    function Build_Text
-     (Buffer : out Gtk.Text_Buffer.Gtk_Text_Buffer) return Gtk_Widget
+     (Buffer : out Gtk.Text_Buffer.Gtk_Text_Buffer;
+      Mono   : Boolean := False) return Gtk_Widget
    is
       V : Gtk.Text_View.Gtk_Text_View;
       S : Gtk.Scrolled_Window.Gtk_Scrolled_Window;
@@ -1373,20 +1442,30 @@ package body Console_Ui is
       V.Set_Cursor_Visible (False);
       V.Set_Left_Margin (10);
       V.Set_Top_Margin (8);
+      V.Set_Monospace (Mono);
       Gtk.Scrolled_Window.Gtk_New (S);
       S.Add (V);
       return Gtk_Widget (S);
    end Build_Text;
 
    function Build_Diagnostic return Gtk_Widget is
-      Box : Gtk.Box.Gtk_Box;
-      Lab : Gtk.Label.Gtk_Label;
+      Box    : Gtk.Box.Gtk_Box;
+      Lab    : Gtk.Label.Gtk_Label;
+      Scroll : Gtk.Scrolled_Window.Gtk_Scrolled_Window;
    begin
       Gtk.Box.Gtk_New (Box, Orientation_Vertical, 6);
       Box.Set_Border_Width (10);
       Make_Label (Lab, "Compteurs");
       Box.Pack_Start (Lab, False, False, 0);
-      Box.Pack_Start (Build_Text (Diag_Buffer), True, True, 0);
+      --  Une etiquette, pas un Text_View : Set_Text sur un tampon de texte
+      --  remettait le defilement en haut a chaque rafraichissement (5 Hz),
+      --  et le bas des compteurs devenait illisible.
+      Make_Label (Lbl_Diag, "", Style => "etat");
+      Lbl_Diag.Set_Yalign (0.0);
+      Lbl_Diag.Set_Selectable (True);
+      Gtk.Scrolled_Window.Gtk_New (Scroll);
+      Scroll.Add (Lbl_Diag);
+      Box.Pack_Start (Scroll, True, True, 0);
       Make_Label (Lab, "Journal");
       Box.Pack_Start (Lab, False, False, 0);
       Box.Pack_Start (Build_Text (Journal), True, True, 0);
@@ -1425,7 +1504,8 @@ package body Console_Ui is
       Area.On_Motion_Notify_Event (On_Motion'Access);
       Area.On_Scroll_Event (On_Scroll'Access);
       Center.Add_Named (Area, "scene");
-      Center.Add_Named (Build_Text (Sar_Buffer), "texte");
+      --  Chasse fixe : les colonnes de chiffres du rapport SAR s'alignent.
+      Center.Add_Named (Build_Text (Sar_Buffer, Mono => True), "texte");
       Row.Pack_Start (Center, True, True, 0);
 
       Gtk.Expander.Gtk_New (Exp_R, "Pistes");
@@ -1445,7 +1525,6 @@ package body Console_Ui is
    procedure Run is
       Root, Top, Bottom : Gtk.Box.Gtk_Box;
       Status   : Gtk.Grid.Gtk_Grid;
-      Views    : Gtk.Stack.Gtk_Stack;
       Switcher : Gtk.Stack_Switcher.Gtk_Stack_Switcher;
       Provider : Gtk.Css_Provider.Gtk_Css_Provider;
       Message  : Unbounded_String;
